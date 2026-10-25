@@ -5,7 +5,7 @@
  *   - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
-const VERSION = 'sica-v5';
+const VERSION = 'sica-v6';
 const C_ESTATICOS = VERSION + '-estaticos';
 const C_PAGINAS = VERSION + '-paginas';
 
@@ -26,10 +26,11 @@ const PRECARGA = [
   '/vendor/pdf.worker.min.js',
   '/img/logo6.png',
   '/img/epo6.png',
-  '/img/plantillamatutinofrente.png',
-  '/img/trantillamatutinoreverso.png',
-  '/img/plantillavespertinofrente.jpg',
-  '/img/trantillavespertinoreverso.png',
+  '/vendor/jszip.min.js',
+  '/vendor/sica-docx.js',
+  '/plantillas/FrenteMatutino.docx',
+  '/plantillas/FrenteVespertino.docx',
+  '/plantillas/Reverso.docx',
   '/manifest.webmanifest'
 ];
 
@@ -101,10 +102,10 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Imágenes (las plantillas se pueden reemplazar): primero el servidor (así se ve la plantilla nueva),
+  // Imágenes y plantillas de Word (se pueden reemplazar): primero el servidor (así se ve la plantilla nueva),
   // y si no hay internet, la última copia guardada. La página las pide con ?v=<hora>; aquí se guardan
   // por su ruta (sin el parámetro) para que sirvan sin internet y no se acumulen copias.
-  if (url.pathname.startsWith('/img/') || url.pathname.startsWith('/plantilla-oficial/')) {
+  if (url.pathname.startsWith('/img/') || url.pathname.startsWith('/plantillas/') || url.pathname.startsWith('/plantilla-oficial/')) {
     const clave = new Request(url.origin + url.pathname);
     e.respondWith(
       fetch(req).then(res => {

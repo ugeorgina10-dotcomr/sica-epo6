@@ -53,26 +53,44 @@ class ControlEscolarController extends Controller
 
     /**
      * Guarda la plantilla oficial (frente o reverso) de un turno EN LA BASE DE DATOS.
-     * Se guarda en la base de datos y no en archivos de public/img.
+     * La plantilla es un archivo de Word (.docx); el navegador lo lee y escribe encima los datos del alumno.
      */
     public function plantillaOficial(Request $request, string $lado): JsonResponse
     {
         abort_unless(in_array($lado, ['frente', 'reverso'], true), 404);
 
         $request->validate([
-            'archivo' => 'required|file|mimes:png|max:5120',
+            'archivo' => 'required|file|max:10240|extensions:docx',
             'turno'   => 'required|in:Matutino,Vespertino',
+        ], [
+            'archivo.extensions' => 'La plantilla debe ser un archivo de Word en formato .docx.',
+            'archivo.max'        => 'El archivo de Word pesa demasiado (máximo 10 MB).',
         ]);
 
+        $ruta = $request->file('archivo')->getRealPath();
+
+        // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo
+        if (class_exists(\ZipArchive::class)) {
+            $zip = new \ZipArchive();
+            $ok  = $zip->open($ruta) === true && $zip->locateName('word/document.xml') !== false;
+            $zip->close();
+            if (!$ok) {
+                return response()->json(['ok' => false, 'message' => 'El archivo no es un documento de Word (.docx) válido.'], 422);
+            }
+        }
+
+        $turno = $request->input('turno');
         Ajuste::updateOrCreate(
-            ['clave' => self::clavePlantilla($request->input('turno'), $lado)],
-            ['valor' => base64_encode(file_get_contents($request->file('archivo')->getRealPath()))]
+            ['clave' => self::clavePlantilla($turno, $lado)],
+            ['valor' => base64_encode(file_get_contents($ruta))]
         );
+        // Las plantillas anteriores eran imágenes (.png): ya no se usan
+        Ajuste::where('clave', self::clavePlantillaImagenVieja($turno, $lado))->delete();
 
         return response()->json(['ok' => true]);
     }
 
-    /** Sirve la plantilla guardada en la BD; si no hay, 404 y la página usa la que viene en public/img */
+    /** Sirve la plantilla (Word) guardada en la BD; si no hay, 404 y la página usa la que viene en public/plantillas */
     public function verPlantillaOficial(string $turno, string $lado)
     {
         abort_unless(in_array($turno, ['Matutino', 'Vespertino'], true) && in_array($lado, ['frente', 'reverso'], true), 404);
@@ -81,7 +99,7 @@ class ControlEscolarController extends Controller
         abort_unless($a && $a->valor, 404);
 
         $respuesta = response(base64_decode($a->valor), 200, [
-            'Content-Type'  => 'image/png',
+            'Content-Type'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'Cache-Control' => 'no-cache',
         ]);
         $respuesta->setEtag(md5($a->valor));
@@ -94,12 +112,18 @@ class ControlEscolarController extends Controller
     public function borrarPlantillaOficial(string $turno, string $lado): JsonResponse
     {
         abort_unless(in_array($turno, ['Matutino', 'Vespertino'], true) && in_array($lado, ['frente', 'reverso'], true), 404);
-        Ajuste::where('clave', self::clavePlantilla($turno, $lado))->delete();
+        Ajuste::whereIn('clave', [self::clavePlantilla($turno, $lado), self::clavePlantillaImagenVieja($turno, $lado)])->delete();
 
         return response()->json(['ok' => true]);
     }
 
     private static function clavePlantilla(string $turno, string $lado): string
+    {
+        return 'plantilla_docx_' . strtolower($turno) . '_' . $lado;
+    }
+
+    /** Clave que usaban las plantillas en imagen (ya eliminadas) */
+    private static function clavePlantillaImagenVieja(string $turno, string $lado): string
     {
         return 'plantilla_' . strtolower($turno) . '_' . $lado;
     }

@@ -239,23 +239,27 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <!-- ===== PLANTILLA OFICIAL DE CREDENCIALES (solo Control Escolar, dentro del Portal del Alumno) ===== -->
  <div id="bloque-plantilla-oficial" class="p-4 bg-white rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Plantilla Oficial de Credenciales <span id="turno-plantilla-actual" class="badge bg-secondary ms-2 align-middle">Matutino</span></h6>
- <p class="text-muted small mb-3">Reemplaza el diseño oficial (frente y reverso) para <b>todos los grupos del turno elegido</b> (usa los botones Matutino / Vespertino de abajo para cambiar de turno). Cada turno tiene su propia plantilla (cambia el C.C.T.). La imagen debe conservar las mismas proporciones y la misma distribución que la actual (frente 797×541, reverso 930×575 px, o mayor con la misma proporción) para que nombre, CURP, grado, grupo, turno y QR caigan en su lugar.</p>
+ <p class="text-muted small mb-2">Aquí se suben los <b>diseños de la credencial hechos en Word (.docx)</b>, uno de frente y uno de reverso por turno. Valen para <b>todos los grupos del turno elegido</b> (usa los botones Matutino / Vespertino de abajo para cambiar de turno; cada turno tiene su propio frente porque cambia el C.C.T.).</p>
+ <p class="text-muted small mb-3">Cuando quieras cambiar el diseño, edítalo en Word, <b>guárdalo como .docx</b> y súbelo aquí: el sistema vuelve a acomodar solo el nombre, CURP, grado, grupo, turno y el código QR. En el frente deben existir el cuadro con el texto <b>QR</b> y las etiquetas <b>NOMBRE DEL ESTUDIANTE:, CURP:, GRADO:, GRUPO:, TURNO:</b>. Los archivos originales están en la carpeta <code>public/plantillas</code> y se usan mientras no subas uno nuevo.</p>
  <div class="row g-3">
  <div class="col-md-6">
- <label class="form-label small">Frente (.png/.jpg)</label>
+ <label class="form-label small">Frente (.docx)</label>
  <div class="input-group input-group-sm mb-2">
- <input type="file" class="form-control" id="input-plantilla-oficial-frente" accept="image/png,image/jpeg">
+ <input type="file" class="form-control" id="input-plantilla-oficial-frente" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
  <button class="btn btn-vinotinto" type="button" onclick="subirPlantillaOficial('frente')">Actualizar</button>
  </div>
- <img id="prev-plantilla-oficial-frente" class="preview-credencial preview-plantilla" alt="Frente actual">
+ <canvas id="prev-plantilla-oficial-frente" class="preview-credencial" width="380" height="240" style="display:none;max-width:100%"></canvas>
+ <div id="msg-prev-plantilla-frente" class="small text-muted text-center mt-1"></div>
  </div>
  <div class="col-md-6">
- <label class="form-label small">Reverso (.png/.jpg)</label>
+ <label class="form-label small">Reverso (.docx)</label>
  <div class="input-group input-group-sm mb-2">
- <input type="file" class="form-control" id="input-plantilla-oficial-reverso" accept="image/png,image/jpeg">
+ <input type="file" class="form-control" id="input-plantilla-oficial-reverso" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
  <button class="btn btn-vinotinto" type="button" onclick="subirPlantillaOficial('reverso')">Actualizar</button>
  </div>
- <img id="prev-plantilla-oficial-reverso" class="preview-credencial preview-plantilla" alt="Reverso actual">
+ <div class="form-check small mb-2"><input class="form-check-input" type="checkbox" id="plantilla-ambos-turnos" checked><label class="form-check-label" for="plantilla-ambos-turnos">Usar este reverso en los dos turnos</label></div>
+ <canvas id="prev-plantilla-oficial-reverso" class="preview-credencial" width="380" height="240" style="display:none;max-width:100%"></canvas>
+ <div id="msg-prev-plantilla-reverso" class="small text-muted text-center mt-1"></div>
  </div>
  </div>
  <button class="btn btn-outline-dark btn-sm mt-3" onclick="restaurarPlantillaOficial()">
@@ -303,7 +307,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <tbody id="tabla-alumnos-credencial"></tbody>
  </table>
  </div>
- <button onclick="descargarCredencialesPDF()" class="btn btn-vinotinto w-100 py-3 shadow-sm btn-accion-restringida">
+ <div class="d-flex align-items-center gap-2 mb-2 flex-wrap"><label class="small fw-semibold m-0" for="sel-hoja-pdf-grupo">Tamaño de hoja al imprimir:</label><select id="sel-hoja-pdf-grupo" class="form-select form-select-sm sel-hoja-pdf" style="max-width:250px" onchange="cambiarHoja(this.value)"><option value="carta">Carta (21.6 × 27.9 cm)</option><option value="oficio">Oficio (21.6 × 33.0 cm)</option></select></div>
+ <button id="btn-pdf-grupo" onclick="descargarCredencialesPDF()" class="btn btn-vinotinto w-100 py-3 shadow-sm btn-accion-restringida">
  Descargar Credenciales Completas del Grupo (Frente y Reverso)
  </button>
  </div>
@@ -318,21 +323,22 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <input type="text" id="edit-curp-alumno" class="form-control form-control-sm" oninput="actualizarVistaPreviaCredencial()"></div>
  <div class="mb-3"><label class="form-label small">Nombre Completo (Apellido paterno, Apellido materno y Nombre)</label>
  <input type="text" id="edit-nombre-alumno" class="form-control form-control-sm" oninput="actualizarVistaPreviaCredencial()"></div>
- <div class="d-flex gap-2">
+ <div class="d-flex align-items-center gap-2 mb-2 flex-wrap"><label class="small fw-semibold m-0" for="sel-hoja-pdf-individual">Tamaño de hoja al imprimir:</label><select id="sel-hoja-pdf-individual" class="form-select form-select-sm sel-hoja-pdf" style="max-width:250px" onchange="cambiarHoja(this.value)"><option value="carta">Carta (21.6 × 27.9 cm)</option><option value="oficio">Oficio (21.6 × 33.0 cm)</option></select></div>
+  <div class="d-flex gap-2">
  <button onclick="guardarCambiosCredencial()" class="btn btn-success w-100 btn-accion-restringida">Guardar Cambios</button>
- <button onclick="descargarCredencialIndividual()" class="btn btn-vinotinto w-100 btn-accion-restringida">Descargar PDF</button>
+ <button id="btn-pdf-individual" onclick="descargarCredencialIndividual()" class="btn btn-vinotinto w-100 btn-accion-restringida">Descargar PDF</button>
  </div>
  </div>
  <div class="col-md-6">
  <label class="form-label small d-block text-center">Vista previa (se actualiza mientras editas)</label>
  <div class="row g-2">
- <div class="col-6 text-center">
+ <div class="col-12 text-center">
  <span class="d-block small text-muted mb-1">Frente</span>
- <canvas id="preview-canvas-frente" width="380" height="258" class="preview-credencial"></canvas>
+ <canvas id="preview-canvas-frente" width="380" height="240" class="preview-credencial" style="max-width:480px"></canvas>
  </div>
- <div class="col-6 text-center">
+ <div class="col-12 text-center">
  <span class="d-block small text-muted mb-1">Reverso</span>
- <canvas id="preview-canvas-reverso" width="380" height="258" class="preview-credencial"></canvas>
+ <canvas id="preview-canvas-reverso" width="380" height="240" class="preview-credencial" style="max-width:480px"></canvas>
  </div>
  </div>
  </div>
@@ -623,7 +629,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 (function(){
  const base = "{{ asset('vendor') }}/";
  const grupos = [
-  ['html5-qrcode.min.js', 'qrious.min.js', 'chart.umd.min.js'],       // escáner, QR y gráficas
+  ['html5-qrcode.min.js', 'qrious.min.js', 'chart.umd.min.js', 'jszip.min.js', 'sica-docx.js'],   // escáner, QR, gráficas y lector de plantillas Word
   ['xlsx.full.min.js', 'jspdf.umd.min.js', 'pdf.min.js'],             // Excel, PDF y lector de PDF
   ['jspdf.plugin.autotable.min.js']                                   // depende de jsPDF
  ];
@@ -1289,7 +1295,7 @@ function mostrarSeccion(id) {
  if (id === 'vista-login') actualizarCredenciales();
  if (id === 'vista-sistema') {
  const rol = rolActivo = $('#rol-select').val();
- if (!plantillasPedidas && !(ES_MOVIL && rol === 'orientador')) { plantillasPedidas = true; cargarPlantillasDefault(); }   // las 4 imágenes pesadas solo se bajan al entrar
+ if (!plantillasPedidas && !(ES_MOVIL && rol === 'orientador')) { plantillasPedidas = true; cargarPlantillasDefault(); }   // las plantillas de Word solo se bajan al entrar
  $('#badge-rol-activo').text('Rol: ' + nombresRoles[rol] + (orientadorActivo ? ' — ' + orientadorActivo.nombre : ''));
  indicePanelActual = 0;
  if (rol === 'orientador') {
@@ -2208,131 +2214,124 @@ function descargarComparativaGradoExcel(grado) {
  const filas = datos.map(g => ({Grupo: nomGrado[grado] + ' ' + g.grupo, Turno: g.turno, 'Orientador(a)': g.orientador, Alumnos: g.alumnos, Asistencias: g.asistencias, Retardos: g.retardos, Permanencias: g.permanencias}));
  descargar('comparativa_' + nomGrado[grado] + '_grado_' + hoy(), filas, 'Excel', 'Comparativa - ' + nomGrado[grado] + ' grado - ' + tp);
 }
-/* ============ PLANTILLAS OFICIALES POR TURNO (frente y reverso) ============
- Cada turno tiene su propia plantilla (cambia el C.C.T.). Se cargan una sola vez desde /public/img
- al abrir el sistema y se guardan en memoria como dataURL, para usarse en la vista previa y en el PDF.
- El PRIMER nombre de cada lista es el que guarda el servidor al subir una plantilla nueva
- (plantillamatutinofrente.png, plantillavespertinoreverso.png, etc.); los siguientes son los nombres
- originales de tus archivos, que se usan mientras no se haya subido una plantilla nueva.
- Se agrega ?v=Date.now() para que el navegador no use una imagen vieja en caché. Si Control Escolar
- subió una plantilla nueva en este navegador (plantillaOficial[turno]), esa tiene prioridad. */
+/* ============ PLANTILLAS OFICIALES EN WORD (frente y reverso, por turno) ============
+ Las plantillas son archivos de Word (.docx). El sistema los lee (public/vendor/sica-docx.js), los acomoda
+ y escribe encima nombre, CURP, grado, grupo, turno y el QR de cada alumno.
+ Cada plantilla se busca en este orden:
+   1) la que Control Escolar subió desde el bloque "Plantilla Oficial de Credenciales" (queda en la base de datos)
+   2) el archivo original de public/plantillas (FrenteMatutino.docx, FrenteVespertino.docx, Reverso.docx) */
 const ARCHIVOS_PLANTILLA = {
- Matutino: {
-  frente:  ['plantillamatutinofrente.png', 'plantillamatutinofrente.jpg'],
-  reverso: ['plantillamatutinoreverso.png', 'trantillamatutinoreverso.png']
- },
- Vespertino: {
-  frente:  ['plantillavespertinofrente.png', 'plantillavespertinofrente.jpg'],
-  reverso: ['plantillavespertinoreverso.png', 'trantillavespertinoreverso.png']
- }
+ Matutino:   {frente: 'FrenteMatutino.docx',   reverso: 'Reverso.docx'},
+ Vespertino: {frente: 'FrenteVespertino.docx', reverso: 'Reverso.docx'}
 };
-const BASE_IMG = "{{ asset('img') }}/";
+const BASE_PLANTILLAS = "{{ asset('plantillas') }}/";
 let plantillasPedidas = false;
+const errorPlantilla = {};   // 'Matutino-frente' -> texto del problema, si lo hay
+try { localStorage.removeItem('sica_epo6_plantilla_oficial'); } catch (e) {}   // ya no se guardan imágenes de plantilla en el navegador
 function cargarPlantillasDefault() {
- Object.keys(ARCHIVOS_PLANTILLA).forEach(turno => {
-  ['frente','reverso'].forEach(lado => {
-   // Primero la que Control Escolar subió (guardada en la base de datos); si no hay, la original de public/img
-   const lista = ['/plantilla-oficial/' + turno + '/' + lado].concat(ARCHIVOS_PLANTILLA[turno][lado]);
-   const intentar = i => {
-    if (i >= lista.length) { console.warn('No se encontró la plantilla ' + turno + ' ' + lado + ' en public/img'); return; }
-    const img = new Image();
-    img.onload = () => {
-     const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
-     c.getContext('2d').drawImage(img, 0, 0);
-     plantillasDefault[turno][lado] = c.toDataURL('image/png');
-     refrescarPreviewPlantillaOficial();
-     if (idEditando) actualizarVistaPreviaCredencial();
-    };
-    img.onerror = () => intentar(i + 1);
-    img.src = (lista[i].charAt(0) === '/' ? lista[i] : BASE_IMG + lista[i]) + '?v=' + Date.now();
+ const hecho = (turno, lado, modelo, error) => {
+  plantillasDefault[turno][lado] = modelo;
+  if (error) errorPlantilla[turno + '-' + lado] = error; else delete errorPlantilla[turno + '-' + lado];
+  refrescarPreviewPlantillaOficial();
+  if (idEditando) actualizarVistaPreviaCredencial();
+ };
+ (window.SICA_LIBS_LISTAS || Promise.resolve()).then(() => {
+  if (!window.SicaDocx) { Object.keys(plantillasDefault).forEach(t => ['frente','reverso'].forEach(l => hecho(t, l, null, 'No se pudo cargar el lector de plantillas de Word.'))); return; }
+  Object.keys(ARCHIVOS_PLANTILLA).forEach(turno => ['frente','reverso'].forEach(lado => {
+   const intentos = ['/plantilla-oficial/' + turno + '/' + lado, BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[turno][lado]];
+   const probar = (i, ultimoError) => {
+    if (i >= intentos.length) return hecho(turno, lado, null, ultimoError || ('No se encontró la plantilla de Word (' + ARCHIVOS_PLANTILLA[turno][lado] + ' en public/plantillas).'));
+    fetch(intentos[i] + '?v=' + Date.now(), {credentials: 'same-origin'})
+     .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
+     .then(buf => SicaDocx.cargar(buf))
+     .then(m => hecho(turno, lado, m))
+     .catch(e => probar(i + 1, e === 'no-esta' || !e ? ultimoError : 'El archivo de Word no se pudo leer: ' + (e.message || e)));
    };
-   intentar(0);
-  });
+   probar(0, '');
+  }));
  });
 }
-/* Devuelve {img,fmt} de la plantilla del turno y lado indicados (o null si aún no cargó). */
+/* Devuelve la plantilla (ya leída) del turno y lado indicados, o null si aún no carga. */
 function plantillaDe(turno, lado) {
  const t = plantillasDefault[turno || 'Matutino'];
- return (t && t[lado]) ? {img: t[lado], fmt:'PNG'} : null;
+ return (t && t[lado]) || null;
 }
-/* ============ PLANTILLA OFICIAL EDITABLE (solo Control Escolar) ============
- Reemplaza la plantilla oficial de frente/reverso del turno elegido para todos sus grupos.
- - En el navegador: se usa de inmediato (vista previa y PDF).
- - En el servidor: se envía a /api/sica/plantilla-oficial/{lado} con el campo "turno"
- (ControlEscolarController@plantillaOficial), que sobrescribe public/img/plantilla{turno}{lado}.png. */
-const LS_PL = 'sica_epo6_plantilla_oficial'; // clave aparte para no inflar el localStorage principal
-let plantillaOficial = {}; // {Matutino:{frente:{img},reverso:{img}}, Vespertino:{...}}
-try { plantillaOficial = JSON.parse(localStorage.getItem(LS_PL) || '{}'); } catch (e) { plantillaOficial = {}; }
-const RATIO_PLANTILLA = {frente: 797/541, reverso: 930/575};
-
-/* CAMBIO: muestra la plantilla del turno elegido. Si esa plantilla aún no está cargada,
- oculta la imagen para que no se quede la del otro turno. */
+/* Falta algo en el Word del frente? (cuadro QR o etiquetas) -> lista de textos */
+function problemasFrente(m) {
+ const faltan = [];
+ if (!m.qr) faltan.push('el cuadro con el texto "QR"');
+ ['nombre','curp','grado','grupo','turno'].forEach(k => { if (!m.campos[k]) faltan.push('la etiqueta ' + (k === 'nombre' ? 'NOMBRE DEL ESTUDIANTE:' : k.toUpperCase() + ':')); });
+ return faltan;
+}
 function refrescarPreviewPlantillaOficial() {
  const t = turnoCred || 'Matutino';
  $('#turno-plantilla-actual').text(t);
  ['frente','reverso'].forEach(l => {
-  const src = (plantillasDefault[t] && plantillasDefault[t][l]) || '';
-  if (src) $('#prev-plantilla-oficial-' + l).attr('src', src).show();
-  else $('#prev-plantilla-oficial-' + l).removeAttr('src').hide();
+  const cv = document.getElementById('prev-plantilla-oficial-' + l);
+  if (!cv) return;
+  const m = plantillasDefault[t] && plantillasDefault[t][l];
+  const msg = $('#msg-prev-plantilla-' + l);
+  if (m && window.SicaDocx) {
+   SicaDocx.dibujar(cv, m, null, {ancho: 900});
+   $(cv).show();
+   const falta = l === 'frente' ? problemasFrente(m) : [];
+   msg.toggleClass('text-danger', falta.length > 0).toggleClass('text-muted', !falta.length)
+    .text(falta.length ? 'Este Word no tiene ' + falta.join(', ') + '.' : '');
+  } else {
+   $(cv).hide();
+   msg.removeClass('text-danger').addClass('text-muted').text(errorPlantilla[t + '-' + l] || 'Cargando plantilla…');
+  }
  });
 }
+/* ============ PLANTILLA OFICIAL EDITABLE (solo Control Escolar) ============
+ Sube un Word (.docx) nuevo para el turno elegido: se lee aquí mismo (vista previa y PDF al instante)
+ y se guarda en el servidor (ControlEscolarController@plantillaOficial) para todos los equipos. */
 function subirPlantillaOficial(lado) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede cambiar la plantilla oficial.'); return; }
  const turno = turnoCred || 'Matutino';
  const f = $('#input-plantilla-oficial-' + lado)[0].files[0];
- if (!f) { alert('Selecciona la imagen de la nueva plantilla.'); return; }
- if (!/^image\/(png|jpe?g)$/.test(f.type)) { alert('Solo se aceptan imágenes .png o .jpg.'); return; }
- const url = URL.createObjectURL(f), img = new Image();
- img.onload = () => {
- URL.revokeObjectURL(url);
- const ratio = img.naturalWidth / img.naturalHeight, esperado = RATIO_PLANTILLA[lado];
- if (Math.abs(ratio - esperado) / esperado > 0.02) {
- alert('La imagen mide ' + img.naturalWidth + '×' + img.naturalHeight + ' y no tiene la proporción de la credencial (' +
- esperado.toFixed(3) + ':1). Si se acepta, nombre, CURP y QR quedarían desalineados.');
- return;
- }
- // Siempre se normaliza a PNG
- const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
- c.getContext('2d').drawImage(img, 0, 0);
- const dataURL = c.toDataURL('image/png');
- plantillaOficial[turno] = plantillaOficial[turno] || {};
- plantillaOficial[turno][lado] = {img: dataURL, fmt: 'PNG'};
- let aviso = '';
- try { localStorage.setItem(LS_PL, JSON.stringify(plantillaOficial)); }
- catch (e) { aviso = ' (la imagen es muy pesada para guardarla en este navegador; solo quedará en el servidor)'; }
- plantillasDefault[turno][lado] = dataURL; // se usa de inmediato en vista previa y PDF
- refrescarPreviewPlantillaOficial();
- if (idEditando) actualizarVistaPreviaCredencial();
- // Reemplazo real del archivo en el servidor
- c.toBlob(blob => {
- const fd = new FormData();
- fd.append('archivo', blob, 'plantilla' + turno.toLowerCase() + lado + '.png');
- fd.append('turno', turno);
- fetch('/api/sica/plantilla-oficial/' + lado, {
- method: 'POST',
- headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
- body: fd
- }).then(r => r.ok ? r.json() : Promise.reject())
- .then(() => $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success')
- .text('¡Plantilla ' + turno + ' (' + lado + ') actualizada con éxito en el servidor! Las nuevas credenciales de ese turno ya se generarán con este diseño.'))
- .catch(() => $('#resumen-plantilla-oficial').removeClass('text-success').addClass('text-danger')
- .text('Plantilla ' + turno + ' (' + lado + ') actualizada solo en este navegador; el servidor no respondió.' + aviso));
- }, 'image/png');
- $('#input-plantilla-oficial-' + lado).val('');
- };
- img.onerror = () => alert('No se pudo leer la imagen.');
- img.src = url;
+ if (!f) { alert('Selecciona el archivo de Word (.docx) de la nueva plantilla.'); return; }
+ if (!/\.docx$/i.test(f.name)) { alert('Solo se aceptan archivos de Word en formato .docx (en Word: Archivo > Guardar como > Documento de Word).'); return; }
+ if (!libsOk('SicaDocx')) return;
+ const caja = $('#resumen-plantilla-oficial');
+ caja.removeClass('text-success text-danger').addClass('text-muted').text('Leyendo el Word…');
+ f.arrayBuffer().then(buf => SicaDocx.cargar(buf)).then(m => {
+  if (lado === 'frente') {
+   const falta = problemasFrente(m);
+   if (falta.length && !confirm('En este Word no encontré ' + falta.join(', ') + '. Los datos del alumno no caerían bien en la credencial.\n\n¿Subirlo de todos modos?')) { caja.text(''); return; }
+  }
+  const turnos = (lado === 'reverso' && $('#plantilla-ambos-turnos').is(':checked')) ? ['Matutino', 'Vespertino'] : [turno];
+  turnos.forEach(t => { plantillasDefault[t][lado] = m; delete errorPlantilla[t + '-' + lado]; });   // se usa de inmediato
+  refrescarPreviewPlantillaOficial();
+  if (idEditando) actualizarVistaPreviaCredencial();
+  caja.removeClass('text-success text-danger').addClass('text-muted').text('Guardando en el servidor…');
+  return Promise.all(turnos.map(t => {
+   const fd = new FormData();
+   fd.append('archivo', f, f.name);
+   fd.append('turno', t);
+   return fetch('/api/sica/plantilla-oficial/' + lado, {
+    method: 'POST',
+    headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
+    body: fd
+   }).then(r => r.ok ? r.json() : r.json().catch(() => ({})).then(d => Promise.reject((d && (d.message || d.mensaje)) || ('error ' + r.status))));
+  })).then(() => {
+   caja.removeClass('text-muted text-danger').addClass('text-success')
+    .text('¡Plantilla ' + turnos.join(' y ') + ' (' + lado + ') actualizada con éxito! Las credenciales de ' + (turnos.length > 1 ? 'los dos turnos' : 'ese turno') + ' ya se generan con este diseño.');
+  }, e => {
+   caja.removeClass('text-muted text-success').addClass('text-danger')
+    .text('Plantilla actualizada solo en este navegador; el servidor no la guardó (' + e + ').');
+  });
+ }).catch(e => {
+  caja.removeClass('text-muted text-success').addClass('text-danger').text('No se pudo leer ese Word: ' + (e && e.message ? e.message : e));
+ }).then(() => $('#input-plantilla-oficial-' + lado).val(''));
 }
 function restaurarPlantillaOficial() {
  if (rolActivo !== 'control') return;
  const t = turnoCred || 'Matutino';
- if (!confirm('¿Volver a la plantilla original del turno ' + t + '?')) return;
- ['frente','reverso'].forEach(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers:{'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''}}).catch(() => {}));
- delete plantillaOficial[t];
- try { localStorage.setItem(LS_PL, JSON.stringify(plantillaOficial)); } catch (e) {}
- plantillasDefault[t] = {frente:null, reverso:null};
- cargarPlantillasDefault(); // vuelve a leer de /public/img
- setTimeout(refrescarPreviewPlantillaOficial, 800);
+ if (!confirm('¿Volver a la plantilla original (la de la carpeta public/plantillas) del turno ' + t + '?')) return;
+ const cab = {'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''};
+ Promise.all(['frente','reverso'].map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers: cab}).catch(() => {})))
+  .then(() => { plantillasDefault[t] = {frente: null, reverso: null}; cargarPlantillasDefault(); });
  $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success').text('Se restauró la plantilla original del turno ' + t + ' en el servidor.');
 }
 /* ============ PORTAL DEL ALUMNO / CREDENCIALES ============ */
@@ -2399,131 +2398,122 @@ function actualizarVistaPreviaCredencial() {
  pintarCredencialCanvas(document.getElementById('preview-canvas-frente'), datosPreview, 'frente');
  pintarCredencialCanvas(document.getElementById('preview-canvas-reverso'), datosPreview, 'reverso');
 }
-/* Dibuja una credencial (frente o reverso) en un <canvas>. Es la misma lógica que se usa para
- generar las imágenes que después se insertan en el PDF, así la vista previa es idéntica al resultado final. */
-// Coordenadas medidas sobre la plantilla oficial (tamaño original 797x541). La plantilla vespertina
-// tiene la misma proporción y distribución, así que usa las mismas coordenadas.
-// Se escalan solas (factor k) sin importar si el canvas es la vista previa chica o el de alta
-// resolución para el PDF, siempre que mantengan esta misma proporción (797:541).
-// CURP, grado, grupo y turno van A LA DERECHA de su etiqueta y el texto se encoge solo (maxW)
-// para no encimarse con la siguiente etiqueta (p. ej. "GRUPO:").
-// Si algún dato queda desalineado, ajusta solo su x (derecha +) o y (abajo +).
-const REF_FRENTE_W = 797;
-const CAMPOS_FRENTE = {
- nombre: {x: 38,  y: 294, maxW: 370, fontMax: 16},  // alineado con el borde izquierdo de "NOMBRE DEL ESTUDIANTE"
- curp:   {x: 134, y: 331, font: 14, maxW: 275},   // CURP, GRADO y TURNO comparten la misma columna (x=134)
- grado:  {x: 134, y: 382, font: 11, maxW: 52},    // termina antes de la etiqueta "GRUPO:"
- grupo:  {x: 282, y: 382, font: 14, maxW: 40},    // justo después de la etiqueta "GRUPO:"
- turno:  {x: 134, y: 437, font: 14, maxW: 250},
- qr:     {x: 423, y: 261, lado: 122}
-};
-function pintarCredencialCanvas(canvas, a, lado, onListo) {
- if (!canvas) return;
- const ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
- ctx.clearRect(0, 0, w, h);
- const pl = plantillaDe(a.turno, lado); // plantilla del turno del alumno
- const terminar = () => { if (onListo) onListo(); };
- const dibujarContenido = () => {
- if (lado !== 'frente') { terminar(); return; } // el reverso ya viene completo en tu plantilla
- const k = w / REF_FRENTE_W; // factor de escala: plantilla real -> este canvas
- ctx.fillStyle = '#000';
- if (!pl) { // respaldo mínimo si no hay plantilla cargada
- ctx.fillStyle = '#800020'; ctx.fillRect(0, 0, w, h * 0.14);
- ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(h * 0.06) + 'px Segoe UI';
- ctx.fillText('EPO 6 - Credencial Digital', w * 0.03, h * 0.09);
- ctx.fillStyle = '#000';
- }
- // Nombre: negritas, MAYÚSCULAS, se encoge solo si no cabe
- const c = CAMPOS_FRENTE.nombre, nombreTxt = (a.nombre || '(SIN NOMBRE)').toUpperCase();
- let tam = c.fontMax * k;
- ctx.font = 'bold ' + Math.round(tam) + 'px Segoe UI';
- while (ctx.measureText(nombreTxt).width > c.maxW * k && tam > 9 * k) {
- tam -= k * 0.5; ctx.font = 'bold ' + Math.round(tam) + 'px Segoe UI';
- }
- ctx.fillText(nombreTxt, c.x * k, c.y * k);
- // CURP / Grado / Grupo / Turno: negritas, MAYÚSCULAS, se encogen solos si no caben
- ['curp','grado','grupo','turno'].forEach(campo => {
- const d = CAMPOS_FRENTE[campo];
- const valor = String(campo === 'curp'  ? (a.curp || '(SIN CURP)')
- : campo === 'grado' ? (nomGrado[a.grado] || '')
- : campo === 'grupo' ? (ROMANOS[a.grupo] || String(a.grupo || ''))
- : (a.turno || '')).toUpperCase();
- let t = d.font * k;
- ctx.font = 'bold ' + Math.round(t) + 'px Segoe UI';
- while (ctx.measureText(valor).width > d.maxW * k && t > 7 * k) {
- t -= k * 0.5; ctx.font = 'bold ' + Math.round(t) + 'px Segoe UI';
- }
- ctx.fillText(valor, d.x * k, d.y * k);
- });
- // QR único por alumno (se genera con su propia CURP)
- if (a.curp) {
- const qr = new Image(), ladoQR = CAMPOS_FRENTE.qr.lado * k;
- qr.onload = () => { ctx.drawImage(qr, CAMPOS_FRENTE.qr.x * k, CAMPOS_FRENTE.qr.y * k, ladoQR, ladoQR); terminar(); };
- qr.onerror = terminar;
- qr.src = qrImg(a.curp);
- } else { terminar(); }
+/* Datos que se escriben sobre la plantilla de Word. El nombre va como se guardó:
+   Apellido paterno, Apellido materno y Nombre(s). */
+function datosCredencial(a) {
+ return {
+  nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)', conQR: !!a.curp,
+  grado: nomGrado[a.grado] || '', gradoCorto: a.grado ? a.grado + '°' : '',
+  grupo: ROMANOS[a.grupo] || String(a.grupo || ''), turno: a.turno || ''
  };
- if (pl && pl.img) {
- const tpl = new Image();
- tpl.onload = () => { ctx.drawImage(tpl, 0, 0, w, h); dibujarContenido(); };
- tpl.onerror = dibujarContenido;
- tpl.src = pl.img;
- } else {
- ctx.fillStyle = '#f4f6f9'; ctx.fillRect(0, 0, w, h);
- dibujarContenido();
- }
 }
-/* Genera, para insertar en un PDF, las imágenes (dataURL) de frente y reverso de un alumno,
- usando un canvas oculto de alta resolución (para que se vea nítido al imprimir). */
-function generarImagenesCredencialPDF(a, cb) {
- const cFrente = document.createElement('canvas'); cFrente.width = 950; cFrente.height = 645;
- const cReverso = document.createElement('canvas'); cReverso.width = 950; cReverso.height = 645;
- let listos = 0;
- const revisar = () => { if (++listos === 2) cb(cFrente.toDataURL('image/png'), cReverso.toDataURL('image/png')); };
- pintarCredencialCanvas(cFrente, a, 'frente', revisar);
- pintarCredencialCanvas(cReverso, a, 'reverso', revisar);
+/* Dibuja una credencial (frente o reverso) en un <canvas> sobre la plantilla de Word del turno del alumno.
+   Es la misma función de la vista previa y del PDF, así lo que se ve es lo que se imprime. */
+function pintarCredencialCanvas(canvas, a, lado, onListo, ancho) {
+ if (!canvas) return;
+ const m = plantillaDe(a.turno, lado);
+ if (!m || !window.SicaDocx) {
+  canvas.width = 380; canvas.height = 240;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f4f6f9'; ctx.fillRect(0, 0, 380, 240);
+  ctx.fillStyle = '#666'; ctx.font = '14px Segoe UI, Arial'; ctx.textAlign = 'center';
+  ctx.fillText(errorPlantilla[(a.turno || 'Matutino') + '-' + lado] || 'Cargando plantilla…', 190, 124);
+  ctx.textAlign = 'start';
+  if (onListo) onListo(null);
+  return;
+ }
+ SicaDocx.dibujar(canvas, m, datosCredencial(a), {ancho: ancho || 760});
+ if (onListo) onListo(m);
+}
+/* ---------- PDF: Carta u Oficio, credenciales a tamaño real ---------- */
+const HOJAS = {carta: {w: 215.9, h: 279.4}, oficio: {w: 215.9, h: 330.2}};   // mm
+const PT_A_MM = 25.4 / 72;
+try { const v = localStorage.getItem('sica_hoja_pdf'); if (HOJAS[v]) $(function () { $('.sel-hoja-pdf').val(v); }); } catch (e) {}
+function cambiarHoja(v) {
+ $('.sel-hoja-pdf').val(v);
+ try { localStorage.setItem('sica_hoja_pdf', v); } catch (e) {}
+}
+const hojaElegida = () => HOJAS[$('.sel-hoja-pdf').first().val()] || HOJAS.carta;
+/* Imágenes (frente y reverso) de un alumno para el PDF, con su tamaño real en mm */
+function imagenesCredencial(a) {
+ const mF = plantillaDe(a.turno, 'frente'), mR = plantillaDe(a.turno, 'reverso');
+ if (!mF || !mR) return null;
+ const cF = document.createElement('canvas'), cR = document.createElement('canvas');
+ pintarCredencialCanvas(cF, a, 'frente', null, 1100);
+ pintarCredencialCanvas(cR, a, 'reverso', null, 1100);
+ return {
+  f: {img: cF.toDataURL('image/jpeg', 0.92), w: mF.ancho * PT_A_MM, h: mF.alto * PT_A_MM},
+  r: {img: cR.toDataURL('image/jpeg', 0.92), w: mR.ancho * PT_A_MM, h: mR.alto * PT_A_MM}
+ };
+}
+/* Cómo acomodar las credenciales en la hoja para que quepan las que más se pueda:
+   frente arriba y reverso abajo, o frente y reverso lado a lado (se elige lo que más aproveche la hoja). */
+function planHoja(hoja, f, r) {
+ const margen = 8, sep = 5, junto = 3;
+ const W = hoja.w - 2 * margen, H = hoja.h - 2 * margen;
+ const opciones = [
+  {modo: 'apilado', bw: Math.max(f.w, r.w), bh: f.h + junto + r.h},
+  {modo: 'lado', bw: f.w + junto + r.w, bh: Math.max(f.h, r.h)}
+ ].map(o => {
+  o.cols = Math.max(0, Math.floor((W + sep) / (o.bw + sep)));
+  o.rows = Math.max(0, Math.floor((H + sep) / (o.bh + sep)));
+  o.n = o.cols * o.rows;
+  return o;
+ });
+ const mejor = opciones[1].n > opciones[0].n ? opciones[1] : opciones[0];
+ if (mejor.n < 1) { mejor.cols = 1; mejor.rows = 1; mejor.n = 1; }
+ return Object.assign({margen: margen, sep: sep, junto: junto}, mejor);
+}
+function generarPDFCredenciales(alumnos, nombreArchivo, boton, textoBoton, onFin) {
+ if (!libsOk('jspdf') || !libsOk('SicaDocx')) return;
+ if (!plantillaDe(alumnos[0].turno, 'frente') || !plantillaDe(alumnos[0].turno, 'reverso')) {
+  alert('La plantilla de Word de este turno todavía no está lista. ' + (errorPlantilla[alumnos[0].turno + '-frente'] || errorPlantilla[alumnos[0].turno + '-reverso'] || 'Espera unos segundos e inténtalo de nuevo.'));
+  return;
+ }
+ const hoja = hojaElegida();
+ const primera = imagenesCredencial(alumnos[0]);
+ const plan = planHoja(hoja, primera.f, primera.r);
+ const d = new window.jspdf.jsPDF({unit: 'mm', format: [hoja.w, hoja.h], orientation: 'portrait'});
+ const anchoRejilla = plan.cols * plan.bw + (plan.cols - 1) * plan.sep;
+ const x0 = Math.max((hoja.w - anchoRejilla) / 2, 0);
+ const $b = boton ? $(boton) : null;
+ if ($b) $b.prop('disabled', true);
+ let i = 0;
+ const paso = () => {
+  if (i >= alumnos.length) {
+   d.save(nombreArchivo);
+   if ($b) $b.prop('disabled', false).text(textoBoton);
+   if (onFin) onFin();
+   return;
+  }
+  const im = i === 0 ? primera : imagenesCredencial(alumnos[i]);
+  const pos = i % plan.n;
+  if (i > 0 && pos === 0) d.addPage([hoja.w, hoja.h], 'portrait');
+  const x = x0 + (pos % plan.cols) * (plan.bw + plan.sep), y = plan.margen + Math.floor(pos / plan.cols) * (plan.bh + plan.sep);
+  d.addImage(im.f.img, 'JPEG', x, y, im.f.w, im.f.h);
+  if (plan.modo === 'apilado') d.addImage(im.r.img, 'JPEG', x, y + im.f.h + plan.junto, im.r.w, im.r.h);
+  else d.addImage(im.r.img, 'JPEG', x + im.f.w + plan.junto, y, im.r.w, im.r.h);
+  i++;
+  if ($b) $b.text('Generando PDF… ' + i + ' de ' + alumnos.length);
+  setTimeout(paso, 0);   // deja respirar a la pantalla entre alumno y alumno
+ };
+ paso();
 }
 function descargarCredencialesPDF() {
  if (!permisoPermite()) return;
  const l = alumnosCred().filter(a => a.curp);
  const sinCurp = alumnosCred().length - l.length;
  if (!l.length) { alert('No hay alumnos con CURP asignado en este grupo. Sube primero la lista con CURP y nombre completo.'); return; }
- if (!libsOk('jspdf')) return;
- const d = new window.jspdf.jsPDF();
- // Tamaño de cada credencial en mm, respetando la proporción real de tus plantillas
- // (797x541 el frente, 930x575 el reverso) para que no se vean estiradas.
- const w = 90, hFrente = 61, hReverso = 56;
- const margen = 10, colGap = 8, filaGap = 8, entreFrenteReverso = 3;
- const altoPar = hFrente + entreFrenteReverso + hReverso;
- const porHoja = 4; // 2 columnas x 2 filas
- const procesarSiguiente = () => {
- if (i >= l.length) { d.save('credenciales_' + nomGrado[credSel.grado] + '_' + credSel.grupo + '_' + turnoCred + '.pdf'); if (sinCurp > 0) alert('Se descargaron ' + l.length + ' credenciales (frente y reverso). ' + sinCurp + ' alumno(s) no tienen CURP asignado todavía y no se incluyeron.'); return; }
- const a = l[i];
- generarImagenesCredencialPDF(a, (imgFrente, imgReverso) => {
- const posEnHoja = i % porHoja;
- if (i > 0 && posEnHoja === 0) d.addPage();
- const col = posEnHoja % 2, fila = Math.floor(posEnHoja / 2);
- const x = margen + col * (w + colGap);
- const y = margen + fila * (altoPar + filaGap);
- d.addImage(imgFrente, 'PNG', x, y, w, hFrente);
- d.addImage(imgReverso, 'PNG', x, y + hFrente + entreFrenteReverso, w, hReverso);
- i++; procesarSiguiente();
- });
- };
- let i = 0;
- procesarSiguiente();
+ generarPDFCredenciales(l, 'credenciales_' + nomGrado[credSel.grado] + '_' + credSel.grupo + '_' + turnoCred + '.pdf',
+  document.getElementById('btn-pdf-grupo'), 'Descargar Credenciales Completas del Grupo (Frente y Reverso)',
+  () => { if (sinCurp > 0) alert('Se descargaron ' + l.length + ' credenciales (frente y reverso). ' + sinCurp + ' alumno(s) no tienen CURP asignado todavía y no se incluyeron.'); });
 }
 function descargarCredencialIndividual() {
  if (!permisoPermite()) return;
  const a = db.alumnos.find(x => x.id === idEditando);
  if (!a.curp) { alert('Este alumno aún no tiene CURP asignado. Sube su CURP desde "Subir lista de alumnos" antes de descargar su credencial.'); return; }
- generarImagenesCredencialPDF(a, (imgFrente, imgReverso) => {
- if (!libsOk('jspdf')) return;
- const d = new window.jspdf.jsPDF();
- d.addImage(imgFrente, 'PNG', 10, 10, 95, 60);
- d.addImage(imgReverso, 'PNG', 10, 74, 95, 60);
- d.save('credencial_' + a.curp + '.pdf');
- });
+ const datos = Object.assign({}, a, {nombre: $('#edit-nombre-alumno').val().trim() || a.nombre, curp: $('#edit-curp-alumno').val().trim().toUpperCase() || a.curp});
+ generarPDFCredenciales([datos], 'credencial_' + datos.curp + '.pdf', document.getElementById('btn-pdf-individual'), 'Descargar PDF');
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
 function restaurarSesion(S) {
