@@ -686,78 +686,119 @@
   }
  }
 
- function ajustarTexto(txt, anchoMax, altoMax, tamMax, tamMin, negrita, fuente, maxLineas) {
-  const palabras = String(txt).trim().split(/\s+/);
-  for (let t = tamMax; t >= tamMin - 0.001; t -= 0.25) {
-   const lineas = [];
-   let cur = '';
-   for (const p of palabras) {
-    const prueba = cur ? cur + ' ' + p : p;
-    if (medirSimple(prueba, t, negrita, fuente) <= anchoMax || !cur) cur = prueba;
-    else { lineas.push(cur); cur = p; }
+ /* Reparte el nombre en renglones: el primero va a la derecha de la etiqueta (como CURP, GRADO...) y los demás
+    debajo, a todo lo ancho que dejen el QR y la foto. Busca la letra más grande que quepa dejando aire antes del
+    siguiente dato (CURP). Devuelve [{txt, x, y}] y el tamaño. */
+ function repartirNombre(txt, n, tope, limiteEn, FUENTE, tamMax) {
+  const palabras = String(txt).trim().split(/\s+/).filter(Boolean);
+  // El nombre va DEBAJO de su etiqueta, a todo lo ancho que dejen el QR y la foto
+  const x1 = n.izq;
+  const base0 = t => n.base + t * 1.3;
+  const anchoLinea = (k, t, inter) => {
+   const y = base0(t) + k * inter;
+   return limiteEn(n.izq, y - t, y + t * 0.3) - n.izq;
+  };
+  const intentar = (t, maxL) => {
+   const inter = t * 1.18, lineas = [];
+   let cur = '', k = 0;
+   for (const w of palabras) {
+    const prueba = cur ? cur + ' ' + w : w;
+    if (medirSimple(prueba, t, true, FUENTE) <= anchoLinea(k, t, inter) + 0.01) { cur = prueba; continue; }
+    if (!cur) return null;                         // ni una palabra sola cabe en el renglón
+    lineas.push(cur); cur = w; k++;
+    if (k >= maxL || medirSimple(cur, t, true, FUENTE) > anchoLinea(k, t, inter) + 0.01) return null;
    }
    lineas.push(cur);
-   const interlinea = t * 1.12;
-   const cabe = lineas.every(l => medirSimple(l, t, negrita, fuente) <= anchoMax + 0.01);
-   if (cabe && lineas.length <= maxLineas && lineas.length * interlinea <= altoMax + 0.01) return {t, lineas, interlinea};
+   const abajo = base0(t) + (lineas.length - 1) * inter + t * 0.25;
+   if (lineas.length > maxL || abajo > tope + 0.01) return null;
+   return {t, inter, lineas};
+  };
+  for (let t = tamMax || 9; t >= 5.4 - 0.001; t -= 0.25) {
+   const r = intentar(t, 3);
+   if (r) return arm(r);
   }
-  // No cabe ni con la letra mínima: se corta con "…" para no salirse del recuadro
-  const t = tamMin, interlinea = t * 1.12, maxL = Math.max(1, Math.min(maxLineas, Math.floor(altoMax / interlinea)));
-  const lineas = []; let cur = '';
-  for (const p of palabras) {
-   const prueba = cur ? cur + ' ' + p : p;
-   if (medirSimple(prueba, t, negrita, fuente) <= anchoMax || !cur) cur = prueba;
-   else { lineas.push(cur); cur = p; }
+  // No cabe ni con la letra mínima: se corta con "…" para no encimarse con el CURP
+  const t = 5.4, inter = t * 1.18, maxL = Math.max(1, Math.min(3, Math.floor((tope - base0(t) - t * 0.25) / inter) + 1));
+  const lineas = []; let cur = '', k = 0;
+  for (const w of palabras) {
+   const prueba = cur ? cur + ' ' + w : w;
+   if (!cur || medirSimple(prueba, t, true, FUENTE) <= anchoLinea(k, t, inter)) cur = prueba;
+   else { if (k + 1 >= maxL) { cur = prueba; break; } lineas.push(cur); cur = w; k++; }
   }
   lineas.push(cur);
-  const rec = lineas.slice(0, maxL);
-  if (lineas.length > maxL) { let u = rec[maxL - 1]; while (u.length > 1 && medirSimple(u + '…', t, negrita, fuente) > anchoMax) u = u.slice(0, -1); rec[maxL - 1] = u + '…'; }
-  return {t, lineas: rec, interlinea};
+  const ult = lineas.length - 1;
+  let u = lineas[ult];
+  const aMax = anchoLinea(ult, t, inter);
+  if (medirSimple(u, t, true, FUENTE) > aMax) { while (u.length > 1 && medirSimple(u + '…', t, true, FUENTE) > aMax) u = u.slice(0, -1); lineas[ult] = u + '…'; }
+  return arm({t, inter, lineas});
+  function arm(r) {
+   return {t: r.t, renglones: r.lineas.map((l, i) => ({txt: l, x: n.izq, y: base0(r.t) + i * r.inter}))};
+  }
  }
 
  function rellenar(ctx, m, d) {
   const C = m.campos, FUENTE = 'Arial';
-  const derecha = m.ox + m.ancho - 3;
+  const derecha = m.ox + m.ancho - 4;
   const obst = [m.qr, m.foto].filter(Boolean);
+  const AIRE = 5;   // pt de separación entre el texto y el cuadro del QR / la foto
   const limiteEn = (xDesde, yArriba, yAbajo) => {
    let lim = derecha;
-   obst.forEach(b => { if (b.x >= xDesde - 0.5 && b.y < yAbajo && b.y + b.h > yArriba) lim = Math.min(lim, b.x - 2.5); });
+   obst.forEach(b => { if (b.x >= xDesde - 0.5 && b.y < yAbajo && b.y + b.h > yArriba) lim = Math.min(lim, b.x - AIRE); });
    return lim;
   };
   ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
   const poner = (txt, x, y, tam) => { ctx.font = 'bold ' + tam + 'px Arial, "Liberation Sans", sans-serif'; ctx.fillText(txt, x, y); };
 
-  // NOMBRE: debajo de su etiqueta, en 1 a 3 renglones, lo más grande que quepa
+  // CURP / GRADO / GRUPO / TURNO: a la derecha de su etiqueta, todos con la MISMA letra
+  const valores = {curp: d.curp || '', grado: d.grado || '', grupo: d.grupo || '', turno: d.turno || ''};
+  const ks = ['curp', 'grado', 'grupo', 'turno'].filter(k => C[k] && valores[k]);
+  const limDe = (k, y) => { const l = C[k]; return Math.min(limiteEn(l.xFin + 4, y - l.size, y + 1), l.limiteDer === Infinity ? Infinity : l.limiteDer - 3); };
+  const cabe = (k, tope) => {
+   const txt = String(valores[k]).toUpperCase(), l = C[k], disp = limDe(k, l.base) - (l.xFin + 4);
+   let t = tope;
+   while (t > 5.5 && medirSimple(txt, t, true, FUENTE) > disp) t -= 0.25;
+   return t;
+  };
+  // La CURP es la más larga: toma la letra más grande que le quepa junto a su etiqueta.
+  // Grupo y turno (cortos) van con letra grande y GRADO con su palabra completa, todos del mismo tamaño.
+  // La CURP (el dato más largo) fija el tamaño de todos los datos: la letra más grande que quepa.
+  // Va junto a su etiqueta o, si así se lee más grande, justo debajo de ella (hay espacio antes de la siguiente etiqueta).
+  const MAXT = 7.5;
+  const sigDe = k => ['nombre', 'curp', 'grado', 'grupo', 'turno'].map(q => C[q]).filter(l => l && l.lineTop > C[k].lineTop + 1).sort((a, b) => a.lineTop - b.lineTop)[0];
+  let TC = ks.indexOf('curp') >= 0 ? cabe('curp', MAXT) : 9, curpAbajo = false;
+  if (ks.indexOf('curp') >= 0) {
+   const l = C.curp, sg = sigDe('curp'), txt = String(valores.curp).toUpperCase();
+   let t = MAXT;
+   const libreX = y => limiteEn(l.izq, y - t, y + 2) - l.izq;
+   while (t > 5.5) {
+    const y2 = l.base + t * 1.15;
+    if (medirSimple(txt, t, true, FUENTE) <= libreX(y2) && (!sg || y2 + t * 0.3 < sg.lineTop - 1.5)) break;
+    t -= 0.25;
+   }
+   
+  }
+  const TG = TC;
+  const topeNombre = Math.min(MAXT + 1, TC + 1);
+  // NOMBRE: primer renglón junto a su etiqueta, el resto debajo; siempre queda aire antes del CURP
   const n = C.nombre;
   if (n && d.nombre) {
    const sigu = ['curp', 'grado', 'grupo', 'turno'].map(k => C[k]).filter(l => l && l.lineTop > n.lineTop + 1).sort((a, b) => a.lineTop - b.lineTop)[0];
-   const arriba = n.base + n.size * 0.35;
-   const abajo = sigu ? (sigu.base - sigu.size * 0.78) - 0.8 : arriba + 36;
-   const lim = limiteEn(n.izq, arriba, abajo);
-   const ancho = lim - n.izq;
-   const r = ajustarTexto(String(d.nombre).toUpperCase(), ancho, abajo - arriba, 10, 5.4, true, FUENTE, 3);
-   // se centra en vertical dentro del espacio libre (queda más legible)
-   const alto = r.lineas.length * r.interlinea;
-   const y0 = arriba + Math.max(0, (abajo - arriba - alto) / 2);
-   r.lineas.forEach((l, i) => poner(l, n.izq, y0 + i * r.interlinea + r.t * 0.86, r.t));
+   const tope = sigu ? (sigu.base - sigu.size * 0.8) - 4.5 : n.base + 30;
+   const r = repartirNombre(String(d.nombre).toUpperCase(), n, tope, limiteEn, FUENTE, topeNombre);
+   r.renglones.forEach(l => poner(l.txt, l.x, l.y, r.t));
   }
-  // CURP / GRADO / GRUPO / TURNO: a la derecha de su etiqueta
-  const valores = {
-   curp: d.curp || '', grado: d.grado || '', grupo: d.grupo || '', turno: d.turno || ''
-  };
-  const alternativa = {grado: d.gradoCorto || ''};
-  ['curp', 'grado', 'grupo', 'turno'].forEach(k => {
-   const l = C[k];
-   if (!l || !valores[k]) return;
-   const x = l.xFin + 3.5;
-   let lim = Math.min(limiteEn(x, l.base - l.size, l.base + 1), l.limiteDer === Infinity ? Infinity : l.limiteDer - 2);
-   let t = 8.5;
-   let txt = String(valores[k]).toUpperCase();
-   // si la palabra completa no cabe con letra legible (6 pt) se usa la forma corta (p. ej. 2°)
-   if (alternativa[k] && medirSimple(txt, 6, true, FUENTE) > lim - x) { txt = String(alternativa[k]).toUpperCase(); }
-   while (t > 4.8 && medirSimple(txt, t, true, FUENTE) > lim - x) t -= 0.25;
-   poner(txt, x, l.base, t);
+  ks.forEach(k => {
+   const l = C[k], x = l.xFin + 4, txt = String(valores[k]).toUpperCase();
+   if (k === 'curp') { if (curpAbajo) poner(txt, l.izq, l.base + TC * 1.15, TC); else poner(txt, x, l.base, TC); return; }
+   if (k === 'grado') {
+    // Primero/Segundo/Tercero siempre enfrente de "GRADO:": letra lo más grande que quepa antes de "GRUPO:"
+    let t = TG; const lim = limDe(k, l.base) - x;
+    while (t > 4.5 && medirSimple(txt, t, true, FUENTE) > lim) t -= 0.25;
+    poner(txt, x, l.base, t);
+    return;
+   }
+   poner(txt, x, l.base, TG);
   });
  }
 
@@ -777,9 +818,10 @@
   if (datos) {
    rellenar(ctx, m, datos);
    if (conQR) {
-    const q = new global.QRious({value: String(datos.curp), size: 420, level: 'M', padding: 0});
-    const lado = Math.min(m.qr.w, m.qr.h) - 9;
-    ctx.imageSmoothingEnabled = false;
+    // El QR ocupa el cuadro que se marcó en Word, centrado
+    const q = new global.QRious({value: String(datos.curp), size: 420, level: 'M', padding: 26});
+    const lado = Math.min(m.qr.w, m.qr.h);   // todo el cuadro que marca el Word
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(q.canvas, m.qr.x + (m.qr.w - lado) / 2, m.qr.y + (m.qr.h - lado) / 2, lado, lado);
     ctx.imageSmoothingEnabled = true;
    }

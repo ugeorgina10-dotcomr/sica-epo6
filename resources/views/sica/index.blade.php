@@ -290,17 +290,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <h6 class="fw-bold m-0 text-danger" id="titulo-grupo-credencial"></h6>
  <span id="badge-plantilla" class="badge bg-secondary">Plantilla oficial</span>
  </div>
- <div class="mb-3 p-3 bg-light rounded-3 border">
- <label class="form-label small">1. Subir lista de alumnos (Excel/.csv con <b>CURP en la columna A</b> y el <b>nombre completo en la columna B</b>; o bien <b>Apellido paterno, Apellido materno y Nombre(s)</b> en las columnas B, C y D) — asigna el CURP y la credencial digital de cada alumno de este grupo y turno. El nombre siempre se guarda como <b>Apellido paterno, Apellido materno y Nombre(s)</b>.</label>
- <select id="orden-nombre-cred" class="form-select form-select-sm mb-2">
- <option value="reordenar" selected>El nombre viene como Nombre(s) + Apellidos (reordenar)</option>
- <option value="tal-cual">El nombre ya viene como Apellido paterno, materno y nombre (no cambiar)</option>
- </select>
- <div class="input-group input-group-sm">
- <input type="file" class="form-control" id="input-subir-lista-credencial" accept=".xlsx,.xls,.csv">
- <button class="btn btn-dark btn-accion-restringida" type="button" onclick="subirListaCredencial()">Subir Lista</button>
- </div>
- </div>
  <div class="table-responsive bg-white rounded-3 border mb-3">
  <table class="table table-striped table-hover align-middle mb-0 small">
  <thead class="table-dark"><tr><th>Matrícula (CURP)</th><th>Nombre Completo</th><th class="text-center">Acción</th></tr></thead>
@@ -419,7 +408,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <!-- SOLO CONTROL ESCOLAR: subir lista del grupo elegido arriba -->
  <div id="bloque-listas-orientador" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
- <p class="text-muted small mb-3">Excel, CSV o PDF (.xlsx/.xls/.csv/.pdf) con el <b>nombre completo</b>, uno por fila o por línea (o en 3 columnas: Apellido paterno, Apellido materno y Nombre(s)). Se asigna al grado, grupo y turno elegidos arriba, y el nombre se guarda como <b>Apellido paterno, Apellido materno y Nombre(s)</b>. El CURP y la credencial se asignan después desde el <b>Portal del Alumno</b>.</p>
+ <p class="text-muted small mb-3">Excel, CSV o PDF (.xlsx/.xls/.csv/.pdf) con el <b>CURP en la columna A</b> y el <b>nombre completo en la columna B</b> (o Apellido paterno, Apellido materno y Nombre(s) en las columnas B, C y D), uno por fila. Se asigna al grado, grupo y turno elegidos arriba, con su CURP y su credencial digital; el nombre se guarda como <b>Apellido paterno, Apellido materno y Nombre(s)</b>. En el <b>Portal del Alumno</b> solo se ve y se edita la credencial. Si el archivo no trae CURP, se cargan solo los nombres.</p>
  <div class="row g-3 align-items-end">
  <div class="col-md-4"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
  <div class="col-md-5"><label class="form-label small">Archivo</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
@@ -1979,50 +1968,29 @@ function subirLista() {
  if (!file) { alert('Selecciona un archivo para la lista.'); return; }
  if (!/\.(xlsx|xls|csv|pdf)$/i.test(file.name)) { alert('Para cargar los alumnos automáticamente usa un archivo Excel (.xlsx/.xls), .csv o .pdf.'); return; }
  const modo = $('#orden-nombre-lista').val();
+ const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
  leerFilasDesdeArchivo(file, rows => {
- rows = rows.filter(r => r[0] && String(r[0]).trim());
- if (rows.length && /nombre|apellido/i.test(rows[0][0])) rows.shift();
+ rows = rows.filter(r => r && r[0] != null && String(r[0]).trim());
+ if (rows.length && /curp|matr|nombre|apellido/i.test(String(rows[0][0]))) rows.shift();
  let nuevos = 0, actualizados = 0;
  rows.forEach(r => {
- const nombre = armarNombre(r, 0, modo);
+ let curp = '', fila = r, desde = 0;
+ const c0 = String(r[0]).trim();
+ if (RX_CURP.test(c0)) { curp = c0.toUpperCase(); desde = 1; }   // Excel: CURP en columna A
+ else { const m = c0.match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/); if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; } }   // PDF: "CURP Nombre"
+ const nombre = armarNombre(fila, desde, modo);
  if (!nombre) return;
- let a = db.alumnos.find(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && norm(x.nombre) === norm(nombre));
- if (a) { actualizados++; }
- else { db.alumnos.push({id:generarId(), curp:'', nombre:nombre, grado:filtro.grado, grupo:filtro.grupo, turno:turnoActivo, reg:{}}); nuevos++; }
+ let a = curp ? db.alumnos.find(x => x.curp === curp) : null;
+ if (!a) a = db.alumnos.find(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && (!curp ? true : !x.curp) && norm(x.nombre) === norm(nombre));
+ if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
+ else { db.alumnos.push({id:generarId(), curp:curp, nombre:nombre, grado:filtro.grado, grupo:filtro.grupo, turno:turnoActivo, reg:{}}); nuevos++; }
  });
- save(); renderTabla();
+ save(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
- alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.\nRecuerda asignar su CURP y credencial desde el Portal del Alumno.');
+ const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
+ alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.'));
  $('#archivo-lista').val('');
  }, msg => alert(msg));
-}
-function subirListaCredencial() {
- if (!permisoPermite()) return;
- if (!credSel) return;
- const file = $('#input-subir-lista-credencial')[0].files[0];
- if (!file) { alert('Selecciona un archivo con CURP y nombre.'); return; }
- if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { alert('Para cargar los alumnos automáticamente usa un archivo Excel (.xlsx/.xls) o .csv.'); return; }
- if (!libsOk('XLSX')) return;
- const modo = $('#orden-nombre-cred').val();
- const rd = new FileReader();
- rd.onload = e => {
- const wb = XLSX.read(e.target.result, {type:'array'});
- const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1}).filter(r => r[0] && r[1]);
- if (rows.length && /curp|matr/i.test(rows[0][0])) rows.shift();
- let asignados = 0, creados = 0;
- rows.forEach(r => {
- const curp = String(r[0]).trim().toUpperCase(), nombre = armarNombre(r, 1, modo);
- if (!curp || !nombre) return;
- let a = db.alumnos.find(x => x.curp === curp);
- if (!a) a = db.alumnos.find(x => x.grado === credSel.grado && x.grupo === credSel.grupo && x.turno === turnoCred && !x.curp && norm(x.nombre) === norm(nombre));
- if (a) { a.curp = curp; a.nombre = nombre; a.grado = credSel.grado; a.grupo = credSel.grupo; a.turno = turnoCred; asignados++; }
- else { db.alumnos.push({id:generarId(), curp:curp, nombre:nombre, grado:credSel.grado, grupo:credSel.grupo, turno:turnoCred, reg:{}}); creados++; }
- });
- save(); selCred(credSel.grado, credSel.grupo);
- alert('CURP asignado a ' + asignados + ' alumno(s) y ' + creados + ' registrado(s) nuevo(s) en ' + nomGrado[credSel.grado] + ' ' + credSel.grupo + ' (' + turnoCred + ').');
- $('#input-subir-lista-credencial').val('');
- };
- rd.readAsArrayBuffer(file);
 }
 function guardarHorarioGrupo() {
  if (!permisoPermite()) return;
@@ -2403,7 +2371,7 @@ function actualizarVistaPreviaCredencial() {
 function datosCredencial(a) {
  return {
   nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)', conQR: !!a.curp,
-  grado: nomGrado[a.grado] || '', gradoCorto: a.grado ? a.grado + '°' : '',
+  grado: nomGrado[a.grado] || '',
   grupo: ROMANOS[a.grupo] || String(a.grupo || ''), turno: a.turno || ''
  };
 }
@@ -2466,26 +2434,27 @@ function planHoja(hoja, f, r) {
 }
 function generarPDFCredenciales(alumnos, nombreArchivo, boton, textoBoton, onFin) {
  if (!libsOk('jspdf') || !libsOk('SicaDocx')) return;
- if (!plantillaDe(alumnos[0].turno, 'frente') || !plantillaDe(alumnos[0].turno, 'reverso')) {
-  alert('La plantilla de Word de este turno todavía no está lista. ' + (errorPlantilla[alumnos[0].turno + '-frente'] || errorPlantilla[alumnos[0].turno + '-reverso'] || 'Espera unos segundos e inténtalo de nuevo.'));
+ const t0 = alumnos[0].turno || 'Matutino';
+ if (!plantillaDe(t0, 'frente') || !plantillaDe(t0, 'reverso')) {
+  alert('La plantilla de Word de este turno todavía no está lista. ' + (errorPlantilla[t0 + '-frente'] || errorPlantilla[t0 + '-reverso'] || 'Espera unos segundos e inténtalo de nuevo.'));
   return;
  }
- const hoja = hojaElegida();
- const primera = imagenesCredencial(alumnos[0]);
- const plan = planHoja(hoja, primera.f, primera.r);
- const d = new window.jspdf.jsPDF({unit: 'mm', format: [hoja.w, hoja.h], orientation: 'portrait'});
- const anchoRejilla = plan.cols * plan.bw + (plan.cols - 1) * plan.sep;
- const x0 = Math.max((hoja.w - anchoRejilla) / 2, 0);
  const $b = boton ? $(boton) : null;
+ const liberar = () => { if ($b) $b.prop('disabled', false).text(textoBoton); };
+ let d, plan, hoja, primera, x0;
+ try {
+  hoja = hojaElegida();
+  primera = imagenesCredencial(alumnos[0]);
+  plan = planHoja(hoja, primera.f, primera.r);
+  d = new window.jspdf.jsPDF({unit: 'mm', format: [hoja.w, hoja.h], orientation: 'portrait'});
+  x0 = Math.max((hoja.w - (plan.cols * plan.bw + (plan.cols - 1) * plan.sep)) / 2, 0);
+ } catch (e) {
+  alert('No se pudo preparar el PDF: ' + (e && e.message ? e.message : e));
+  return;
+ }
  if ($b) $b.prop('disabled', true);
  let i = 0;
- const paso = () => {
-  if (i >= alumnos.length) {
-   d.save(nombreArchivo);
-   if ($b) $b.prop('disabled', false).text(textoBoton);
-   if (onFin) onFin();
-   return;
-  }
+ const poner = () => {
   const im = i === 0 ? primera : imagenesCredencial(alumnos[i]);
   const pos = i % plan.n;
   if (i > 0 && pos === 0) d.addPage([hoja.w, hoja.h], 'portrait');
@@ -2494,10 +2463,25 @@ function generarPDFCredenciales(alumnos, nombreArchivo, boton, textoBoton, onFin
   if (plan.modo === 'apilado') d.addImage(im.r.img, 'JPEG', x, y + im.f.h + plan.junto, im.r.w, im.r.h);
   else d.addImage(im.r.img, 'JPEG', x + im.f.w + plan.junto, y, im.r.w, im.r.h);
   i++;
-  if ($b) $b.text('Generando PDF… ' + i + ' de ' + alumnos.length);
-  setTimeout(paso, 0);   // deja respirar a la pantalla entre alumno y alumno
  };
- paso();
+ const terminar = () => { d.save(nombreArchivo); liberar(); if (onFin) onFin(); };
+ const falla = e => { liberar(); alert('No se pudo generar el PDF: ' + (e && e.message ? e.message : e)); };
+ try {
+  if (alumnos.length <= 15) {            // pocos alumnos: se descarga de inmediato, sin esperas
+   while (i < alumnos.length) poner();
+   terminar();
+   return;
+  }
+  const paso = () => {
+   try {
+    if (i >= alumnos.length) return terminar();
+    poner();
+    if ($b) $b.text('Generando PDF… ' + i + ' de ' + alumnos.length);
+    setTimeout(paso, 0);                 // deja respirar a la pantalla entre alumno y alumno
+   } catch (e) { falla(e); }
+  };
+  paso();
+ } catch (e) { falla(e); }
 }
 function descargarCredencialesPDF() {
  if (!permisoPermite()) return;
