@@ -686,61 +686,71 @@
   }
  }
 
- /* Reparte el nombre en renglones: el primero va a la derecha de la etiqueta (como CURP, GRADO...) y los demás
-    debajo, a todo lo ancho que dejen el QR y la foto. Busca la letra más grande que quepa dejando aire antes del
-    siguiente dato (CURP). Devuelve [{txt, x, y}] y el tamaño. */
+ /* Reparte el nombre en renglones, todos DEBAJO de la etiqueta "NOMBRE DEL ESTUDIANTE:" y a todo lo ancho que
+    dejen el QR y la foto. Busca la letra más grande que quepa (1, 2 o 3 renglones) dejando aire antes del
+    siguiente dato (CURP). Devuelve {t, renglones:[{txt, x, y}]}. */
  function repartirNombre(txt, n, tope, limiteEn, FUENTE, tamMax) {
   const palabras = String(txt).trim().split(/\s+/).filter(Boolean);
-  // El nombre va DEBAJO de su etiqueta, a todo lo ancho que dejen el QR y la foto
-  const x1 = n.izq;
-  const base0 = t => n.base + t * 1.3;
-  const anchoLinea = (k, t, inter) => {
-   const y = base0(t) + k * inter;
-   return limiteEn(n.izq, y - t, y + t * 0.3) - n.izq;
+  const xi = n.xIni;
+  // 1er renglón pegado a su etiqueta (las mayúsculas con acento suben ~0.93 de la letra); renglones apretados pero sin tocarse
+  const geom = t => {
+   const inter = t * 1.12;
+   const base = k => n.base + 1 + t * 0.93 + k * inter;
+   const ancho = k => limiteEn(xi, base(k) - t, base(k) + t * 0.3) - xi;
+   return {inter, base, ancho};
   };
   const intentar = (t, maxL) => {
-   const inter = t * 1.18, lineas = [];
+   const g = geom(t), lineas = [];
    let cur = '', k = 0;
    for (const w of palabras) {
     const prueba = cur ? cur + ' ' + w : w;
-    if (medirSimple(prueba, t, true, FUENTE) <= anchoLinea(k, t, inter) + 0.01) { cur = prueba; continue; }
-    if (!cur) return null;                         // ni una palabra sola cabe en el renglón
+    if (medirSimple(prueba, t, true, FUENTE) <= g.ancho(k) + 0.01) { cur = prueba; continue; }
+    if (!cur) return null;                          // ni una palabra sola cabe en el renglón
     lineas.push(cur); cur = w; k++;
-    if (k >= maxL || medirSimple(cur, t, true, FUENTE) > anchoLinea(k, t, inter) + 0.01) return null;
+    if (k >= maxL || medirSimple(cur, t, true, FUENTE) > g.ancho(k) + 0.01) return null;
    }
    lineas.push(cur);
-   const abajo = base0(t) + (lineas.length - 1) * inter + t * 0.25;
-   if (lineas.length > maxL || abajo > tope + 0.01) return null;
-   return {t, inter, lineas};
+   if (g.base(lineas.length - 1) + t * 0.2 > tope + 0.01) return null;
+   return {t, lineas, g};
   };
   for (let t = tamMax || 9; t >= 5.4 - 0.001; t -= 0.25) {
    const r = intentar(t, 3);
    if (r) return arm(r);
   }
   // No cabe ni con la letra mínima: se corta con "…" para no encimarse con el CURP
-  const t = 5.4, inter = t * 1.18, maxL = Math.max(1, Math.min(3, Math.floor((tope - base0(t) - t * 0.25) / inter) + 1));
+  const t = 5.4, g = geom(t);
+  const maxL = Math.max(1, Math.min(3, Math.floor((tope - g.base(0) - t * 0.2) / g.inter) + 1));
   const lineas = []; let cur = '', k = 0;
   for (const w of palabras) {
    const prueba = cur ? cur + ' ' + w : w;
-   if (!cur || medirSimple(prueba, t, true, FUENTE) <= anchoLinea(k, t, inter)) cur = prueba;
+   if (!cur || medirSimple(prueba, t, true, FUENTE) <= g.ancho(k)) cur = prueba;
    else { if (k + 1 >= maxL) { cur = prueba; break; } lineas.push(cur); cur = w; k++; }
   }
   lineas.push(cur);
   const ult = lineas.length - 1;
   let u = lineas[ult];
-  const aMax = anchoLinea(ult, t, inter);
+  const aMax = g.ancho(ult);
   if (medirSimple(u, t, true, FUENTE) > aMax) { while (u.length > 1 && medirSimple(u + '…', t, true, FUENTE) > aMax) u = u.slice(0, -1); lineas[ult] = u + '…'; }
-  return arm({t, inter, lineas});
+  return arm({t, lineas, g});
   function arm(r) {
-   return {t: r.t, renglones: r.lineas.map((l, i) => ({txt: l, x: n.izq, y: base0(r.t) + i * r.inter}))};
+   return {t: r.t, renglones: r.lineas.map((l, i) => ({txt: l, x: xi, y: r.g.base(i)}))};
   }
  }
 
+ /* Escribe encima de la plantilla el nombre, CURP, grado, grupo y turno del alumno.
+    Antes la letra quedaba muy chica (~6 pt) porque cada dato tenía que caber a la derecha de su etiqueta
+    (el grado, por ejemplo, solo tiene ~26 pt antes de "GRUPO:"). Ahora, si así se lee más grande,
+    cada dato se escribe justo DEBAJO de su etiqueta (igual que ya iba el nombre), con la letra más grande
+    que quepa sin tocar el QR, la foto ni la siguiente etiqueta. */
  function rellenar(ctx, m, d) {
   const C = m.campos, FUENTE = 'Arial';
   const derecha = m.ox + m.ancho - 4;
+  const abajoCard = m.oy + m.alto - 8;       // deja libre la franja roja de abajo
   const obst = [m.qr, m.foto].filter(Boolean);
-  const AIRE = 5;   // pt de separación entre el texto y el cuadro del QR / la foto
+  const AIRE = 3.5;   // pt de separación entre el texto y el cuadro del QR / la foto
+  const MAXT = 10;    // letra máxima de CURP, grado, grupo y turno (antes 7.5)
+  const MAXN = 11;  // letra máxima del nombre
+  const MINT = 5.5;
   const limiteEn = (xDesde, yArriba, yAbajo) => {
    let lim = derecha;
    obst.forEach(b => { if (b.x >= xDesde - 0.5 && b.y < yAbajo && b.y + b.h > yArriba) lim = Math.min(lim, b.x - AIRE); });
@@ -750,56 +760,72 @@
   if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
   const poner = (txt, x, y, tam) => { ctx.font = 'bold ' + tam + 'px Arial, "Liberation Sans", sans-serif'; ctx.fillText(txt, x, y); };
 
-  // CURP / GRADO / GRUPO / TURNO: a la derecha de su etiqueta, todos con la MISMA letra
   const valores = {curp: d.curp || '', grado: d.grado || '', grupo: d.grupo || '', turno: d.turno || ''};
   const ks = ['curp', 'grado', 'grupo', 'turno'].filter(k => C[k] && valores[k]);
-  const limDe = (k, y) => { const l = C[k]; return Math.min(limiteEn(l.xFin + 4, y - l.size, y + 1), l.limiteDer === Infinity ? Infinity : l.limiteDer - 3); };
-  const cabe = (k, tope) => {
-   const txt = String(valores[k]).toUpperCase(), l = C[k], disp = limDe(k, l.base) - (l.xFin + 4);
-   let t = tope;
-   while (t > 5.5 && medirSimple(txt, t, true, FUENTE) > disp) t -= 0.25;
-   return t;
+  const texto = k => String(valores[k]).toUpperCase();
+  // etiqueta de la fila de abajo (para no encimarse con ella)
+  const topeAbajo = k => {
+   const l = C[k];
+   const sig = Object.keys(C).map(q => C[q]).filter(o => o && o.base > l.base + 1);
+   return sig.length ? Math.min.apply(null, sig.map(o => o.base - o.size * 0.8)) - 3.5 : abajoCard;
   };
-  // La CURP es la más larga: toma la letra más grande que le quepa junto a su etiqueta.
-  // Grupo y turno (cortos) van con letra grande y GRADO con su palabra completa, todos del mismo tamaño.
-  // La CURP (el dato más largo) fija el tamaño de todos los datos: la letra más grande que quepa.
-  // Va junto a su etiqueta o, si así se lee más grande, justo debajo de ella (hay espacio antes de la siguiente etiqueta).
-  const MAXT = 7.5;
-  const sigDe = k => ['nombre', 'curp', 'grado', 'grupo', 'turno'].map(q => C[q]).filter(l => l && l.lineTop > C[k].lineTop + 1).sort((a, b) => a.lineTop - b.lineTop)[0];
-  let TC = ks.indexOf('curp') >= 0 ? cabe('curp', MAXT) : 9, curpAbajo = false;
-  if (ks.indexOf('curp') >= 0) {
-   const l = C.curp, sg = sigDe('curp'), txt = String(valores.curp).toUpperCase();
-   let t = MAXT;
-   const libreX = y => limiteEn(l.izq, y - t, y + 2) - l.izq;
-   while (t > 5.5) {
-    const y2 = l.base + t * 1.15;
-    if (medirSimple(txt, t, true, FUENTE) <= libreX(y2) && (!sg || y2 + t * 0.3 < sg.lineTop - 1.5)) break;
-    t -= 0.25;
+  // ¿cabe el dato "k" con letra "t"?  junto = a la derecha de su etiqueta; abajo = debajo de ella
+  const cabe = (k, t, modo) => {
+   const l = C[k], ancho = medirSimple(texto(k), t, true, FUENTE);
+   const lim = l.limiteDer === Infinity ? Infinity : l.limiteDer - 3;
+   if (modo === 'junto') {
+    const x = l.xFin + 4;
+    return x + ancho <= Math.min(limiteEn(x, l.base - l.size, l.base + 1), lim) + 0.01;
    }
-   
-  }
-  const TG = TC;
-  const topeNombre = Math.min(MAXT + 1, TC + 1);
-  // NOMBRE: primer renglón junto a su etiqueta, el resto debajo; siempre queda aire antes del CURP
+   const x = l.xIni, y = l.base + t * 1.15;
+   if (y + t * 0.25 > topeAbajo(k)) return false;
+   return x + ancho <= Math.min(limiteEn(x, y - t, y + t * 0.25), lim) + 0.01;
+  };
+  const maxFit = (lista, modo) => {
+   if (!lista.length) return MAXT;
+   for (let t = MAXT; t >= MINT - 0.001; t -= 0.25) if (lista.every(k => cabe(k, t, modo))) return t;
+   return MINT;
+  };
+  const cortos = ks.filter(k => k !== 'curp'), largos = ks.filter(k => k === 'curp');
+  const plan = modo => ({modo: modo, TC: maxFit(largos, modo), T2: maxFit(cortos, modo)});
+  const pj = plan('junto'), pa = plan('abajo');
+  // Se prefiere lo de siempre (a la derecha de la etiqueta) salvo que debajo se lea claramente más grande
+  const P = Math.min(pa.TC, pa.T2) >= Math.min(pj.TC, pj.T2) + 0.5 ? pa : pj;
+
+  // NOMBRE: debajo de su etiqueta (o primer renglón junto a ella); siempre queda aire antes del CURP
   const n = C.nombre;
   if (n && d.nombre) {
    const sigu = ['curp', 'grado', 'grupo', 'turno'].map(k => C[k]).filter(l => l && l.lineTop > n.lineTop + 1).sort((a, b) => a.lineTop - b.lineTop)[0];
-   const tope = sigu ? (sigu.base - sigu.size * 0.8) - 4.5 : n.base + 30;
-   const r = repartirNombre(String(d.nombre).toUpperCase(), n, tope, limiteEn, FUENTE, topeNombre);
+   const tope = sigu ? (sigu.base - sigu.size * 0.8) - 2.5 : n.base + 30;
+   const r = repartirNombre(String(d.nombre).toUpperCase(), n, tope, limiteEn, FUENTE, MAXN);
    r.renglones.forEach(l => poner(l.txt, l.x, l.y, r.t));
   }
   ks.forEach(k => {
-   const l = C[k], x = l.xFin + 4, txt = String(valores[k]).toUpperCase();
-   if (k === 'curp') { if (curpAbajo) poner(txt, l.izq, l.base + TC * 1.15, TC); else poner(txt, x, l.base, TC); return; }
-   if (k === 'grado') {
-    // Primero/Segundo/Tercero siempre enfrente de "GRADO:": letra lo más grande que quepa antes de "GRUPO:"
-    let t = TG; const lim = limDe(k, l.base) - x;
-    while (t > 4.5 && medirSimple(txt, t, true, FUENTE) > lim) t -= 0.25;
-    poner(txt, x, l.base, t);
-    return;
-   }
-   poner(txt, x, l.base, TG);
+   const l = C[k], t = k === 'curp' ? P.TC : P.T2;
+   if (P.modo === 'abajo') poner(texto(k), l.xIni, l.base + t * 1.15, t);
+   else poner(texto(k), l.xFin + 4, l.base, t);
   });
+ }
+
+ /* QR: se genera sin margen, se recorta a los cuadritos y se dibuja ocupando TODO el recuadro que se marcó
+    en Word (centrado), dejando solo 1 cuadrito de margen blanco para que lo lea bien el escáner. */
+ const qrCache = {};
+ function qrRecortado(valor) {
+  if (qrCache[valor]) return qrCache[valor];
+  const q = new global.QRious({value: String(valor), size: 600, level: 'M', padding: 0});
+  const cv = q.canvas, W = cv.width, H = cv.height;
+  const px = cv.getContext('2d').getImageData(0, 0, W, H).data;
+  const oscuro = (x, y) => { const i = (y * W + x) * 4; return px[i + 3] > 0 && px[i] < 128; };
+  let x1 = W, y1 = H, x2 = -1, y2 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (oscuro(x, y)) { if (x < x1) x1 = x; if (x > x2) x2 = x; if (y < y1) y1 = y; if (y > y2) y2 = y; }
+  if (x2 < 0) { x1 = 0; y1 = 0; x2 = W - 1; y2 = H - 1; }
+  const lado = x2 - x1 + 1;
+  // el renglón de arriba del cuadro de esquina mide exactamente 7 cuadritos
+  let corrida = 0; while (x1 + corrida <= x2 && oscuro(x1 + corrida, y1)) corrida++;
+  const modulos = corrida >= 7 ? Math.round(lado / (corrida / 7)) : 29;
+  const r = {cv: cv, sx: x1, sy: y1, sw: lado, sh: y2 - y1 + 1, modulos: modulos};
+  const claves = Object.keys(qrCache); if (claves.length > 400) delete qrCache[claves[0]];
+  return (qrCache[valor] = r);
  }
 
  function dibujar(canvas, m, datos, opc) {
@@ -818,12 +844,15 @@
   if (datos) {
    rellenar(ctx, m, datos);
    if (conQR) {
-    // El QR ocupa el cuadro que se marcó en Word, centrado
-    const q = new global.QRious({value: String(datos.curp), size: 420, level: 'M', padding: 26});
-    const lado = Math.min(m.qr.w, m.qr.h);   // todo el cuadro que marca el Word
+    // El QR ocupa todo el cuadro que se marcó en Word, centrado (el cuadro puede no ser exactamente cuadrado)
+    const q = qrRecortado(datos.curp), b = m.qr;
+    const lado = Math.min(b.w, b.h);
+    const mod = lado / (q.modulos + 2);          // 1 cuadrito de margen blanco alrededor
+    const cx = b.x + (b.w - lado) / 2, cy = b.y + (b.h - lado) / 2;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(b.x - 0.4, b.y - 0.4, b.w + 0.8, b.h + 0.8);   // fondo blanco: tapa la línea punteada del recuadro
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(q.canvas, m.qr.x + (m.qr.w - lado) / 2, m.qr.y + (m.qr.h - lado) / 2, lado, lado);
-    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(q.cv, q.sx, q.sy, q.sw, q.sh, cx + mod, cy + mod, mod * q.modulos, mod * q.modulos);
    }
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);

@@ -117,6 +117,60 @@ class ControlEscolarController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    /** Archivos de Word originales que vienen en public/plantillas (el reverso es el mismo para los dos turnos) */
+    private const PLANTILLAS_ORIGINALES = [
+        'Matutino'   => ['frente' => 'FrenteMatutino.docx',   'reverso' => 'Reverso.docx'],
+        'Vespertino' => ['frente' => 'FrenteVespertino.docx', 'reverso' => 'Reverso.docx'],
+    ];
+
+    /**
+     * Elimina PERMANENTEMENTE la plantilla anterior (el Word original de public/plantillas).
+     * Solo se permite cuando ya hay una plantilla nueva guardada en el servidor para ese turno y lado,
+     * así nunca se queda el sistema sin plantilla. Después ya no se puede "restaurar la original".
+     */
+    public function eliminarPlantillaAnterior(string $turno, string $lado): JsonResponse
+    {
+        abort_unless(in_array($turno, ['Matutino', 'Vespertino'], true) && in_array($lado, ['frente', 'reverso'], true), 404);
+
+        if (!Ajuste::where('clave', self::clavePlantilla($turno, $lado))->exists()) {
+            return response()->json([
+                'ok'      => false,
+                'mensaje' => 'Primero sube la plantilla nueva (' . $lado . ' ' . $turno . '). La anterior solo se puede eliminar cuando la nueva ya está en uso.',
+            ], 422);
+        }
+
+        // El reverso lo usan los dos turnos: solo se borra si los dos ya tienen su reverso nuevo
+        if ($lado === 'reverso') {
+            foreach (['Matutino', 'Vespertino'] as $t) {
+                if (!Ajuste::where('clave', self::clavePlantilla($t, 'reverso'))->exists()) {
+                    return response()->json([
+                        'ok'      => false,
+                        'mensaje' => 'El reverso anterior lo usan los dos turnos. Sube también el reverso nuevo del turno ' . $t . ' (o marca "Usar este reverso en los dos turnos") y vuelve a intentarlo.',
+                    ], 422);
+                }
+            }
+        }
+
+        $archivo = self::PLANTILLAS_ORIGINALES[$turno][$lado];
+        $ruta    = public_path('plantillas/' . $archivo);
+        $borrado = false;
+
+        if (is_file($ruta)) {
+            $borrado = @unlink($ruta);
+            if (!$borrado) {
+                return response()->json([
+                    'ok'      => false,
+                    'mensaje' => 'No se pudo borrar ' . $archivo . ' (el servidor no tiene permiso sobre la carpeta public/plantillas).',
+                ], 500);
+            }
+        }
+
+        // También se limpia cualquier plantilla en imagen que haya quedado guardada de versiones viejas
+        Ajuste::where('clave', self::clavePlantillaImagenVieja($turno, $lado))->delete();
+
+        return response()->json(['ok' => true, 'archivo' => $archivo, 'borrado' => $borrado]);
+    }
+
     private static function clavePlantilla(string $turno, string $lado): string
     {
         return 'plantilla_docx_' . strtolower($turno) . '_' . $lado;

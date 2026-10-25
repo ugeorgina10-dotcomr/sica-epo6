@@ -44,6 +44,9 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .tarjeta-grado.grado-desactivado{opacity:.4;pointer-events:none;cursor:not-allowed}
 .preview-credencial{width:100%;max-width:340px;border:1px solid #dee2e6;border-radius:10px;background:#eee;display:block;margin:0 auto}
 .preview-plantilla{height:240px;object-fit:contain;object-position:center;background:#fff}
+/* Vista previa de la plantilla oficial: frente y reverso con el mismo alto y alineados arriba */
+.slot-prev-plantilla{min-height:150px;display:flex;align-items:flex-start;justify-content:center}
+.slot-prev-plantilla canvas.preview-credencial{max-width:100%;margin:0}
 .badge-asignado{font-size:.7rem}
 /* ===== Responsivo ===== */
 @media (max-width:767.98px){
@@ -240,7 +243,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-plantilla-oficial" class="p-4 bg-white rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Plantilla Oficial de Credenciales <span id="turno-plantilla-actual" class="badge bg-secondary ms-2 align-middle">Matutino</span></h6>
  <p class="text-muted small mb-2">Aquí se suben los <b>diseños de la credencial hechos en Word (.docx)</b>, uno de frente y uno de reverso por turno. Valen para <b>todos los grupos del turno elegido</b> (usa los botones Matutino / Vespertino de abajo para cambiar de turno; cada turno tiene su propio frente porque cambia el C.C.T.).</p>
- <p class="text-muted small mb-3">Cuando quieras cambiar el diseño, edítalo en Word, <b>guárdalo como .docx</b> y súbelo aquí: el sistema vuelve a acomodar solo el nombre, CURP, grado, grupo, turno y el código QR. En el frente deben existir el cuadro con el texto <b>QR</b> y las etiquetas <b>NOMBRE DEL ESTUDIANTE:, CURP:, GRADO:, GRUPO:, TURNO:</b>. Los archivos originales están en la carpeta <code>public/plantillas</code> y se usan mientras no subas uno nuevo.</p>
+ <p class="text-muted small mb-3">Cuando quieras cambiar el diseño, edítalo en Word, <b>guárdalo como .docx</b> y súbelo aquí: el sistema vuelve a acomodar solo el nombre, CURP, grado, grupo, turno y el código QR. En el frente deben existir el cuadro con el texto <b>QR</b> y las etiquetas <b>NOMBRE DEL ESTUDIANTE:, CURP:, GRADO:, GRUPO:, TURNO:</b>.</p>
  <div class="row g-3">
  <div class="col-md-6">
  <label class="form-label small">Frente (.docx)</label>
@@ -248,7 +251,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <input type="file" class="form-control" id="input-plantilla-oficial-frente" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
  <button class="btn btn-vinotinto" type="button" onclick="subirPlantillaOficial('frente')">Actualizar</button>
  </div>
- <canvas id="prev-plantilla-oficial-frente" class="preview-credencial" width="380" height="240" style="display:none;max-width:100%"></canvas>
+ <div class="slot-prev-plantilla">
+ <canvas id="prev-plantilla-oficial-frente" class="preview-credencial" width="380" height="240" style="display:none"></canvas>
+ </div>
  <div id="msg-prev-plantilla-frente" class="small text-muted text-center mt-1"></div>
  </div>
  <div class="col-md-6">
@@ -257,14 +262,21 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <input type="file" class="form-control" id="input-plantilla-oficial-reverso" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
  <button class="btn btn-vinotinto" type="button" onclick="subirPlantillaOficial('reverso')">Actualizar</button>
  </div>
- <div class="form-check small mb-2"><input class="form-check-input" type="checkbox" id="plantilla-ambos-turnos" checked><label class="form-check-label" for="plantilla-ambos-turnos">Usar este reverso en los dos turnos</label></div>
- <canvas id="prev-plantilla-oficial-reverso" class="preview-credencial" width="380" height="240" style="display:none;max-width:100%"></canvas>
+ <div class="slot-prev-plantilla">
+ <canvas id="prev-plantilla-oficial-reverso" class="preview-credencial" width="380" height="240" style="display:none"></canvas>
+ </div>
  <div id="msg-prev-plantilla-reverso" class="small text-muted text-center mt-1"></div>
+ <div class="form-check small mt-2"><input class="form-check-input" type="checkbox" id="plantilla-ambos-turnos" checked><label class="form-check-label" for="plantilla-ambos-turnos">Usar este reverso en los dos turnos</label></div>
  </div>
  </div>
- <button class="btn btn-outline-dark btn-sm mt-3" onclick="restaurarPlantillaOficial()">
+ <div class="d-flex flex-wrap gap-2 mt-3">
+ <button id="btn-restaurar-plantilla" class="btn btn-outline-dark btn-sm" onclick="restaurarPlantillaOficial()">
  Restaurar plantilla original
  </button>
+ <button id="btn-eliminar-anterior" class="btn btn-outline-danger btn-sm" onclick="eliminarPlantillaAnterior()" title="Borra para siempre el archivo de Word anterior (solo si ya subiste uno nuevo)">
+ Eliminar plantilla anterior
+ </button>
+ </div>
  <div id="resumen-plantilla-oficial" class="mt-2 small fw-semibold"></div>
  </div>
 
@@ -2195,10 +2207,14 @@ const ARCHIVOS_PLANTILLA = {
 const BASE_PLANTILLAS = "{{ asset('plantillas') }}/";
 let plantillasPedidas = false;
 const errorPlantilla = {};   // 'Matutino-frente' -> texto del problema, si lo hay
+const origenPlantilla = {};  // 'Matutino-frente' -> 'servidor' (la que subió Control Escolar) | 'original' (el Word de public/plantillas)
+const existeOriginal = {};   // 'FrenteMatutino.docx' -> true/false (false = ya se eliminó para siempre)
 try { localStorage.removeItem('sica_epo6_plantilla_oficial'); } catch (e) {}   // ya no se guardan imágenes de plantilla en el navegador
 function cargarPlantillasDefault() {
- const hecho = (turno, lado, modelo, error) => {
+ revisarOriginales();
+ const hecho = (turno, lado, modelo, error, origen) => {
   plantillasDefault[turno][lado] = modelo;
+  if (modelo && origen) origenPlantilla[turno + '-' + lado] = origen; else delete origenPlantilla[turno + '-' + lado];
   if (error) errorPlantilla[turno + '-' + lado] = error; else delete errorPlantilla[turno + '-' + lado];
   refrescarPreviewPlantillaOficial();
   if (idEditando) actualizarVistaPreviaCredencial();
@@ -2208,11 +2224,11 @@ function cargarPlantillasDefault() {
   Object.keys(ARCHIVOS_PLANTILLA).forEach(turno => ['frente','reverso'].forEach(lado => {
    const intentos = ['/plantilla-oficial/' + turno + '/' + lado, BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[turno][lado]];
    const probar = (i, ultimoError) => {
-    if (i >= intentos.length) return hecho(turno, lado, null, ultimoError || ('No se encontró la plantilla de Word (' + ARCHIVOS_PLANTILLA[turno][lado] + ' en public/plantillas).'));
+    if (i >= intentos.length) return hecho(turno, lado, null, ultimoError || ('No se encontró la plantilla de Word de este turno. Sube una con el botón "Actualizar".'));
     fetch(intentos[i] + '?v=' + Date.now(), {credentials: 'same-origin'})
      .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
      .then(buf => SicaDocx.cargar(buf))
-     .then(m => hecho(turno, lado, m))
+     .then(m => hecho(turno, lado, m, null, i === 0 ? 'servidor' : 'original'))
      .catch(e => probar(i + 1, e === 'no-esta' || !e ? ultimoError : 'El archivo de Word no se pudo leer: ' + (e.message || e)));
    };
    probar(0, '');
@@ -2250,6 +2266,36 @@ function refrescarPreviewPlantillaOficial() {
    msg.removeClass('text-danger').addClass('text-muted').text(errorPlantilla[t + '-' + l] || 'Cargando plantilla…');
   }
  });
+ igualarAlturaPreviews();
+ actualizarBotonesPlantilla();
+}
+/* Frente y reverso se ven con EXACTAMENTE la misma altura (el reverso es un poco más ancho que el frente,
+   por eso antes se veía más bajito). La altura se limita al ancho de la columna para que nunca se corte. */
+function igualarAlturaPreviews() {
+ const cvs = ['frente', 'reverso'].map(l => document.getElementById('prev-plantilla-oficial-' + l)).filter(c => c && c.style.display !== 'none' && c.width && c.height);
+ if (!cvs.length) return;
+ const maxAsp = Math.max.apply(null, cvs.map(c => c.width / c.height));
+ const colW = Math.min.apply(null, cvs.map(c => c.parentElement.clientWidth));   // 0 si el panel aún está oculto
+ const h = Math.floor(Math.min(250, colW > 0 ? (colW - 2) / maxAsp : 250));
+ cvs.forEach(c => { c.style.height = h + 'px'; c.style.width = Math.round(h * c.width / c.height) + 'px'; });
+}
+window.addEventListener('resize', igualarAlturaPreviews);
+/* ¿Siguen existiendo los Word originales de public/plantillas? (se pueden eliminar para siempre) */
+function revisarOriginales() {
+ return Promise.all(['FrenteMatutino.docx', 'FrenteVespertino.docx', 'Reverso.docx'].map(f =>
+  fetch(BASE_PLANTILLAS + f + '?v=' + Date.now(), {method: 'HEAD', credentials: 'same-origin'})
+   .then(r => { existeOriginal[f] = r.ok; })
+   .catch(() => {})                         // sin internet: no se sabe, se deja como estaba
+ )).then(actualizarBotonesPlantilla);
+}
+function actualizarBotonesPlantilla() {
+ const t = turnoCred || 'Matutino', lados = ['frente', 'reverso'];
+ const hayOriginal = lados.some(l => existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
+ const hayAnterior = lados.some(l => origenPlantilla[t + '-' + l] === 'servidor' && existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
+ $('#btn-restaurar-plantilla').prop('disabled', !hayOriginal)
+  .attr('title', hayOriginal ? '' : 'La plantilla original ya fue eliminada, no se puede restaurar.');
+ $('#btn-eliminar-anterior').prop('disabled', !hayAnterior)
+  .attr('title', hayAnterior ? 'Borra para siempre el archivo de Word anterior de este turno.' : 'Disponible cuando ya subiste una plantilla nueva y la anterior todavía existe.');
 }
 /* ============ PLANTILLA OFICIAL EDITABLE (solo Control Escolar) ============
  Sube un Word (.docx) nuevo para el turno elegido: se lee aquí mismo (vista previa y PDF al instante)
@@ -2283,6 +2329,8 @@ function subirPlantillaOficial(lado) {
     body: fd
    }).then(r => r.ok ? r.json() : r.json().catch(() => ({})).then(d => Promise.reject((d && (d.message || d.mensaje)) || ('error ' + r.status))));
   })).then(() => {
+   turnos.forEach(t => { origenPlantilla[t + '-' + lado] = 'servidor'; });
+   actualizarBotonesPlantilla();
    caja.removeClass('text-muted text-danger').addClass('text-success')
     .text('¡Plantilla ' + turnos.join(' y ') + ' (' + lado + ') actualizada con éxito! Las credenciales de ' + (turnos.length > 1 ? 'los dos turnos' : 'ese turno') + ' ya se generan con este diseño.');
   }, e => {
@@ -2296,11 +2344,40 @@ function subirPlantillaOficial(lado) {
 function restaurarPlantillaOficial() {
  if (rolActivo !== 'control') return;
  const t = turnoCred || 'Matutino';
- if (!confirm('¿Volver a la plantilla original (la de la carpeta public/plantillas) del turno ' + t + '?')) return;
+ // Solo se restaura lo que todavía tiene su Word original (si ya se eliminó para siempre, no hay a qué volver)
+ const lados = ['frente', 'reverso'].filter(l => existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
+ if (!lados.length) { alert('La plantilla original del turno ' + t + ' ya fue eliminada, por eso no se puede restaurar.'); return; }
+ if (!confirm('¿Volver a la plantilla original del turno ' + t + '?')) return;
  const cab = {'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''};
- Promise.all(['frente','reverso'].map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers: cab}).catch(() => {})))
+ Promise.all(lados.map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers: cab}).catch(() => {})))
   .then(() => { plantillasDefault[t] = {frente: null, reverso: null}; cargarPlantillasDefault(); });
  $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success').text('Se restauró la plantilla original del turno ' + t + ' en el servidor.');
+}
+/* Elimina PARA SIEMPRE la plantilla anterior (el Word original del servidor) del turno elegido.
+   Solo se puede cuando ya hay una plantilla nueva en uso; la nueva no se toca. */
+function eliminarPlantillaAnterior() {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede eliminar la plantilla anterior.'); return; }
+ const t = turnoCred || 'Matutino', caja = $('#resumen-plantilla-oficial');
+ const lados = ['frente', 'reverso'].filter(l => origenPlantilla[t + '-' + l] === 'servidor' && existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
+ if (!lados.length) {
+  const hayNueva = ['frente', 'reverso'].some(l => origenPlantilla[t + '-' + l] === 'servidor');
+  alert(hayNueva ? 'La plantilla anterior del turno ' + t + ' ya fue eliminada.'
+                 : 'Todavía no hay una plantilla nueva en el turno ' + t + '. Primero sube el Word nuevo con el botón "Actualizar"; después podrás eliminar la anterior.');
+  return;
+ }
+ const archivos = lados.map(l => ARCHIVOS_PLANTILLA[t][l]).filter((v, i, a) => a.indexOf(v) === i).join(', ');
+ if (!confirm('¿Eliminar PERMANENTEMENTE la plantilla anterior del turno ' + t + ' (' + archivos + ')?\n\nLa plantilla nueva que subiste sigue en uso, pero ya no se podrá "Restaurar plantilla original". Esta acción no se puede deshacer.')) return;
+ const cab = {'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''};
+ caja.removeClass('text-success text-danger').addClass('text-muted').text('Eliminando la plantilla anterior…');
+ Promise.all(lados.map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l + '/anterior', {method: 'DELETE', headers: cab})
+  .then(r => r.json().catch(() => ({})).then(d => ({ok: r.ok && d.ok === true, mensaje: d.mensaje || d.message || ('error ' + r.status)})))
+  .catch(() => ({ok: false, mensaje: 'No hubo conexión con el servidor.'}))
+ )).then(res => {
+  const mal = res.filter(r => !r.ok);
+  revisarOriginales();
+  if (mal.length) caja.removeClass('text-muted text-success').addClass('text-danger').text(mal.map(r => r.mensaje).filter((v, i, a) => a.indexOf(v) === i).join(' '));
+  else caja.removeClass('text-muted text-danger').addClass('text-success').text('Listo: la plantilla anterior del turno ' + t + ' se eliminó para siempre. Sigue en uso la plantilla nueva.');
+ });
 }
 /* ============ PORTAL DEL ALUMNO / CREDENCIALES ============ */
 const qrImg = curp => (typeof QRious === 'undefined') ? '' : new QRious({value:curp, size:220}).toDataURL();

@@ -68,6 +68,11 @@ Route::middleware('auth')->group(function () {
         ->middleware('sica:control')
         ->name('sica.plantilla.borrar');
 
+    // Borra PARA SIEMPRE el archivo de Word anterior (el original de public/plantillas) cuando ya hay uno nuevo en uso
+    Route::delete('/api/sica/plantilla-oficial/{turno}/{lado}/anterior', [ControlEscolarController::class, 'eliminarPlantillaAnterior'])
+        ->middleware('sica:control')
+        ->name('sica.plantilla.anterior');
+
     // Contraseñas: solo Control Escolar (cambiar la de cada rol y poner una propia a cada orientador)
     Route::middleware(['sica:control', 'throttle:20,1,claves'])->prefix('/api/sica/claves')->group(function () {
         Route::get('/', [ClavesController::class, 'index'])->name('sica.claves');
