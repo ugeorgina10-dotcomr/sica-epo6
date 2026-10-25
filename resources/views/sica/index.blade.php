@@ -23,6 +23,9 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .main-card{background:rgba(255,255,255,.95);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.3);border:1px solid rgba(128,0,32,.25)}
 .login-card{background:rgba(255,255,255,.96);border-radius:20px;box-shadow:0 15px 40px rgba(0,0,0,.35);border:1px solid #e2e8f0}
 .btn-vinotinto{background:#800020;color:#fff;font-weight:600;transition:.12s}
+.casilla{display:inline-block;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid #adb5bd;border-radius:4px;background:#fff;position:relative;transition:.12s}
+#requisitos-clave li.cumple .casilla{background:#198754;border-color:#198754}
+#requisitos-clave li.cumple .casilla::after{content:"";position:absolute;left:3px;top:0;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .btn-vinotinto:hover{background:#600018;color:#fff}
 .institution-logo{width:130px;height:130px;object-fit:contain}
 .small-logo{width:75px;height:75px;object-fit:contain}
@@ -572,15 +575,15 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
   <div class="form-check mt-2 small"><input class="form-check-input" type="checkbox" id="ver-claves" onchange="verClavesNuevas()"><label class="form-check-label" for="ver-claves">Mostrar lo que escribo</label></div>
   <div class="mt-3 p-3 rounded-3 small bg-white" style="border:1px solid #eee">
    <div class="fw-semibold mb-1" style="color:#800020">Cómo hacer una contraseña segura</div>
-   <ol class="mb-2 ps-4" id="requisitos-clave">
-    <li data-req="largo">Mínimo 8 caracteres (máximo 72).</li>
-    <li data-req="mayus">Una letra mayúscula y una minúscula.</li>
-    <li data-req="numero">Al menos un número.</li>
-    <li data-req="espacios">Sin espacios.</li>
-    <li data-req="especial">Solo letras y números: sin caracteres especiales (@ # $ % & * . - _ ! ?) ni acentos.</li>
-    <li data-req="escuela">Sin el nombre de la escuela ni la clave inicial (prepa06, epo6).</li>
-    <li data-req="igual">Las dos casillas deben coincidir.</li>
-   </ol>
+   <ul class="list-unstyled mb-2" id="requisitos-clave">
+    <li data-req="largo"><span class="casilla" aria-hidden="true"></span>Mínimo 8 caracteres (máximo 72).</li>
+    <li data-req="mayus"><span class="casilla" aria-hidden="true"></span>Una letra mayúscula y una minúscula.</li>
+    <li data-req="numero"><span class="casilla" aria-hidden="true"></span>Al menos un número.</li>
+    <li data-req="espacios"><span class="casilla" aria-hidden="true"></span>Sin espacios.</li>
+    <li data-req="especial"><span class="casilla" aria-hidden="true"></span>Solo letras y números: sin caracteres especiales (@ # $ % & * . - _ ! ?) ni acentos.</li>
+    <li data-req="escuela"><span class="casilla" aria-hidden="true"></span>Sin el nombre de la escuela ni la clave inicial (prepa06, epo6).</li>
+    <li data-req="igual"><span class="casilla" aria-hidden="true"></span>Las dos casillas deben coincidir.</li>
+   </ul>
    <div class="text-muted">El botón <b>Generar</b> crea una que ya cumple todo. Evita nombres, CURP y fechas de nacimiento, y no repitas la misma contraseña en otro rol.</div>
   </div>
   <div id="entrega-clave" class="mt-3 p-3 rounded-3 d-none" style="background:#eef7f0;border:1px solid #b7dcc0">
@@ -1520,7 +1523,7 @@ function revisarRequisitosClave() {
  };
  $('#requisitos-clave li').each(function () {
   const cumple = ok[$(this).data('req')];
-  $(this).toggleClass('text-success fw-semibold', cumple);
+  $(this).toggleClass('cumple text-success fw-semibold', cumple);
  });
  return Object.values(ok).every(Boolean);
 }
