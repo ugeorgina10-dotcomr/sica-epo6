@@ -22,12 +22,12 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .bg-login{background:#fff !important;min-height:100vh}
 .main-card{background:rgba(255,255,255,.95);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.3);border:1px solid rgba(128,0,32,.25)}
 .login-card{background:rgba(255,255,255,.96);border-radius:20px;box-shadow:0 15px 40px rgba(0,0,0,.35);border:1px solid #e2e8f0}
-.btn-vinotinto{background:#800020;color:#fff;font-weight:600;transition:.3s}
+.btn-vinotinto{background:#800020;color:#fff;font-weight:600;transition:.12s}
 .btn-vinotinto:hover{background:#600018;color:#fff}
 .institution-logo{width:130px;height:130px;object-fit:contain}
 .small-logo{width:75px;height:75px;object-fit:contain}
 .cct-text{font-size:.9rem;color:#444;letter-spacing:.5px;font-weight:500}
-.profile-card{border:2px solid #dee2e6;border-radius:12px;cursor:pointer;transition:.2s;background:#fff}
+.profile-card{border:2px solid #dee2e6;border-radius:12px;cursor:pointer;transition:.12s;background:#fff}
 .profile-card.active{border-color:#800020;background:#fdf8f8}
 .camera-box-ref{width:100%;max-width:320px;min-height:200px;background:#111;border-radius:10px;margin:0 auto;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-direction:column}
 .camera-box-ref video{width:100%}
@@ -462,7 +462,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <button onclick="detener('cam-orient')" class="btn btn-dark py-2 px-3 rounded-pill small">Apagar</button>
  </div>
  <div id="bloque-buscador-orientador" class="row g-3 mb-4 bg-light p-3 rounded-3 border">
- <div class="col-md-5"><label class="form-label">Buscador de Alumno</label><input type="text" id="buscador-alumno" class="form-control shadow-sm" placeholder="Ej. Maria Jose..." oninput="renderTabla()"></div>
+ <div class="col-md-5"><label class="form-label">Buscador de Alumno</label><input type="text" id="buscador-alumno" class="form-control shadow-sm" placeholder="Ej. Maria Jose..." oninput="renderTablaPronto()"></div>
  <div class="col-md-4"><label class="form-label">Calendario (fecha a consultar)</label><input type="date" id="calendario-orientador" class="form-control shadow-sm" onchange="renderTabla()"></div>
  <div class="col-md-3">
  <label class="form-label">Período del reporte</label>
@@ -572,15 +572,15 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
   <div class="form-check mt-2 small"><input class="form-check-input" type="checkbox" id="ver-claves" onchange="verClavesNuevas()"><label class="form-check-label" for="ver-claves">Mostrar lo que escribo</label></div>
   <div class="mt-3 p-3 rounded-3 small bg-white" style="border:1px solid #eee">
    <div class="fw-semibold mb-1" style="color:#800020">Cómo hacer una contraseña segura</div>
-   <ul class="list-unstyled mb-2" id="requisitos-clave">
-    <li data-req="largo"><span class="marca me-2">○</span>Mínimo 8 caracteres (máximo 72).</li>
-    <li data-req="mayus"><span class="marca me-2">○</span>Una letra mayúscula y una minúscula.</li>
-    <li data-req="numero"><span class="marca me-2">○</span>Al menos un número.</li>
-    <li data-req="espacios"><span class="marca me-2">○</span>Sin espacios.</li>
-    <li data-req="especial"><span class="marca me-2">○</span>Solo letras y números: sin caracteres especiales (@ # $ % & * . - _ ! ?) ni acentos.</li>
-    <li data-req="escuela"><span class="marca me-2">○</span>Sin el nombre de la escuela ni la clave inicial (prepa06, epo6).</li>
-    <li data-req="igual"><span class="marca me-2">○</span>Las dos casillas deben coincidir.</li>
-   </ul>
+   <ol class="mb-2 ps-4" id="requisitos-clave">
+    <li data-req="largo">Mínimo 8 caracteres (máximo 72).</li>
+    <li data-req="mayus">Una letra mayúscula y una minúscula.</li>
+    <li data-req="numero">Al menos un número.</li>
+    <li data-req="espacios">Sin espacios.</li>
+    <li data-req="especial">Solo letras y números: sin caracteres especiales (@ # $ % & * . - _ ! ?) ni acentos.</li>
+    <li data-req="escuela">Sin el nombre de la escuela ni la clave inicial (prepa06, epo6).</li>
+    <li data-req="igual">Las dos casillas deben coincidir.</li>
+   </ol>
    <div class="text-muted">El botón <b>Generar</b> crea una que ya cumple todo. Evita nombres, CURP y fechas de nacimiento, y no repitas la misma contraseña en otro rol.</div>
   </div>
   <div id="entrega-clave" class="mt-3 p-3 rounded-3 d-none" style="background:#eef7f0;border:1px solid #b7dcc0">
@@ -708,9 +708,15 @@ function guardarOrientadoresServidor() {
  });
 }
 // El teléfono nunca sobrescribe toda la base en el servidor: solo envía cada escaneo (registrar_asistencia).
+let _temporizadorSave = null;
 const save = () => {
- localStorage.setItem(LS, JSON.stringify(db));
- if (!ES_MOVIL) sincronizarConServidor('guardar_todo', db);
+ try { localStorage.setItem(LS, JSON.stringify(db)); } catch (e) {}
+ if (ES_MOVIL) return;
+ // Varias acciones seguidas (subir lista, escanear varios QR...) se envían al servidor en UNA sola petición.
+ // Mientras tanto queda la marca de pendiente: si se cierra la página antes, se envía al volver a abrir.
+ try { localStorage.setItem(PEND_TODO, '1'); } catch (e) {}
+ clearTimeout(_temporizadorSave);
+ _temporizadorSave = setTimeout(() => { _temporizadorSave = null; sincronizarConServidor('guardar_todo', db); }, 600);
 };
 /* ============ SINCRONIZACIÓN CON EL SERVIDOR (MySQL vía Laravel) ============
  Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
@@ -751,7 +757,7 @@ function sincronizarConServidor(accion, datos, reintento) {
    if (r.status === 401) { sesionExpirada(); return; }
    if (r.status === 403) return r.json().then(d => avisoPermiso(d && d.mensaje)).catch(() => avisoPermiso());
    if (accion === 'guardar_todo') {
-    if (r.ok) localStorage.removeItem(PEND_TODO);
+    if (r.ok) { if (!_temporizadorSave) localStorage.removeItem(PEND_TODO); }
     else if (r.status >= 500) localStorage.setItem(PEND_TODO, '1');
    }
   }).catch(() => {
@@ -841,7 +847,7 @@ function sesionExpirada() {
 /* Descarga el estado del servidor (listas, CURPs, horarios, asistencias de todos los dispositivos) */
 function cargarDesdeServidor() {
  // Si se hicieron cambios sin internet, primero se envían; así la descarga no los pisa con datos viejos del servidor
- if (!ES_MOVIL && rolActivo && localStorage.getItem(PEND_TODO)) {
+ if (!ES_MOVIL && rolActivo && localStorage.getItem(PEND_TODO) && !_temporizadorSave) {
   return fetchT('/api/sica/sync', {
    method: 'POST',
    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
@@ -852,10 +858,25 @@ function cargarDesdeServidor() {
  }
  return descargarEstadoServidor();
 }
+/* El navegador convierte solo los 304 en 200 y entregaba todo el estado cada 3 s: había que volver a leerlo,
+   fusionarlo, guardarlo y redibujar la tabla aunque nada hubiera cambiado. Ahora se manda el ETag a mano
+   (cache:'no-store') para recibir el 304 de verdad y no hacer nada cuando no hay cambios. */
+let _etagEstado = null, _descargandoEstado = false;
 function descargarEstadoServidor() {
- return fetchT('/api/sica/estado', {headers:{'Accept':'application/json'}}, 15000)
-  .then(r => { if (r.status === 401) { sesionExpirada(); return null; } return r.ok ? r.json() : null; })
+ if (_descargandoEstado) return Promise.resolve();   // no se amontonan consultas si el servidor tarda
+ _descargandoEstado = true;
+ const cab = {'Accept':'application/json'};
+ if (_etagEstado) cab['If-None-Match'] = _etagEstado;
+ return fetchT('/api/sica/estado', {headers: cab, cache: 'no-store'}, 15000)
+  .then(r => {
+   if (r.status === 401) { sesionExpirada(); return null; }
+   if (r.status === 304) { autoSubirPendientes(); return null; }   // sin cambios en el servidor
+   if (!r.ok) return null;
+   const et = r.headers.get('ETag');
+   return r.json().then(d => { _etagEstado = et; return d; });
+  })
   .then(s => {
+   _descargandoEstado = false;
    if (!s) return;
    fusionarServidor(s);
    autoSubirPendientes();
@@ -877,7 +898,7 @@ function descargarEstadoServidor() {
    }
    else if (!$('#vista-login').hasClass('d-none') && !$('#select-orientador-login').val()) actualizarCredenciales();
   })
-  .catch(() => {});
+  .catch(() => { _descargandoEstado = false; });
 }
 let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Entrada';
 let filtro = null, credSel = null, idEditando = null, chartAsistencias = null, gradoSeleccionado = null;
@@ -1297,6 +1318,7 @@ function cerrarSesion() {
  localStorage.removeItem('sica_orientador');
  orientadorActivo = null;
  rolActivo = null;
+ _etagEstado = null;
  document.body.classList.remove('modo-movil');
  fetch('/auth/logout', {
  method: 'POST',
@@ -1499,7 +1521,6 @@ function revisarRequisitosClave() {
  $('#requisitos-clave li').each(function () {
   const cumple = ok[$(this).data('req')];
   $(this).toggleClass('text-success fw-semibold', cumple);
-  $(this).find('.marca').text(cumple ? 'Sí' : 'No');
  });
  return Object.values(ok).every(Boolean);
 }
@@ -1934,6 +1955,8 @@ function renderTabla() {
  if (rolActivo) aplicarPermisosSolo();
  renderStats();
 }
+let _temporizadorTabla = null;
+function renderTablaPronto() { clearTimeout(_temporizadorTabla); _temporizadorTabla = setTimeout(renderTabla, 150); }
 function aplicarPermisosSolo() {
  const ok = rolActivo === 'control' || db.permisos[rolActivo] === 'editar';
  $('.btn-accion-restringida').toggleClass('bloqueado-permiso', !ok);
