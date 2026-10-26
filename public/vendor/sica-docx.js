@@ -941,6 +941,9 @@
    for (let t = MAXT; t >= MINT - 0.001; t -= 0.25) if (lista.every(k => cabe(k, t, modo))) return t;
    return MINT;
   };
+  // GRADO: si la palabra completa ("PRIMERO") no cabe ni con la letra mínima entre "GRADO:" y "GRUPO:",
+  // se escribe la forma corta ("1°"), así nunca se encima con la etiqueta de GRUPO.
+  if (C.grado && valores.grado && d.gradoCorto && !cabe('grado', MINT, 'junto')) valores.grado = d.gradoCorto;
   // CURP, grado, grupo y turno siempre van al frente (a la derecha de su etiqueta);
   // solo el NOMBRE va debajo de su etiqueta. Todos con el mismo tamaño de letra.
   let U = maxFit(ks, 'junto');
@@ -989,9 +992,22 @@
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.setTransform(esc, 0, 0, esc, -m.ox * esc, -m.oy * esc);
   const conQR = !!(datos && datos.conQR !== false && datos.curp && m.qr && global.QRious);
-  m.ops.forEach(o => { if (conQR && o.ph === 'qr') return; pintar(ctx, o); });
+  // El fondo de la plantilla es igual para todos los alumnos: se pinta una vez y se reutiliza (PDF de grupos mucho más rápido)
+  m._bg = m._bg || {};
+  const kbg = canvas.width + 'x' + canvas.height + (conQR ? 'q' : '');
+  let bg = m._bg[kbg];
+  if (!bg) {
+   const ks = Object.keys(m._bg); if (ks.length > 6) delete m._bg[ks[0]];
+   bg = m._bg[kbg] = document.createElement('canvas');
+   bg.width = canvas.width; bg.height = canvas.height;
+   const bx = bg.getContext('2d');
+   bx.fillStyle = '#fff'; bx.fillRect(0, 0, bg.width, bg.height);
+   bx.setTransform(esc, 0, 0, esc, -m.ox * esc, -m.oy * esc);
+   m.ops.forEach(o => { if (conQR && o.ph === 'qr') return; pintar(bx, o); });
+  }
+  ctx.drawImage(bg, 0, 0);
+  ctx.setTransform(esc, 0, 0, esc, -m.ox * esc, -m.oy * esc);
   if (datos) {
    rellenar(ctx, m, datos);
    if (conQR) {

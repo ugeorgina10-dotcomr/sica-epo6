@@ -631,16 +631,22 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 (function(){
  const base = "{{ asset('vendor') }}/";
  const grupos = [
-  ['html5-qrcode.min.js', 'qrious.min.js', 'chart.umd.min.js', 'jszip.min.js', 'sica-docx.js'],   // escáner, QR, gráficas y lector de plantillas Word
-  ['xlsx.full.min.js', 'jspdf.umd.min.js', 'pdf.min.js'],             // Excel, PDF y lector de PDF
-  ['jspdf.plugin.autotable.min.js']                                   // depende de jsPDF
+  ['jszip.min.js', 'qrious.min.js', 'sica-docx.js'],                 // lo mínimo para dibujar credenciales (lector de Word + QR)
+  ['html5-qrcode.min.js', 'chart.umd.min.js'],                        // escáner y gráficas
+  ['xlsx.full.min.js', 'jspdf.umd.min.js', 'pdf.min.js']              // Excel, PDF y lector de PDF
  ];
  const cargar = src => new Promise(ok => {
   const s = document.createElement('script');
-  s.src = base + src + '?v=17'; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=18'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
- window.SICA_LIBS_LISTAS = grupos.reduce((p, g) => p.then(() => Promise.all(g.map(cargar))), Promise.resolve()).then(() => {
+ // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
+ window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(cargar));
+ const resto = window.SICA_DOCX_LISTO.then(() => Promise.all([
+  Promise.all(grupos[1].map(cargar)),
+  Promise.all(grupos[2].map(cargar)).then(() => cargar('jspdf.plugin.autotable.min.js'))   // autotable depende de jsPDF
+ ]));
+ window.SICA_LIBS_LISTAS = resto.then(() => {
   if (window.Chart) Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
  });
@@ -2220,19 +2226,28 @@ function cargarPlantillasDefault() {
   refrescarPreviewPlantillaOficial();
   if (idEditando) actualizarVistaPreviaCredencial();
  };
- (window.SICA_LIBS_LISTAS || Promise.resolve()).then(() => {
+ // Se esperan solo las librerías de Word (no Excel/PDF/gráficas). El mismo archivo (p. ej. Reverso.docx, igual en los dos turnos) se lee UNA sola vez.
+ const leidos = {};   // url -> promesa del modelo ya leído
+ const leer = (url, forzar) => (!forzar && leidos[url]) || (leidos[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
+  .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
+  .then(buf => {
+   const esPdf = new Uint8Array(buf, 0, 5).join() === '37,80,68,70,45';   // "%PDF-": el lector de PDF puede tardar en cargar
+   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf));
+  }).catch(e => { delete leidos[url]; throw e; }));
+ (window.SICA_DOCX_LISTO || window.SICA_LIBS_LISTAS || Promise.resolve()).then(() => {
   if (!window.SicaDocx) { Object.keys(plantillasDefault).forEach(t => ['frente','reverso'].forEach(l => hecho(t, l, null, 'No se pudo cargar el lector de plantillas. Revisa tu internet y recarga la página.'))); return; }
-  Object.keys(ARCHIVOS_PLANTILLA).forEach(turno => ['frente','reverso'].forEach(lado => {
-   const intentos = ['/plantilla-oficial/' + turno + '/' + lado, BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[turno][lado]];
-   const probar = (i, ultimoError) => {
-    if (i >= intentos.length) return hecho(turno, lado, null, ultimoError || ('Todavía no hay plantilla para este turno. Elige tu archivo (Word o PDF) y pulsa "Actualizar".'));
-    fetch(intentos[i] + '?v=' + Date.now(), {credentials: 'same-origin'})
-     .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
-     .then(buf => SicaDocx.cargar(buf))
-     .then(m => hecho(turno, lado, m, null, i === 0 ? 'servidor' : 'original'))
-     .catch(e => probar(i + 1, e === 'no-esta' || !e ? ultimoError : 'No se pudo leer el archivo de la plantilla: ' + (e.message || e)));
-   };
-   probar(0, '');
+  // el turno que se está viendo primero
+  const turnos = Object.keys(ARCHIVOS_PLANTILLA).sort((a, b) => (b === turnoCred) - (a === turnoCred));
+  turnos.forEach(turno => ['frente','reverso'].forEach(lado => {
+   const urlServidor = '/plantilla-oficial/' + turno + '/' + lado, urlOriginal = BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[turno][lado];
+   // Se piden las dos a la vez (antes la del servidor fallaba con 404 y apenas entonces se pedía la original)
+   const pServ = leer(urlServidor, true).then(m => ({m}), e => ({e}));
+   const pOrig = leer(urlOriginal).then(m => ({m}), e => ({e}));
+   pServ.then(rs => rs.m ? hecho(turno, lado, rs.m, null, 'servidor') : pOrig.then(ro => {
+    if (ro.m) return hecho(turno, lado, ro.m, null, 'original');
+    const malo = [rs.e, ro.e].find(e => e && e !== 'no-esta');
+    hecho(turno, lado, null, malo ? 'No se pudo leer el archivo de la plantilla: ' + (malo.message || malo) : 'Todavía no hay plantilla para este turno. Elige tu archivo (Word o PDF) y pulsa "Actualizar".');
+   }));
   }));
  });
 }
@@ -2451,7 +2466,7 @@ function actualizarVistaPreviaCredencial() {
 function datosCredencial(a) {
  return {
   nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)', conQR: !!a.curp,
-  grado: nomGrado[a.grado] || '',
+  grado: nomGrado[a.grado] || '', gradoCorto: a.grado ? a.grado + '°' : '',
   grupo: ROMANOS[a.grupo] || String(a.grupo || ''), turno: a.turno || ''
  };
 }
