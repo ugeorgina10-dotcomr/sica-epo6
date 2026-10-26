@@ -885,7 +885,7 @@
 
  /* Escribe encima de la plantilla el nombre, CURP, grado, grupo y turno del alumno.
     TODOS los datos del alumno llevan EXACTAMENTE el mismo tamaño de letra (y la misma letra: Arial negrita).
-    Se busca la letra más grande (hasta 10 pt) con la que quepan todos los datos sin tocar el QR, la foto
+    Se busca la letra más grande (hasta 6 pt, como los nombres de los directivos) con la que quepan todos los datos sin tocar el QR, la foto
     ni la siguiente etiqueta; si el nombre es muy largo, baja la letra de todos los datos juntos, nunca solo la del nombre.
     Cada dato va a la derecha de su etiqueta o justo debajo de ella, lo que permita una letra más grande. */
  function rellenar(ctx, m, d) {
@@ -904,7 +904,7 @@
   }).filter(b => b && b.w > 30 && b.w < m.ancho * 0.45 && b.h > 40 && b.x > m.ox + m.ancho * 0.55 && !(m.qr && Math.abs(b.x - m.qr.x) < 2))[0] || null;
   const obst = [m.qr, m.foto || fotoAuto].filter(Boolean);
   const AIRE = 3.5;   // pt de separación entre el texto y el cuadro del QR / la foto
-  const MAXT = 10;    // letra máxima de todos los datos del alumno (nombre, CURP, grado, grupo y turno)
+  const MAXT = 6;     // letra de todos los datos del alumno (nombre, CURP, grado, grupo y turno): 6 pt, igual que los nombres de los directivos del reverso
   const MINT = 5.5;
   const limiteEn = (xDesde, yArriba, yAbajo) => {
    let lim = derecha;
