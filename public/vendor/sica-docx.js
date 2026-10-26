@@ -841,7 +841,7 @@
   // 1er renglón pegado a su etiqueta (las mayúsculas con acento suben ~0.93 de la letra); renglones apretados pero sin tocarse
   const geom = t => {
    const inter = t * 1.12;
-   const base = k => n.base + 4 + t * 0.93 + k * inter;   // +4 pt: nombre un poco más abajo de su etiqueta
+   const base = k => n.base + 6 + t * 0.93 + k * inter;   // +6 pt: nombre un poco más abajo de su etiqueta
    const ancho = k => limiteEn(xi, base(k) - t, base(k) + t * 0.3) - xi;
    return {inter, base, ancho};
   };
