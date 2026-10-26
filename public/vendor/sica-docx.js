@@ -934,8 +934,8 @@
   const cortos = ks.filter(k => k !== 'curp'), largos = ks.filter(k => k === 'curp');
   const plan = modo => ({modo: modo, TC: maxFit(largos, modo), T2: maxFit(cortos, modo)});
   const pj = plan('junto'), pa = plan('abajo');
-  // Se prefiere lo de siempre (a la derecha de la etiqueta) salvo que debajo se lea claramente más grande
-  const P = Math.min(pa.TC, pa.T2) >= Math.min(pj.TC, pj.T2) + 0.5 ? pa : pj;
+  // Se prefiere lo de siempre (a la derecha de la etiqueta) salvo que debajo la letra quede más grande
+  const P = Math.min(pa.TC, pa.T2) >= Math.min(pj.TC, pj.T2) + 0.25 ? pa : pj;
 
   // Tamaño único de letra: el más grande que quepa para CURP, grado, grupo y turno...
   let U = Math.min(P.TC, P.T2);

@@ -242,17 +242,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <!-- ===== PLANTILLA OFICIAL DE CREDENCIALES (solo Control Escolar, dentro del Portal del Alumno) ===== -->
  <div id="bloque-plantilla-oficial" class="p-4 bg-white rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Plantilla Oficial de Credenciales <span id="turno-plantilla-actual" class="badge bg-secondary ms-2 align-middle">Matutino</span></h6>
- <div class="small mb-3 p-3 rounded-3" style="background:#fbf3f5;border:1px solid #ecd3da">
-   <div class="fw-semibold mb-1" style="color:#800020">¿Cómo funciona? Es muy fácil:</div>
-   <ol class="mb-2 ps-3">
-    <li>Haz el diseño de la credencial en <b>Word</b> y guárdalo (<b>.docx</b>), o expórtalo como <b>PDF</b>.</li>
-    <li>Elige el turno con los botones <b>Matutino / Vespertino</b> de abajo.</li>
-    <li>Pulsa <b>Elegir archivo</b> en “Frente” o en “Reverso” y luego <b>Actualizar</b>. ¡Listo!</li>
-   </ol>
-   <div class="mb-1"><b>Qué hace el sistema:</b> escribe solo el <b>nombre, CURP, grado, grupo, turno y el código QR</b> de cada alumno, todo con la <b>misma letra y el mismo tamaño</b>. Sirve para <b>todos los grupos del turno elegido</b>.</div>
-   <div class="mb-1"><b>El frente debe tener:</b> un cuadro con el texto <b>QR</b> (ahí va el código) y estas etiquetas escritas tal cual: <b>NOMBRE DEL ESTUDIANTE:</b> <b>CURP:</b> <b>GRADO:</b> <b>GRUPO:</b> <b>TURNO:</b> (y, si quieres, un cuadro con el texto <b>FOTOGRAFÍA</b>). No escribas nada junto a las etiquetas: el sistema lo llena.</div>
-   <div class="text-muted">El Matutino y el Vespertino llevan cada uno su propio frente (cambia el C.C.T.). Si tu archivo es PDF, debe tener el texto seleccionable (no una foto) y se usa solo la <b>primera hoja</b>.</div>
-  </div>
+ <p class="text-muted small mb-2">Aquí se suben los <b>diseños de la credencial hechos en Word (.docx) o en PDF</b>: uno de <b>frente</b> y uno de <b>reverso</b> por turno. Valen para <b>todos los grupos del turno elegido</b> (usa los botones Matutino / Vespertino de abajo para cambiar de turno; cada turno tiene su propio frente porque cambia el C.C.T.).</p>
+ <p class="text-muted small mb-2">Cuando quieras cambiar el diseño, edítalo en Word y <b>guárdalo como .docx</b> (o expórtalo como <b>PDF</b>), luego elige el archivo aquí abajo y pulsa <b>Actualizar</b>: el sistema vuelve a acomodar solo el nombre, CURP, grado, grupo, turno y el código QR de cada alumno, todos con la <b>misma letra y el mismo tamaño</b>. En el frente deben existir el cuadro con el texto <b>QR</b> y las etiquetas <b>NOMBRE DEL ESTUDIANTE:, CURP:, GRADO:, GRUPO:, TURNO:</b>; no escribas nada a un lado de ellas, porque ahí escribe el sistema.</p>
+ <p class="text-muted small mb-3">Si tu archivo es PDF, el texto debe poder seleccionarse (no una foto de la credencial) y se usa solo la <b>primera hoja</b>.</p>
  <div class="row g-3">
  <div class="col-md-6">
  <label class="form-label small">Frente (Word .docx o PDF)</label>
@@ -645,7 +637,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  ];
  const cargar = src => new Promise(ok => {
   const s = document.createElement('script');
-  s.src = base + src; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=10'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  window.SICA_LIBS_LISTAS = grupos.reduce((p, g) => p.then(() => Promise.all(g.map(cargar))), Promise.resolve()).then(() => {
