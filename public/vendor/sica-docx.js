@@ -941,12 +941,15 @@
    for (let t = MAXT; t >= MINT - 0.001; t -= 0.25) if (lista.every(k => cabe(k, t, modo))) return t;
    return MINT;
   };
-  // GRADO: si la palabra completa ("PRIMERO") no cabe ni con la letra mínima entre "GRADO:" y "GRUPO:",
-  // se escribe la forma corta ("1°"), así nunca se encima con la etiqueta de GRUPO.
-  if (C.grado && valores.grado && d.gradoCorto && !cabe('grado', MINT, 'junto')) valores.grado = d.gradoCorto;
-  // CURP, grado, grupo y turno siempre van al frente (a la derecha de su etiqueta);
-  // solo el NOMBRE va debajo de su etiqueta. Todos con el mismo tamaño de letra.
-  let U = maxFit(ks, 'junto');
+  // GRADO: la palabra completa (PRIMERO / SEGUNDO / TERCERO) casi nunca cabe entre "GRADO:" y "GRUPO:".
+  // Si no cabe a la derecha de su etiqueta ni con la letra mínima, se escribe justo DEBAJO de "GRADO:"
+  // (igual que el nombre), con la misma letra que los demás datos; así nunca se encima con "GRUPO:".
+  const gradoAbajo = !!(C.grado && valores.grado && !cabe('grado', MINT, 'junto') && cabe('grado', MINT, 'abajo'));
+  const ksJunto = gradoAbajo ? ks.filter(k => k !== 'grado') : ks;
+  // CURP, grupo y turno van al frente (a la derecha de su etiqueta); el NOMBRE (y el grado, si no cabe) debajo de su etiqueta.
+  // Todos con el mismo tamaño de letra.
+  let U = maxFit(ksJunto, 'junto');
+  if (gradoAbajo) U = Math.min(U, maxFit(['grado'], 'abajo'));
  
   // ...y que además quepa el nombre (si es muy largo se reparte en renglones y, de ser necesario, baja la letra de todos)
   const n = C.nombre;
@@ -958,7 +961,8 @@
    U = Math.min(U, nom.t);
   }
   if (nom) nom.renglones.forEach(l => poner(l.txt, l.x, l.y, U));
-  ks.forEach(k => poner(texto(k), C[k].xFin + 4, C[k].base, U));
+  ksJunto.forEach(k => poner(texto(k), C[k].xFin + 4, C[k].base, U));
+  if (gradoAbajo) poner(texto('grado'), C.grado.xIni, C.grado.base + U * 1.15, U);
  }
 
  /* QR: se genera sin margen, se recorta a los cuadritos y se dibuja ocupando TODO el recuadro que se marcó

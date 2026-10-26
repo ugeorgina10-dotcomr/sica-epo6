@@ -2466,7 +2466,7 @@ function actualizarVistaPreviaCredencial() {
 function datosCredencial(a) {
  return {
   nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)', conQR: !!a.curp,
-  grado: nomGrado[a.grado] || '', gradoCorto: a.grado ? a.grado + '°' : '',
+  grado: nomGrado[a.grado] || '',
   grupo: ROMANOS[a.grupo] || String(a.grupo || ''), turno: a.turno || ''
  };
 }
