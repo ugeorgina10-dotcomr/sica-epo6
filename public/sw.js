@@ -5,7 +5,7 @@
  *   - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
-const VERSION = 'sica-v10';
+const VERSION = 'sica-v11';
 const C_ESTATICOS = VERSION + '-estaticos';
 const C_PAGINAS = VERSION + '-paginas';
 
@@ -16,18 +16,18 @@ const PRECARGA = [
   '/vendor/fontawesome/webfonts/fa-regular-400.woff2',
   '/vendor/fontawesome/webfonts/fa-brands-400.woff2',
   '/vendor/jquery.min.js',
-  '/vendor/html5-qrcode.min.js?v=10',
-  '/vendor/qrious.min.js?v=10',
-  '/vendor/xlsx.full.min.js?v=10',
-  '/vendor/jspdf.umd.min.js?v=10',
-  '/vendor/jspdf.plugin.autotable.min.js?v=10',
-  '/vendor/chart.umd.min.js?v=10',
-  '/vendor/pdf.min.js?v=10',
+  '/vendor/html5-qrcode.min.js?v=11',
+  '/vendor/qrious.min.js?v=11',
+  '/vendor/xlsx.full.min.js?v=11',
+  '/vendor/jspdf.umd.min.js?v=11',
+  '/vendor/jspdf.plugin.autotable.min.js?v=11',
+  '/vendor/chart.umd.min.js?v=11',
+  '/vendor/pdf.min.js?v=11',
   '/vendor/pdf.worker.min.js',
   '/img/logo6.png',
   '/img/epo6.png',
-  '/vendor/jszip.min.js?v=10',
-  '/vendor/sica-docx.js?v=10',
+  '/vendor/jszip.min.js?v=11',
+  '/vendor/sica-docx.js?v=11',
   '/plantillas/FrenteMatutino.docx',
   '/plantillas/FrenteVespertino.docx',
   '/plantillas/Reverso.docx',

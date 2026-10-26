@@ -892,7 +892,17 @@
   const C = m.campos, FUENTE = 'Arial';
   const derecha = m.ox + m.ancho - 4;
   const abajoCard = m.oy + m.alto - 8;       // deja libre la franja roja de abajo
-  const obst = [m.qr, m.foto].filter(Boolean);
+  // Si no se detectó el cuadro de la foto (a veces viene dentro de un grupo de Word), se busca su recuadro punteado
+  // en el lado derecho de la credencial para no escribir encima de él.
+  const fotoAuto = m.foto ? null : (m.ops || []).map(o => {
+   if (!o || o.t !== 'path' || !o.dash || o.dash === 'solid' || !o.cmds || o.cmds.length < 4) return null;
+   const xs = [], ys = [];
+   o.cmds.forEach(c => { if (c.length >= 3) { xs.push(c[1]); ys.push(c[2]); } });
+   if (!xs.length) return null;
+   const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
+   return {x: x, y: y, w: Math.max.apply(null, xs) - x, h: Math.max.apply(null, ys) - y};
+  }).filter(b => b && b.w > 30 && b.w < m.ancho * 0.45 && b.h > 40 && b.x > m.ox + m.ancho * 0.55 && !(m.qr && Math.abs(b.x - m.qr.x) < 2))[0] || null;
+  const obst = [m.qr, m.foto || fotoAuto].filter(Boolean);
   const AIRE = 3.5;   // pt de separación entre el texto y el cuadro del QR / la foto
   const MAXT = 10;    // letra máxima de todos los datos del alumno (nombre, CURP, grado, grupo y turno)
   const MINT = 5.5;
@@ -931,14 +941,10 @@
    for (let t = MAXT; t >= MINT - 0.001; t -= 0.25) if (lista.every(k => cabe(k, t, modo))) return t;
    return MINT;
   };
-  const cortos = ks.filter(k => k !== 'curp'), largos = ks.filter(k => k === 'curp');
-  const plan = modo => ({modo: modo, TC: maxFit(largos, modo), T2: maxFit(cortos, modo)});
-  const pj = plan('junto'), pa = plan('abajo');
-  // Se prefiere lo de siempre (a la derecha de la etiqueta) salvo que debajo la letra quede más grande
-  const P = Math.min(pa.TC, pa.T2) >= Math.min(pj.TC, pj.T2) + 0.25 ? pa : pj;
-
-  // Tamaño único de letra: el más grande que quepa para CURP, grado, grupo y turno...
-  let U = Math.min(P.TC, P.T2);
+  // CURP, grado, grupo y turno siempre van al frente (a la derecha de su etiqueta);
+  // solo el NOMBRE va debajo de su etiqueta. Todos con el mismo tamaño de letra.
+  let U = maxFit(ks, 'junto');
+ 
   // ...y que además quepa el nombre (si es muy largo se reparte en renglones y, de ser necesario, baja la letra de todos)
   const n = C.nombre;
   let nom = null;
@@ -949,11 +955,7 @@
    U = Math.min(U, nom.t);
   }
   if (nom) nom.renglones.forEach(l => poner(l.txt, l.x, l.y, U));
-  ks.forEach(k => {
-   const l = C[k];
-   if (P.modo === 'abajo') poner(texto(k), l.xIni, l.base + U * 1.15, U);
-   else poner(texto(k), l.xFin + 4, l.base, U);
-  });
+  ks.forEach(k => poner(texto(k), C[k].xFin + 4, C[k].base, U));
  }
 
  /* QR: se genera sin margen, se recorta a los cuadritos y se dibuja ocupando TODO el recuadro que se marcó

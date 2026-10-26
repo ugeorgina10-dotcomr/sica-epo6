@@ -31,5 +31,6 @@ También puedes reemplazar los archivos de `public/plantillas`; esos se usan mie
 (opcional: un cuadro con el texto `FOTOGRAFÍA`). Deja libre el espacio junto a las etiquetas: ahí escribe el sistema.
 - **Si es PDF:** el texto debe poder seleccionarse (no una foto) y se usa solo la primera hoja.
 - Si el nombre es muy largo, baja la letra de todos los datos juntos para que siempre queden del mismo tamaño.
+- El nombre va debajo de su etiqueta; CURP, grado, grupo y turno van al frente (a la derecha de su etiqueta). Para que la letra salga lo más grande posible, deja espacio libre entre "GRADO:" y "GRUPO:" y no pongas el cuadro del QR junto a la CURP.
 - El PDF de credenciales se descarga en tamaño Carta u Oficio, con las credenciales a tamaño real.
 - Si el diseño usa elementos muy especiales (efectos, WordArt, formas rotadas) puede que no se dibujen igual: revisa la vista previa.
