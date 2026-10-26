@@ -53,36 +53,40 @@ class ControlEscolarController extends Controller
 
     /**
      * Guarda la plantilla oficial (frente o reverso) de un turno EN LA BASE DE DATOS.
-     * La plantilla es un archivo de Word (.docx); el navegador lo lee y escribe encima los datos del alumno.
+     * La plantilla es un archivo de Word (.docx) o un PDF; el navegador lo lee y escribe encima los datos del alumno.
      */
     public function plantillaOficial(Request $request, string $lado): JsonResponse
     {
         abort_unless(in_array($lado, ['frente', 'reverso'], true), 404);
 
         $request->validate([
-            'archivo' => 'required|file|max:10240|extensions:docx',
+            'archivo' => 'required|file|max:10240|extensions:docx,pdf',
             'turno'   => 'required|in:Matutino,Vespertino',
         ], [
-            'archivo.extensions' => 'La plantilla debe ser un archivo de Word en formato .docx.',
-            'archivo.max'        => 'El archivo de Word pesa demasiado (máximo 10 MB).',
+            'archivo.extensions' => 'La plantilla debe ser un Word (.docx) o un PDF.',
+            'archivo.max'        => 'El archivo pesa demasiado (máximo 10 MB).',
         ]);
 
         $ruta = $request->file('archivo')->getRealPath();
 
-        // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo
-        if (class_exists(\ZipArchive::class)) {
+        $contenido = file_get_contents($ruta);
+
+        if (str_starts_with($contenido, '%PDF-')) {
+            // PDF: se reconoce por su encabezado
+        } elseif (class_exists(\ZipArchive::class)) {
+            // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo
             $zip = new \ZipArchive();
             $ok  = $zip->open($ruta) === true && $zip->locateName('word/document.xml') !== false;
             $zip->close();
             if (!$ok) {
-                return response()->json(['ok' => false, 'message' => 'El archivo no es un documento de Word (.docx) válido.'], 422);
+                return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) ni un PDF válido.'], 422);
             }
         }
 
         $turno = $request->input('turno');
         Ajuste::updateOrCreate(
             ['clave' => self::clavePlantilla($turno, $lado)],
-            ['valor' => base64_encode(file_get_contents($ruta))]
+            ['valor' => base64_encode($contenido)]
         );
         // Las plantillas anteriores eran imágenes (.png): ya no se usan
         Ajuste::where('clave', self::clavePlantillaImagenVieja($turno, $lado))->delete();
@@ -90,7 +94,7 @@ class ControlEscolarController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** Sirve la plantilla (Word) guardada en la BD; si no hay, 404 y la página usa la que viene en public/plantillas */
+    /** Sirve la plantilla (Word o PDF) guardada en la BD; si no hay, 404 y la página usa la que viene en public/plantillas */
     public function verPlantillaOficial(string $turno, string $lado)
     {
         abort_unless(in_array($turno, ['Matutino', 'Vespertino'], true) && in_array($lado, ['frente', 'reverso'], true), 404);
@@ -98,8 +102,13 @@ class ControlEscolarController extends Controller
         $a = Ajuste::find(self::clavePlantilla($turno, $lado));
         abort_unless($a && $a->valor, 404);
 
-        $respuesta = response(base64_decode($a->valor), 200, [
-            'Content-Type'  => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        $bytes = base64_decode($a->valor);
+        $tipo  = str_starts_with($bytes, '%PDF-')
+            ? 'application/pdf'
+            : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+        $respuesta = response($bytes, 200, [
+            'Content-Type'  => $tipo,
             'Cache-Control' => 'no-cache',
         ]);
         $respuesta->setEtag(md5($a->valor));

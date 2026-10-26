@@ -7,8 +7,11 @@
  *   - las etiquetas NOMBRE / CURP / GRADO / GRUPO / TURNO -> los datos se escriben junto a cada una
  * Cuando se cambia el diseño en Word basta con subir el archivo de nuevo: todo se vuelve a acomodar.
  *
+ * También lee plantillas en PDF (necesita pdf.js, vendor/pdf.min.js): el PDF se usa como fondo y se buscan, por la
+ * posición del texto, las mismas etiquetas y los cuadros "QR" y "FOTOGRAFÍA".
+ *
  * Necesita JSZip (vendor/jszip.min.js). Uso:
- *   const m = await SicaDocx.cargar(arrayBuffer);        // lee y acomoda el Word
+ *   const m = await SicaDocx.cargar(arrayBuffer);        // lee y acomoda el Word (.docx) o el PDF
  *   SicaDocx.dibujar(canvas, m, datos|null, {ancho:760}); // datos = {nombre, curp, grado, grupo, turno}
  *   m.ancho / m.alto = tamaño real en puntos de la credencial
  */
@@ -112,7 +115,7 @@
  /* =====================================================================
     Lectura de todo el documento
     ===================================================================== */
- async function cargar(buffer) {
+ async function cargarDocx(buffer) {
   if (!global.JSZip) throw new Error('Falta la librería JSZip.');
   let zip;
   try { zip = await global.JSZip.loadAsync(buffer); }
@@ -648,6 +651,149 @@
  }
 
  /* =====================================================================
+    Plantillas en PDF
+    El PDF se dibuja como imagen de fondo (recortada al diseño, sin márgenes en blanco). Las etiquetas
+    NOMBRE / CURP / GRADO / GRUPO / TURNO se encuentran por la posición de su texto y los cuadros "QR" y
+    "FOTOGRAFÍA" por su texto y su borde (recto o punteado). Se usa la primera página del PDF.
+    ===================================================================== */
+ async function cargarPDF(buffer) {
+  if (!global.pdfjsLib) throw new Error('Falta el lector de PDF (pdf.js).');
+  let pdf;
+  try { pdf = await global.pdfjsLib.getDocument({data: new Uint8Array(buffer.slice(0))}).promise; }
+  catch (e) { throw new Error('El archivo no es un PDF válido o está protegido con contraseña.'); }
+  try {
+   const page = await pdf.getPage(1);
+   const v1 = page.getViewport({scale: 1});
+   // resolución: la mayor que quepa en ~4000 px (entre 2 y 8 px por pt)
+   const ESC = Math.max(2, Math.min(8, 4000 / Math.max(v1.width, v1.height)));
+   const vp = page.getViewport({scale: ESC});
+   const full = document.createElement('canvas');
+   full.width = Math.ceil(vp.width); full.height = Math.ceil(vp.height);
+   const fctx = full.getContext('2d', {willReadFrequently: true});
+   await page.render({canvasContext: fctx, viewport: vp, background: 'rgb(255,255,255)'}).promise;
+
+   // zona con contenido (todo lo que no es blanco)
+   const W0 = full.width, H0 = full.height;
+   const px0 = fctx.getImageData(0, 0, W0, H0).data;
+   let ax = W0, ay = H0, bx = -1, by = -1;
+   for (let y = 0; y < H0; y++) {
+    for (let x = 0, i = y * W0 * 4; x < W0; x++, i += 4) {
+     if (px0[i + 3] > 0 && (px0[i] < 245 || px0[i + 1] < 245 || px0[i + 2] < 245)) {
+      if (x < ax) ax = x; if (x > bx) bx = x; if (y < ay) ay = y; if (y > by) by = y;
+     }
+    }
+   }
+   if (bx < 0) throw new Error('El PDF está vacío.');
+   // si la hoja del PDF ya es del tamaño de una credencial, se respeta completa (tal cual la diseñó quien la exportó)
+   if (v1.width <= 420 && v1.height <= 300) { ax = 0; ay = 0; bx = W0 - 1; by = H0 - 1; }
+   const cw = bx - ax + 1, ch = by - ay + 1;
+   const img = document.createElement('canvas');
+   img.width = cw; img.height = ch;
+   img.getContext('2d').drawImage(full, ax, ay, cw, ch, 0, 0, cw, ch);
+   const ctx = img.getContext('2d', {willReadFrequently: true});
+   const data = ctx.getImageData(0, 0, cw, ch).data;
+   const ox = ax / ESC, oy = ay / ESC;               // pt del origen del recorte dentro de la página
+   const aPt = (x, y) => { const q = v1.convertToViewportPoint(x, y); return [q[0] - ox, q[1] - oy]; };
+
+   // texto de la página, ordenado en renglones
+   const tc = await page.getTextContent();
+   const items = tc.items.filter(it => it.str && it.str.trim()).map(it => {
+    const t = it.transform, p = aPt(t[4], t[5]);
+    return {s: it.str, x: p[0], base: p[1], w: it.width || 0, size: Math.hypot(t[2], t[3]) || Math.abs(t[3]) || 8};
+   });
+   items.sort((a, b) => (a.base - b.base) || (a.x - b.x));
+   const renglones = [];
+   items.forEach(it => {
+    const r = renglones.find(r => Math.abs(r.base - it.base) < Math.max(1.2, it.size * 0.2));
+    if (r) r.items.push(it); else renglones.push({base: it.base, items: [it]});
+   });
+   const campos = {};
+   const medirRel = (sub, todo) => { const a = medirSimple(todo, 10, false, 'Arial'); return a ? medirSimple(sub, 10, false, 'Arial') / a : 0; };
+   renglones.forEach(r => {
+    r.items.sort((a, b) => a.x - b.x);
+    let texto = '';
+    const mapa = [];
+    r.items.forEach((it, k) => {
+     if (k && !/\s$/.test(texto) && !/^\s/.test(it.s) && it.x - (r.items[k - 1].x + r.items[k - 1].w) > it.size * 0.15) texto += ' ';
+     mapa.push({ini: texto.length, it: it});
+     texto += it.s;
+    });
+    // x de un carácter dentro del renglón (reparte el ancho del bloque de texto según el ancho de las letras)
+    const xDe = pos => {
+     let m = mapa[0];
+     for (const e of mapa) if (e.ini <= pos) m = e;
+     const k = Math.max(0, Math.min(m.it.s.length, pos - m.ini));
+     return m.it.x + m.it.w * medirRel(m.it.s.slice(0, k), m.it.s);
+    };
+    const re = /(NOMBRE(?:\s+DEL\s+ESTUDIANTE)?|CURP|GRADO|GRUPO|TURNO)\s*:/gi;
+    let mm;
+    while ((mm = re.exec(texto))) {
+     const clave = mm[1].toUpperCase().startsWith('NOMBRE') ? 'nombre' : mm[1].toLowerCase();
+     if (campos[clave]) continue;
+     const it = mapa.filter(e => e.ini <= mm.index).pop().it;
+     campos[clave] = {k: clave, xIni: xDe(mm.index), xFin: xDe(mm.index + mm[0].length), base: r.base, size: it.size,
+      lineTop: r.base - it.size, lineH: it.size * 1.2, izq: 0, ancho: cw / ESC, y: r.base - it.size};
+    }
+   });
+   // GRADO y GRUPO comparten renglón: GRADO termina donde empieza GRUPO
+   Object.keys(campos).forEach(k => {
+    const l = campos[k];
+    l.limiteDer = Infinity;
+    Object.keys(campos).forEach(o => {
+     const m = campos[o];
+     if (m !== l && Math.abs(m.base - l.base) < 1 && m.xIni > l.xFin) l.limiteDer = Math.min(l.limiteDer, m.xIni);
+    });
+   });
+
+   // cuadros "QR" y "FOTOGRAFÍA": se parte del texto y se busca su borde en la imagen
+   const oscuro = (x, y) => { if (x < 0 || y < 0 || x >= cw || y >= ch) return false; const i = (y * cw + x) * 4; return data[i + 3] > 0 && (data[i] + data[i + 1] + data[i + 2]) / 3 < 190; };
+   const densV = (x, y1, y2) => { let n = 0, t = 0; for (let y = Math.max(0, Math.round(y1)); y <= Math.min(ch - 1, Math.round(y2)); y++) { t++; if (oscuro(Math.round(x), y)) n++; } return t ? n / t : 0; };
+   const densH = (y, x1, x2) => { let n = 0, t = 0; for (let x = Math.max(0, Math.round(x1)); x <= Math.min(cw - 1, Math.round(x2)); x++) { t++; if (oscuro(x, Math.round(y))) n++; } return t ? n / t : 0; };
+   const buscarBorde = (desde, hasta, paso, dens) => {   // primer borde (línea continua o punteada) en esa dirección
+    for (let p = desde; paso > 0 ? p <= hasta : p >= hasta; p += paso) {
+     if (dens(p) >= 0.3) {
+      let q = p, suma = p, n = 1;                          // centro del grosor de la línea
+      while (dens(q + paso) >= 0.3 && n < ESC * 4) { q += paso; suma += q; n++; }
+      return suma / n;
+     }
+    }
+    return null;
+   };
+   const cajaDe = (regex, ventana) => {
+    const it = items.find(e => regex.test(e.s.trim()));
+    if (!it) return null;
+    const cx = (it.x + it.w / 2) * ESC, cy = (it.base - it.size * 0.35) * ESC;
+    const mw = (it.w / 2 + 3) * ESC, mh = (it.size * 0.6 + 2) * ESC, vent = ventana * ESC, tope = 140 * ESC;
+    const izq = buscarBorde(cx - mw, cx - tope, -1, x => densV(x, cy - vent, cy + vent));
+    const der = buscarBorde(cx + mw, cx + tope, 1, x => densV(x, cy - vent, cy + vent));
+    const arr = buscarBorde(cy - mh, cy - tope, -1, y => densH(y, cx - vent, cx + vent));
+    const aba = buscarBorde(cy + mh, cy + tope, 1, y => densH(y, cx - vent, cx + vent));
+    if (izq === null || der === null || arr === null || aba === null) return null;
+    return {x: izq / ESC, y: arr / ESC, w: (der - izq) / ESC, h: (aba - arr) / ESC};
+   };
+   const qr = cajaDe(/^QR$/i, 16), foto = cajaDe(/^FOTOGRAF[IÍ]A$/i, 16);
+
+   const avisos = [];
+   const faltan = ['nombre', 'curp', 'grado', 'grupo', 'turno'].filter(k => !campos[k]);
+   if (faltan.length) avisos.push('No se encontraron las etiquetas: ' + faltan.join(', ').toUpperCase() + '.');
+   return {
+    ancho: cw / ESC, alto: ch / ESC, ox: 0, oy: 0,
+    ops: [{t: 'img', img: img, x: 0, y: 0, w: cw / ESC, h: ch / ESC, layer: 0}],
+    campos: campos, qr: qr, foto: foto, avisos: avisos, origen: 'pdf'
+   };
+  } finally {
+   try { pdf.destroy(); } catch (e) {}
+  }
+ }
+
+ /* Lee una plantilla: detecta solo si es un PDF (empieza con "%PDF-") o un Word (.docx) */
+ async function cargar(buffer) {
+  const cab = new Uint8Array(buffer, 0, Math.min(5, buffer.byteLength));
+  if (String.fromCharCode.apply(null, cab) === '%PDF-') return cargarPDF(buffer);
+  return cargarDocx(buffer);
+ }
+
+ /* =====================================================================
     Dibujo en canvas
     ===================================================================== */
  const DASH = {sysDot: [1, 1], dot: [1, 2], sysDash: [3, 1], dash: [4, 3], lgDash: [8, 3], sysDashDot: [3, 1, 1, 1]};
@@ -738,18 +884,17 @@
  }
 
  /* Escribe encima de la plantilla el nombre, CURP, grado, grupo y turno del alumno.
-    Antes la letra quedaba muy chica (~6 pt) porque cada dato tenía que caber a la derecha de su etiqueta
-    (el grado, por ejemplo, solo tiene ~26 pt antes de "GRUPO:"). Ahora, si así se lee más grande,
-    cada dato se escribe justo DEBAJO de su etiqueta (igual que ya iba el nombre), con la letra más grande
-    que quepa sin tocar el QR, la foto ni la siguiente etiqueta. */
+    TODOS los datos del alumno llevan EXACTAMENTE el mismo tamaño de letra (y la misma letra: Arial negrita).
+    Se busca la letra más grande (hasta 10 pt) con la que quepan todos los datos sin tocar el QR, la foto
+    ni la siguiente etiqueta; si el nombre es muy largo, baja la letra de todos los datos juntos, nunca solo la del nombre.
+    Cada dato va a la derecha de su etiqueta o justo debajo de ella, lo que permita una letra más grande. */
  function rellenar(ctx, m, d) {
   const C = m.campos, FUENTE = 'Arial';
   const derecha = m.ox + m.ancho - 4;
   const abajoCard = m.oy + m.alto - 8;       // deja libre la franja roja de abajo
   const obst = [m.qr, m.foto].filter(Boolean);
   const AIRE = 3.5;   // pt de separación entre el texto y el cuadro del QR / la foto
-  const MAXT = 10;    // letra máxima de CURP, grado, grupo y turno (antes 7.5)
-  const MAXN = 11;  // letra máxima del nombre
+  const MAXT = 10;    // letra máxima de todos los datos del alumno (nombre, CURP, grado, grupo y turno)
   const MINT = 5.5;
   const limiteEn = (xDesde, yArriba, yAbajo) => {
    let lim = derecha;
@@ -792,18 +937,22 @@
   // Se prefiere lo de siempre (a la derecha de la etiqueta) salvo que debajo se lea claramente más grande
   const P = Math.min(pa.TC, pa.T2) >= Math.min(pj.TC, pj.T2) + 0.5 ? pa : pj;
 
-  // NOMBRE: debajo de su etiqueta (o primer renglón junto a ella); siempre queda aire antes del CURP
+  // Tamaño único de letra: el más grande que quepa para CURP, grado, grupo y turno...
+  let U = Math.min(P.TC, P.T2);
+  // ...y que además quepa el nombre (si es muy largo se reparte en renglones y, de ser necesario, baja la letra de todos)
   const n = C.nombre;
+  let nom = null;
   if (n && d.nombre) {
    const sigu = ['curp', 'grado', 'grupo', 'turno'].map(k => C[k]).filter(l => l && l.lineTop > n.lineTop + 1).sort((a, b) => a.lineTop - b.lineTop)[0];
    const tope = sigu ? (sigu.base - sigu.size * 0.8) - 2.5 : n.base + 30;
-   const r = repartirNombre(String(d.nombre).toUpperCase(), n, tope, limiteEn, FUENTE, MAXN);
-   r.renglones.forEach(l => poner(l.txt, l.x, l.y, r.t));
+   nom = repartirNombre(String(d.nombre).toUpperCase(), n, tope, limiteEn, FUENTE, U);
+   U = Math.min(U, nom.t);
   }
+  if (nom) nom.renglones.forEach(l => poner(l.txt, l.x, l.y, U));
   ks.forEach(k => {
-   const l = C[k], t = k === 'curp' ? P.TC : P.T2;
-   if (P.modo === 'abajo') poner(texto(k), l.xIni, l.base + t * 1.15, t);
-   else poner(texto(k), l.xFin + 4, l.base, t);
+   const l = C[k];
+   if (P.modo === 'abajo') poner(texto(k), l.xIni, l.base + U * 1.15, U);
+   else poner(texto(k), l.xFin + 4, l.base, U);
   });
  }
 

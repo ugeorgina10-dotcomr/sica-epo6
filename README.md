@@ -15,12 +15,21 @@ En `C:\xampp\php\php.ini` deben estar activas (sin `;`): `extension=zip`, `exten
 Cuentas iniciales: ver `database/seeders/UsuarioSeeder.php` (contrasena inicial `prepa06`; cambiala desde Control Escolar).
 Si aparece "500 Server Error": pon `APP_DEBUG=true` en `.env` o revisa `storage/logs/laravel.log`.
 
-## Plantillas de credencial (Word)
-El diseño de la credencial es un archivo de Word (.docx): `FrenteMatutino.docx`, `FrenteVespertino.docx` y `Reverso.docx`
-(carpeta `public/plantillas`). El sistema los lee y escribe encima nombre, CURP, grado, grupo, turno y el QR de cada alumno.
-- Para cambiar el diseño: edita el Word, guárdalo como .docx y súbelo en **Portal del Alumno > Plantilla Oficial de Credenciales**
-  (solo Control Escolar). Queda guardado en la base de datos y vale para todos los equipos.
-  También puedes reemplazar los archivos de `public/plantillas`; esos se usan mientras no se suba uno nuevo.
-- El frente debe tener un cuadro con el texto `QR` y las etiquetas `NOMBRE DEL ESTUDIANTE:`, `CURP:`, `GRADO:`, `GRUPO:`, `TURNO:`.
-- El PDF se descarga en tamaño Carta u Oficio, con las credenciales a tamaño real.
-- Si el Word usa elementos muy especiales (efectos, WordArt, formas rotadas) puede que no se dibujen igual: revisa la vista previa.
+## Plantillas de credencial (Word o PDF)
+El diseño de la credencial es un archivo de Word (.docx) o un PDF: `FrenteMatutino.docx`, `FrenteVespertino.docx` y `Reverso.docx`
+(carpeta `public/plantillas`). El sistema los lee y escribe encima nombre, CURP, grado, grupo, turno y el QR de cada alumno,
+todo con la misma letra y el mismo tamaño.
+
+**Cómo cambiar el diseño (paso a paso):**
+1. Haz el diseño en Word y guárdalo como `.docx`, o expórtalo como PDF.
+2. Entra a **Portal del Alumno > Plantilla Oficial de Credenciales** (solo Control Escolar) y elige el turno (Matutino / Vespertino).
+3. En "Frente" o "Reverso" pulsa **Elegir archivo** y luego **Actualizar**. Queda guardado y vale para todos los equipos.
+
+También puedes reemplazar los archivos de `public/plantillas`; esos se usan mientras no se suba uno nuevo.
+
+**Reglas del frente:** debe tener un cuadro con el texto `QR` y las etiquetas `NOMBRE DEL ESTUDIANTE:`, `CURP:`, `GRADO:`, `GRUPO:`, `TURNO:`
+(opcional: un cuadro con el texto `FOTOGRAFÍA`). Deja libre el espacio junto a las etiquetas: ahí escribe el sistema.
+- **Si es PDF:** el texto debe poder seleccionarse (no una foto) y se usa solo la primera hoja.
+- Si el nombre es muy largo, baja la letra de todos los datos juntos para que siempre queden del mismo tamaño.
+- El PDF de credenciales se descarga en tamaño Carta u Oficio, con las credenciales a tamaño real.
+- Si el diseño usa elementos muy especiales (efectos, WordArt, formas rotadas) puede que no se dibujen igual: revisa la vista previa.
