@@ -879,7 +879,11 @@
   if (medirSimple(u, t, true, FUENTE) > aMax) { while (u.length > 1 && medirSimple(u + '…', t, true, FUENTE) > aMax) u = u.slice(0, -1); lineas[ult] = u + '…'; }
   return arm({t, lineas, g});
   function arm(r) {
-   return {t: r.t, renglones: r.lineas.map((l, i) => ({txt: l, x: xi, y: r.g.base(i)}))};
+   // Cada renglón del nombre va CENTRADO en el espacio disponible (desde la etiqueta hasta el QR / la foto / el borde).
+   return {t: r.t, renglones: r.lineas.map((l, i) => {
+    const libre = r.g.ancho(i), w = medirSimple(l, r.t, true, FUENTE);
+    return {txt: l, x: xi + Math.max(0, (libre - w) / 2), y: r.g.base(i)};
+   })};
   }
  }
 

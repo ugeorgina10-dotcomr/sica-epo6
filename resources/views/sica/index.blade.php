@@ -637,7 +637,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  ];
  const cargar = src => new Promise(ok => {
   const s = document.createElement('script');
-  s.src = base + src + '?v=12'; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=13'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  window.SICA_LIBS_LISTAS = grupos.reduce((p, g) => p.then(() => Promise.all(g.map(cargar))), Promise.resolve()).then(() => {
