@@ -548,7 +548,8 @@
    const relleno = kid(spPr, 'a', 'noFill') ? null : colorDe(spPr);
    let trazo = null, grosor = 0, dash = null;
    if (ln && !kid(ln, 'a', 'noFill')) {
-    trazo = colorDe(ln) || (kid(ln, 'a', 'solidFill') ? '#000000' : null);
+    // sin color propio (solo "estilo de línea" del tema, como el marco punteado del reverso): se dibuja en negro suave
+    trazo = colorDe(ln) || (kid(ln, 'a', 'solidFill') || kid(wsp, 'wps', 'style') ? '#1a1a1a' : null);
     grosor = num(at(ln, 'w'), 9525) / EMU;
     const pd = kid(ln, 'a', 'prstDash'); dash = pd ? at(pd, 'val') : null;
    }
@@ -629,6 +630,20 @@
    }
   });
   if (!isFinite(x1)) throw new Error('La plantilla de Word está vacía.');
+  // Si el diseño trae un marco punteado (la guía de corte), la credencial mide EXACTAMENTE ese marco:
+  // así al imprimir y recortar sale del tamaño que se dibujó en Word.
+  let marco = null;
+  S.out.forEach(o => {
+   if (o.t !== 'path' || !o.stroke || !o.dash || o.dash === 'solid' || !o.cmds) return;
+   const xs = [], ys = [];
+   o.cmds.forEach(c => { for (let k = 1; k < c.length; k += 2) { xs.push(c[k]); ys.push(c[k + 1]); } });
+   if (xs.length < 4) return;
+   const b = {x1: Math.min.apply(null, xs), y1: Math.min.apply(null, ys), x2: Math.max.apply(null, xs), y2: Math.max.apply(null, ys), m: (o.lw || 0) / 2};
+   const w = b.x2 - b.x1, h = b.y2 - b.y1;
+   if (w < 150 || h < 90 || w > 400 || h > 300) return;          // tamaño de credencial
+   if (!marco || w * h > (marco.x2 - marco.x1) * (marco.y2 - marco.y1)) marco = b;
+  });
+  if (marco) { x1 = marco.x1 - marco.m; y1 = marco.y1 - marco.m; x2 = marco.x2 + marco.m; y2 = marco.y2 + marco.m; }
   const ops = S.out.map((o, i) => ({o, i})).sort((a, b) => (a.o.layer - b.o.layer) || (a.i - b.i)).map(e => e.o);
 
   const campos = {};
@@ -642,6 +657,11 @@
     if (m !== l && Math.abs(m.base - l.base) < 1 && m.xIni > l.xFin) l.limiteDer = Math.min(l.limiteDer, m.xIni);
    });
   });
+  // Las piezas de texto del renglón de GRUPO se marcan: al escribir el grado (que en letra es largo) se corren a la derecha
+  if (campos.grado && campos.grupo && Math.abs(campos.grado.base - campos.grupo.base) < 1) {
+   const u = campos.grupo;
+   ops.forEach(o => { if (o.t === 't' && Math.abs(o.y - u.base) < 1.5 && o.x >= u.xIni - 0.5) o.gr = true; });
+  }
   const faltan = ['nombre', 'curp', 'grado', 'grupo', 'turno'].filter(k => !campos[k]);
   if (faltan.length) S.avisos.push('No se encontraron las etiquetas: ' + faltan.join(', ').toUpperCase() + '.');
   return {
@@ -835,7 +855,8 @@
  /* Reparte el nombre en renglones, todos DEBAJO de la etiqueta "NOMBRE DEL ESTUDIANTE:" y a todo lo ancho que
     dejen el QR y la foto. Busca la letra más grande que quepa (1, 2 o 3 renglones) dejando aire antes del
     siguiente dato (CURP). Devuelve {t, renglones:[{txt, x, y}]}. */
- function repartirNombre(txt, n, tope, limiteEn, FUENTE, tamMax) {
+ function repartirNombre(txt, n, tope, limiteEn, FUENTE, tamMax, tamMin) {
+  tamMin = tamMin || 5.4;
   const palabras = String(txt).trim().split(/\s+/).filter(Boolean);
   const xi = n.xIni;
   // 1er renglón pegado a su etiqueta (las mayúsculas con acento suben ~0.93 de la letra); renglones apretados pero sin tocarse
@@ -859,12 +880,12 @@
    if (g.base(lineas.length - 1) + t * 0.2 > tope + 0.01) return null;
    return {t, lineas, g};
   };
-  for (let t = tamMax || 9; t >= 5.4 - 0.001; t -= 0.25) {
+  for (let t = tamMax || 9; t >= tamMin - 0.001; t -= 0.25) {
    const r = intentar(t, 3);
    if (r) return arm(r);
   }
   // No cabe ni con la letra mínima: se corta con "…" para no encimarse con el CURP
-  const t = 5.4, g = geom(t);
+  const t = tamMin, g = geom(t);
   const maxL = Math.max(1, Math.min(3, Math.floor((tope - g.base(0) - t * 0.2) / g.inter) + 1));
   const lineas = []; let cur = '', k = 0;
   for (const w of palabras) {
@@ -883,17 +904,22 @@
   }
  }
 
- /* Escribe encima de la plantilla el nombre, CURP, grado, grupo y turno del alumno.
-    TODOS los datos del alumno llevan EXACTAMENTE el mismo tamaño de letra (y la misma letra: Arial negrita).
-    Se busca la letra más grande (hasta 7 pt) con la que quepan todos los datos sin tocar el QR, la foto
-    ni la siguiente etiqueta; si el nombre es muy largo, baja la letra de todos los datos juntos, nunca solo la del nombre.
-    Cada dato va a la derecha de su etiqueta o justo debajo de ella, lo que permita una letra más grande. */
- function rellenar(ctx, m, d) {
+ /* Calcula dónde va cada dato del alumno (nombre, CURP, grado, grupo y turno) sobre la plantilla.
+    - CURP, grado, grupo y turno empiezan justo DESPUÉS de los dos puntos de su etiqueta; el nombre va debajo de la suya.
+    - TODOS llevan el mismo tamaño de letra (Arial negrita), de 7 pt. Solo baja
+      de ahí si no cabe sin tocar el QR, la foto o la siguiente etiqueta, y baja para todos juntos.
+    - El grado va en letra (PRIMERO, SEGUNDO, TERCERO) y es largo: la etiqueta "GRUPO:" y su valor se corren a la
+      derecha lo necesario para que nunca se junten con el grado.
+    Devuelve {t, dx, textos:[{txt, x, y}]}. */
+ const TAM_DATOS = 7;        // pt: letra de todos los datos del alumno (para cambiarla, edita este número)
+ const TAM_MIN = 4.5;        // pt: lo más chico a lo que puede bajar si un dato no cabe
+ const SEP_DATO = 2.5;       // pt entre los dos puntos y el dato
+ const SEP_GRUPO = 3;        // pt mínimos entre el grado y la etiqueta GRUPO:
+ function planear(m, d) {
   const C = m.campos, FUENTE = 'Arial';
   const derecha = m.ox + m.ancho - 4;
   const abajoCard = m.oy + m.alto - 8;       // deja libre la franja roja de abajo
   // Si no se detectó el cuadro de la foto (a veces viene dentro de un grupo de Word), se busca su recuadro punteado
-  // en el lado derecho de la credencial para no escribir encima de él.
   const fotoAuto = m.foto ? null : (m.ops || []).map(o => {
    if (!o || o.t !== 'path' || !o.dash || o.dash === 'solid' || !o.cmds || o.cmds.length < 4) return null;
    const xs = [], ys = [];
@@ -903,66 +929,56 @@
    return {x: x, y: y, w: Math.max.apply(null, xs) - x, h: Math.max.apply(null, ys) - y};
   }).filter(b => b && b.w > 30 && b.w < m.ancho * 0.45 && b.h > 40 && b.x > m.ox + m.ancho * 0.55 && !(m.qr && Math.abs(b.x - m.qr.x) < 2))[0] || null;
   const obst = [m.qr, m.foto || fotoAuto].filter(Boolean);
-  const AIRE = 3.5;   // pt de separación entre el texto y el cuadro del QR / la foto
-  const MAXT = 7;     // letra de todos los datos del alumno (nombre, CURP, grado, grupo y turno): 7 pt
-  const MINT = 5.5;
-  const limiteEn = (xDesde, yArriba, yAbajo) => {
+  const AIRE = 3.5;        // pt entre el nombre y el cuadro del QR / la foto
+  const AIRE_DATO = 1.5;   // pt entre un dato de renglón y el QR (el QR ya trae su propio margen blanco)
+  const limiteEn = (xDesde, yArriba, yAbajo, aire) => {
    let lim = derecha;
-   obst.forEach(b => { if (b.x >= xDesde - 0.5 && b.y < yAbajo && b.y + b.h > yArriba) lim = Math.min(lim, b.x - AIRE); });
+   obst.forEach(b => { if (b.x >= xDesde - 0.5 && b.y < yAbajo && b.y + b.h > yArriba) lim = Math.min(lim, b.x - (aire == null ? AIRE : aire)); });
    return lim;
   };
-  ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
-  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-  const poner = (txt, x, y, tam) => { ctx.font = 'bold ' + tam + 'px Arial, "Liberation Sans", sans-serif'; ctx.fillText(txt, x, y); };
-
   const valores = {curp: d.curp || '', grado: d.grado || '', grupo: d.grupo || '', turno: d.turno || ''};
   const ks = ['curp', 'grado', 'grupo', 'turno'].filter(k => C[k] && valores[k]);
   const texto = k => String(valores[k]).toUpperCase();
-  // etiqueta de la fila de abajo (para no encimarse con ella)
-  const topeAbajo = k => {
-   const l = C[k];
-   const sig = Object.keys(C).map(q => C[q]).filter(o => o && o.base > l.base + 1);
-   return sig.length ? Math.min.apply(null, sig.map(o => o.base - o.size * 0.8)) - 3.5 : abajoCard;
+  const w = (k, t) => medirSimple(texto(k), t, true, FUENTE);
+  const movible = !!(C.grado && C.grupo && (m.ops || []).some(o => o.gr));   // solo en Word: en PDF el fondo es una imagen
+
+  // cuánto hay que correr "GRUPO:" a la derecha para que quepa el grado con la letra t
+  const dxPara = t => {
+   if (!movible || !C.grado || !C.grupo || !valores.grado) return 0;
+   return Math.max(0, C.grado.xFin + SEP_DATO + w('grado', t) + SEP_GRUPO - C.grupo.xIni);
   };
-  // ¿cabe el dato "k" con letra "t"?  junto = a la derecha de su etiqueta; abajo = debajo de ella
-  const cabe = (k, t, modo) => {
-   const l = C[k], ancho = medirSimple(texto(k), t, true, FUENTE);
-   const lim = l.limiteDer === Infinity ? Infinity : l.limiteDer - 3;
-   if (modo === 'junto') {
-    const x = l.xFin + 4;
-    return x + ancho <= Math.min(limiteEn(x, l.base - l.size, l.base + 1), lim) + 0.01;
-   }
-   const x = l.xIni, y = l.base + t * 1.15;
-   if (y + t * 0.25 > topeAbajo(k)) return false;
-   return x + ancho <= Math.min(limiteEn(x, y - t, y + t * 0.25), lim) + 0.01;
+  // ¿caben todos los datos de renglón con la letra t?
+  const caben = t => {
+   const dx = dxPara(t);
+   return ks.every(k => {
+    const l = C[k], x = l.xFin + (k === 'grupo' ? dx : 0) + SEP_DATO;
+    if (k === 'grado' && !movible && l.limiteDer !== Infinity) return x + w(k, t) <= l.limiteDer - 2 + 0.01;
+    return x + w(k, t) <= limiteEn(x, l.base - l.size, l.base + 1, AIRE_DATO) + 0.01;
+   });
   };
-  const maxFit = (lista, modo) => {
-   if (!lista.length) return MAXT;
-   for (let t = MAXT; t >= MINT - 0.001; t -= 0.25) if (lista.every(k => cabe(k, t, modo))) return t;
-   return MINT;
-  };
-  // GRADO: la palabra completa (PRIMERO / SEGUNDO / TERCERO) casi nunca cabe entre "GRADO:" y "GRUPO:".
-  // Si no cabe a la derecha de su etiqueta ni con la letra mínima, se escribe justo DEBAJO de "GRADO:"
-  // (igual que el nombre), con la misma letra que los demás datos; así nunca se encima con "GRUPO:".
-  const gradoAbajo = !!(C.grado && valores.grado && !cabe('grado', MINT, 'junto') && cabe('grado', MINT, 'abajo'));
-  const ksJunto = gradoAbajo ? ks.filter(k => k !== 'grado') : ks;
-  // CURP, grupo y turno van al frente (a la derecha de su etiqueta); el NOMBRE (y el grado, si no cabe) debajo de su etiqueta.
-  // Todos con el mismo tamaño de letra.
-  let U = maxFit(ksJunto, 'junto');
-  if (gradoAbajo) U = Math.min(U, maxFit(['grado'], 'abajo'));
- 
+  let U = TAM_MIN;
+  for (let t = TAM_DATOS; t >= TAM_MIN - 0.001; t -= 0.25) if (caben(t)) { U = t; break; }
+
   // ...y que además quepa el nombre (si es muy largo se reparte en renglones y, de ser necesario, baja la letra de todos)
   const n = C.nombre;
   let nom = null;
   if (n && d.nombre) {
    const sigu = ['curp', 'grado', 'grupo', 'turno'].map(k => C[k]).filter(l => l && l.lineTop > n.lineTop + 1).sort((a, b) => a.lineTop - b.lineTop)[0];
    const tope = sigu ? (sigu.base - sigu.size * 0.8) - 2.5 : n.base + 30;
-   nom = repartirNombre(String(d.nombre).toUpperCase(), n, tope, limiteEn, FUENTE, U);
+   nom = repartirNombre(String(d.nombre).toUpperCase(), n, tope, limiteEn, FUENTE, U, TAM_MIN);
    U = Math.min(U, nom.t);
   }
-  if (nom) nom.renglones.forEach(l => poner(l.txt, l.x, l.y, U));
-  ksJunto.forEach(k => poner(texto(k), C[k].xFin + 4, C[k].base, U));
-  if (gradoAbajo) poner(texto('grado'), C.grado.xIni, C.grado.base + U * 1.15, U);
+  const dx = dxPara(U);
+  const textos = [];
+  if (nom) nom.renglones.forEach(l => textos.push({txt: l.txt, x: l.x, y: l.y}));
+  ks.forEach(k => textos.push({txt: texto(k), x: C[k].xFin + (k === 'grupo' ? dx : 0) + SEP_DATO, y: C[k].base}));
+  return {t: U, dx: dx, textos: textos};
+ }
+ function escribir(ctx, plan) {
+  ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+  ctx.font = 'bold ' + plan.t + 'px Arial, "Liberation Sans", sans-serif';
+  plan.textos.forEach(l => ctx.fillText(l.txt, l.x, l.y));
  }
 
  /* QR: se genera sin margen, se recorta a los cuadritos y se dibuja ocupando TODO el recuadro que se marcó
@@ -999,7 +1015,7 @@
   const conQR = !!(datos && datos.conQR !== false && datos.curp && m.qr && global.QRious);
   // El fondo de la plantilla es igual para todos los alumnos: se pinta una vez y se reutiliza (PDF de grupos mucho más rápido)
   m._bg = m._bg || {};
-  const kbg = canvas.width + 'x' + canvas.height + (conQR ? 'q' : '');
+  const kbg = canvas.width + 'x' + canvas.height + (conQR ? 'q' : '') + (datos ? 'd' : '');
   let bg = m._bg[kbg];
   if (!bg) {
    const ks = Object.keys(m._bg); if (ks.length > 6) delete m._bg[ks[0]];
@@ -1008,12 +1024,14 @@
    const bx = bg.getContext('2d');
    bx.fillStyle = '#fff'; bx.fillRect(0, 0, bg.width, bg.height);
    bx.setTransform(esc, 0, 0, esc, -m.ox * esc, -m.oy * esc);
-   m.ops.forEach(o => { if (conQR && o.ph === 'qr') return; pintar(bx, o); });
+   m.ops.forEach(o => { if (conQR && o.ph === 'qr') return; if (datos && o.gr) return; pintar(bx, o); });   // las piezas de "GRUPO:" se pintan aparte (se corren según el grado)
   }
   ctx.drawImage(bg, 0, 0);
   ctx.setTransform(esc, 0, 0, esc, -m.ox * esc, -m.oy * esc);
+  const plan = datos ? planear(m, datos) : null;
+  if (datos) m.ops.forEach(o => { if (o.gr) { ctx.save(); if (plan.dx > 0) ctx.translate(plan.dx, 0); pintar(ctx, o); ctx.restore(); } });
   if (datos) {
-   rellenar(ctx, m, datos);
+   escribir(ctx, plan);
    if (conQR) {
     // El QR ocupa todo el cuadro que se marcó en Word, centrado (el cuadro puede no ser exactamente cuadrado)
     const q = qrRecortado(datos.curp), b = m.qr;

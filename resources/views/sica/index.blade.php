@@ -637,7 +637,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  ];
  const cargar = src => new Promise(ok => {
   const s = document.createElement('script');
-  s.src = base + src + '?v=18'; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=19'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
@@ -733,7 +733,7 @@ const save = () => {
  // Mientras tanto queda la marca de pendiente: si se cierra la página antes, se envía al volver a abrir.
  try { localStorage.setItem(PEND_TODO, '1'); } catch (e) {}
  clearTimeout(_temporizadorSave);
- _temporizadorSave = setTimeout(() => { _temporizadorSave = null; sincronizarConServidor('guardar_todo', db); }, 600);
+ _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 600);
 };
 /* ============ SINCRONIZACIÓN CON EL SERVIDOR (MySQL vía Laravel) ============
  Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
@@ -762,25 +762,65 @@ function guardarPaginaOffline() {
  } catch (e) {}
 }
 const PEND_TODO = 'sica_epo6_pend_todo';   // marca: hay cambios guardados solo en este equipo (se hicieron sin internet)
-function sincronizarConServidor(accion, datos, reintento) {
- try {
-  fetchT('/api/sica/sync', {
+/* ---- Guardado de todo (alumnos, asistencias, horarios) ----
+   Antes se reenviaba TODA la base (todos los alumnos con todo su historial) en cada cambio: con listas grandes la petición
+   pesaba megas, tardaba y el servidor podía rechazarla por tamaño sin avisar. Ahora:
+   - solo se envían los alumnos que cambiaron desde la última vez que el servidor los guardó (se compara su "firma"),
+   - y se mandan por lotes chicos, uno tras otro. */
+const LOTE_ALUMNOS = 150;
+const _firmasGuardadas = new Map();   // id del alumno -> firma de lo que ya tiene el servidor
+const firmaAlumno = a => JSON.stringify([a.curp, a.nombre, a.grado, a.grupo, a.turno, a.reg]);
+let _enviando = false, _hayOtroEnvio = false;
+function _postSync(accion, datos, ms) {
+ return fetchT('/api/sica/sync', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
+  body: JSON.stringify({ accion: accion, datos: datos })
+ }, ms || 60000).then(r => {
+  if (r.status !== 419) return r;
+  // el token CSRF venció: se pide uno nuevo y se reintenta UNA vez
+  return refrescarCsrf().then(() => fetchT('/api/sica/sync', {
    method: 'POST',
    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
    body: JSON.stringify({ accion: accion, datos: datos })
-  }, 30000).then(r => {
-   // 419: el token CSRF venció -> se pide uno nuevo y se reintenta UNA vez
-   if (r.status === 419 && !reintento) return refrescarCsrf().then(() => sincronizarConServidor(accion, datos, true));
+  }, ms || 60000));
+ });
+}
+/* sinVacios = true: si no hay ningún alumno distinto al del servidor, no manda nada. Devuelve una promesa con true/false. */
+function enviarTodo(sinVacios) {
+ if (_enviando) { _hayOtroEnvio = true; return Promise.resolve(false); }
+ const cambiados = db.alumnos.filter(a => _firmasGuardadas.get(a.id) !== firmaAlumno(a));
+ if (!cambiados.length && sinVacios) { if (!_temporizadorSave) localStorage.removeItem(PEND_TODO); return Promise.resolve(true); }
+ _enviando = true;
+ const lotes = [];
+ for (let i = 0; i < cambiados.length; i += LOTE_ALUMNOS) lotes.push(cambiados.slice(i, i + LOTE_ALUMNOS));
+ if (!lotes.length) lotes.push([]);
+ const hayPlantillas = db.plantillas && Object.keys(db.plantillas).length;
+ let fallo = false;
+ return lotes.reduce((prev, lote, n) => prev.then(() => {
+  if (fallo) return;
+  const datos = {orientadores: db.orientadores, horarios: db.horarios, plantillas: n === 0 && hayPlantillas ? db.plantillas : {}, alumnos: lote};
+  return _postSync('guardar_todo', datos).then(r => {
+   if (r.status === 401) { fallo = true; sesionExpirada(); return; }
+   if (r.status === 403) { fallo = true; localStorage.removeItem(PEND_TODO); return r.json().then(d => avisoPermiso(d && d.mensaje)).catch(() => avisoPermiso()); }
+   if (!r.ok) { fallo = true; return; }
+   lote.forEach(a => { _firmasGuardadas.set(a.id, firmaAlumno(a)); a.enServidor = true; });
+  });
+ }), Promise.resolve()).catch(() => { fallo = true; }).then(() => {
+  _enviando = false;
+  if (!fallo && !_temporizadorSave) localStorage.removeItem(PEND_TODO);
+  else if (fallo && localStorage.getItem(PEND_TODO) !== null) { /* se queda pendiente y se reintenta solo */ }
+  if (_hayOtroEnvio) { _hayOtroEnvio = false; setTimeout(() => enviarTodo(), 200); }
+  return !fallo;
+ });
+}
+function sincronizarConServidor(accion, datos, reintento) {
+ if (accion === 'guardar_todo') { enviarTodo(); return; }
+ try {
+  _postSync(accion, datos, 30000).then(r => {
    if (r.status === 401) { sesionExpirada(); return; }
    if (r.status === 403) return r.json().then(d => avisoPermiso(d && d.mensaje)).catch(() => avisoPermiso());
-   if (accion === 'guardar_todo') {
-    if (r.ok) { if (!_temporizadorSave) localStorage.removeItem(PEND_TODO); }
-    else if (r.status >= 500) localStorage.setItem(PEND_TODO, '1');
-   }
-  }).catch(() => {
-   /* sin conexión: localStorage sigue funcionando y se recuerda que falta enviar los cambios */
-   if (accion === 'guardar_todo') localStorage.setItem(PEND_TODO, '1');
-  });
+  }).catch(() => { /* sin conexión: localStorage sigue funcionando */ });
  } catch (err) { /* entorno sin fetch: se ignora */ }
 }
 /* Mezcla el estado del servidor con el local sin perder entradas/salidas ya registradas.
@@ -791,6 +831,7 @@ function fusionarServidor(s) {
  const locales = new Map(db.alumnos.map(a => [clv(a), a])), claves = new Set();
  const lista = s.alumnos.map(sa => {
   claves.add(clv(sa)); sa.reg = sa.reg || {}; sa.enServidor = true;
+  const firmaServidor = firmaAlumno(sa);   // lo que el servidor ya tiene de este alumno (antes de mezclar lo local)
   const la = locales.get(clv(sa));
   if (la) {
    sa.id = la.id;
@@ -800,6 +841,7 @@ function fusionarServidor(s) {
     if (l.salida && !r.salida) r.salida = l.salida;
    });
   }
+  _firmasGuardadas.set(sa.id, firmaServidor);
   return sa;
  });
  // Se conservan los locales aún no enviados; los que ya estuvieron en el servidor y ya no están (eliminados) se quitan
@@ -815,22 +857,10 @@ function pintarEstadoDatos() {}   // (ya no hay recuadro de estado; la subida au
 function autoSubirPendientes() {
  if (rolActivo !== 'control' || ES_MOVIL) return;
  const faltan = db.alumnos.filter(a => !a.enServidor).length;
- if (!faltan) {
-  pintarEstadoDatos('✔ Todo guardado en el servidor: ' + db.orientadores.length + ' orientador(es) y ' + db.alumnos.length + ' alumno(s).', true);
-  return;
- }
+ if (!faltan) return;
  if (_autoSubiendo) return;
  _autoSubiendo = true;
- pintarEstadoDatos('Subiendo ' + faltan + ' alumno(s) al servidor…');
- fetchT('/api/sica/sync', {
-  method: 'POST',
-  headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
-  body: JSON.stringify({accion: 'guardar_todo', datos: db})
- }, 120000).then(r => {
-  if (r.status === 419) return refrescarCsrf();
-  if (r.ok) localStorage.removeItem(PEND_TODO); else pintarEstadoDatos('⚠ No se pudo subir al servidor; se reintenta solo.', false);
- }).catch(() => pintarEstadoDatos('⚠ Sin conexión con el servidor; se reintenta solo.', false))
- .then(() => { _autoSubiendo = false; });
+ enviarTodo(true).then(() => { _autoSubiendo = false; });
 }
 /* Pide un token CSRF nuevo (cuando la sesión venció, el anterior ya no sirve) */
 function refrescarCsrf() {
@@ -865,12 +895,7 @@ function sesionExpirada() {
 function cargarDesdeServidor() {
  // Si se hicieron cambios sin internet, primero se envían; así la descarga no los pisa con datos viejos del servidor
  if (!ES_MOVIL && rolActivo && localStorage.getItem(PEND_TODO) && !_temporizadorSave) {
-  return fetchT('/api/sica/sync', {
-   method: 'POST',
-   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
-   body: JSON.stringify({ accion: 'guardar_todo', datos: db })
-  }, 30000).then(r => { if (r.ok) localStorage.removeItem(PEND_TODO); else if (r.status === 401) sesionExpirada(); })
-  .catch(() => {})
+  return enviarTodo(true)
   .then(() => localStorage.getItem(PEND_TODO) ? null : descargarEstadoServidor());
  }
  return descargarEstadoServidor();
