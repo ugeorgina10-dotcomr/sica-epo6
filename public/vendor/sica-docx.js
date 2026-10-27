@@ -906,14 +906,15 @@
 
  /* Calcula dónde va cada dato del alumno (nombre, CURP, grado, grupo y turno) sobre la plantilla.
     - CURP, grado, grupo y turno empiezan justo DESPUÉS de los dos puntos de su etiqueta; el nombre va debajo de la suya.
-    - TODOS llevan el mismo tamaño de letra (Arial negrita), de 7 pt. Solo baja
+    - TODOS llevan el mismo tamaño de letra (Arial negrita), de 6 pt: el mismo de las negritas del reverso (nombres de
+      director, subdirectora y secretario). Solo baja
       de ahí si no cabe sin tocar el QR, la foto o la siguiente etiqueta, y baja para todos juntos.
     - El grado va en letra (PRIMERO, SEGUNDO, TERCERO) y es largo: la etiqueta "GRUPO:" y su valor se corren a la
       derecha lo necesario para que nunca se junten con el grado.
     Devuelve {t, dx, textos:[{txt, x, y}]}. */
- const TAM_DATOS = 7;        // pt: letra de todos los datos del alumno (para cambiarla, edita este número)
+ const TAM_DATOS = 6;        // pt: letra de todos los datos del alumno = la negrita del reverso (para cambiarla, edita este número)
  const TAM_MIN = 4.5;        // pt: lo más chico a lo que puede bajar si un dato no cabe
- const SEP_DATO = 2;         // pt entre los dos puntos y el dato
+ const SEP_DATO = 1;         // pt entre los dos puntos y el dato
  const SEP_GRUPO = 3;        // pt mínimos entre el grado y la etiqueta GRUPO:
  function planear(m, d) {
   const C = m.campos, FUENTE = 'Arial';
@@ -928,7 +929,10 @@
    const x = Math.min.apply(null, xs), y = Math.min.apply(null, ys);
    return {x: x, y: y, w: Math.max.apply(null, xs) - x, h: Math.max.apply(null, ys) - y};
   }).filter(b => b && b.w > 30 && b.w < m.ancho * 0.45 && b.h > 40 && b.x > m.ox + m.ancho * 0.55 && !(m.qr && Math.abs(b.x - m.qr.x) < 2))[0] || null;
-  const obst = [m.qr, m.foto || fotoAuto].filter(Boolean);
+  // Del QR se respeta solo el cuadrado que de verdad se dibuja (el cuadro de Word es más ancho y deja unos pt blancos a los lados);
+  // así el texto puede usar ese espacio y seguir conservando el margen blanco propio del QR.
+  const qrReal = m.qr ? (() => { const L = Math.min(m.qr.w, m.qr.h); return {x: m.qr.x + (m.qr.w - L) / 2, y: m.qr.y + (m.qr.h - L) / 2, w: L, h: L}; })() : null;
+  const obst = [qrReal, m.foto || fotoAuto].filter(Boolean);
   const AIRE = 3.5;        // pt entre el nombre y el cuadro del QR / la foto
   const AIRE_DATO = 0.4;   // pt entre un dato de renglón y el QR (el QR ya trae su propio margen blanco)
   const limiteEn = (xDesde, yArriba, yAbajo, aire) => {
@@ -957,7 +961,7 @@
    });
   };
   let U = TAM_MIN;
-  for (let t = TAM_DATOS; t >= TAM_MIN - 0.001; t -= 0.25) if (caben(t)) { U = t; break; }
+  for (let t = TAM_DATOS; t >= TAM_MIN - 0.001; t -= 0.05) if (caben(t)) { U = Math.round(t * 100) / 100; break; }
 
   // ...y que además quepa el nombre (si es muy largo se reparte en renglones y, de ser necesario, baja la letra de todos)
   const n = C.nombre;
@@ -1031,6 +1035,10 @@
   const plan = datos ? planear(m, datos) : null;
   if (datos) m.ops.forEach(o => { if (o.gr) { ctx.save(); if (plan.dx > 0) ctx.translate(plan.dx, 0); pintar(ctx, o); ctx.restore(); } });
   if (datos) {
+   if (conQR) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(m.qr.x - 0.4, m.qr.y - 0.4, m.qr.w + 0.8, m.qr.h + 0.8);   // fondo blanco: tapa la línea punteada del recuadro (va antes del texto)
+   }
    escribir(ctx, plan);
    if (conQR) {
     // El QR ocupa todo el cuadro que se marcó en Word, centrado (el cuadro puede no ser exactamente cuadrado)
@@ -1038,8 +1046,6 @@
     const lado = Math.min(b.w, b.h);
     const mod = lado / (q.modulos + 2);          // 1 cuadrito de margen blanco alrededor
     const cx = b.x + (b.w - lado) / 2, cy = b.y + (b.h - lado) / 2;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(b.x - 0.4, b.y - 0.4, b.w + 0.8, b.h + 0.8);   // fondo blanco: tapa la línea punteada del recuadro
     ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(q.cv, q.sx, q.sy, q.sw, q.sh, cx + mod, cy + mod, mod * q.modulos, mod * q.modulos);
    }
