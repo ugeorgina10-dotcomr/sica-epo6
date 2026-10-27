@@ -913,7 +913,7 @@
     Devuelve {t, dx, textos:[{txt, x, y}]}. */
  const TAM_DATOS = 7;        // pt: letra de todos los datos del alumno (para cambiarla, edita este número)
  const TAM_MIN = 4.5;        // pt: lo más chico a lo que puede bajar si un dato no cabe
- const SEP_DATO = 2.5;       // pt entre los dos puntos y el dato
+ const SEP_DATO = 2;         // pt entre los dos puntos y el dato
  const SEP_GRUPO = 3;        // pt mínimos entre el grado y la etiqueta GRUPO:
  function planear(m, d) {
   const C = m.campos, FUENTE = 'Arial';
@@ -930,7 +930,7 @@
   }).filter(b => b && b.w > 30 && b.w < m.ancho * 0.45 && b.h > 40 && b.x > m.ox + m.ancho * 0.55 && !(m.qr && Math.abs(b.x - m.qr.x) < 2))[0] || null;
   const obst = [m.qr, m.foto || fotoAuto].filter(Boolean);
   const AIRE = 3.5;        // pt entre el nombre y el cuadro del QR / la foto
-  const AIRE_DATO = 1.5;   // pt entre un dato de renglón y el QR (el QR ya trae su propio margen blanco)
+  const AIRE_DATO = 0.4;   // pt entre un dato de renglón y el QR (el QR ya trae su propio margen blanco)
   const limiteEn = (xDesde, yArriba, yAbajo, aire) => {
    let lim = derecha;
    obst.forEach(b => { if (b.x >= xDesde - 0.5 && b.y < yAbajo && b.y + b.h > yArriba) lim = Math.min(lim, b.x - (aire == null ? AIRE : aire)); });
@@ -1048,5 +1048,5 @@
   return canvas;
  }
 
- global.SicaDocx = {cargar: cargar, dibujar: dibujar};
+ global.SicaDocx = {cargar: cargar, dibujar: dibujar, _planear: planear};
 })(window);

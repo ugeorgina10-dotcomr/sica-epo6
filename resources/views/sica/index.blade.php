@@ -637,7 +637,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  ];
  const cargar = src => new Promise(ok => {
   const s = document.createElement('script');
-  s.src = base + src + '?v=19'; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=20'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
@@ -2530,7 +2530,8 @@ function imagenesCredencial(a) {
  pintarCredencialCanvas(cF, a, 'frente', null, 1100);
  pintarCredencialCanvas(cR, a, 'reverso', null, 1100);
  return {
-  f: {img: cF.toDataURL('image/jpeg', 0.92), w: mF.ancho * PT_A_MM, h: mF.alto * PT_A_MM},
+  // El frente sale EXACTAMENTE del tamaño del reverso (el marco del reverso es la medida de la credencial)
+  f: {img: cF.toDataURL('image/jpeg', 0.92), w: mR.ancho * PT_A_MM, h: mR.alto * PT_A_MM},
   r: {img: cR.toDataURL('image/jpeg', 0.92), w: mR.ancho * PT_A_MM, h: mR.alto * PT_A_MM}
  };
 }
