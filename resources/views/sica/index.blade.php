@@ -319,10 +319,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <h6 class="fw-bold m-0 text-danger">Editar Credencial Individual</h6>
  <button onclick="regresarListaGrupo()" class="btn btn-outline-dark btn-sm">Regresar a Todos</button>
  </div>
+ <div id="aviso-credencial-solo-lectura" class="alert alert-warning py-2 small fw-semibold d-none">Solo lectura: para editar o descargar esta credencial se requiere autorización del Encargado de Control Escolar.</div>
  <div class="row">
  <div class="col-md-6">
  <div class="mb-3"><label class="form-label small">Matrícula (CURP)</label>
- <input type="text" id="edit-curp-alumno" class="form-control form-control-sm" oninput="actualizarVistaPreviaCredencial()"></div>
+ <input type="text" id="edit-curp-alumno" class="form-control form-control-sm" maxlength="18" autocomplete="off" oninput="actualizarVistaPreviaCredencial()">
+ <div class="form-text">La CURP debe tener exactamente 18 caracteres.</div></div>
  <div class="mb-3"><label class="form-label small">Nombre Completo (Apellido paterno, Apellido materno y Nombre)</label>
  <input type="text" id="edit-nombre-alumno" class="form-control form-control-sm" oninput="actualizarVistaPreviaCredencial()"></div>
  <div class="d-flex align-items-center gap-2 mb-2 flex-wrap"><label class="small fw-semibold m-0" for="sel-hoja-pdf-individual">Tamaño de hoja al imprimir:</label><select id="sel-hoja-pdf-individual" class="form-select form-select-sm sel-hoja-pdf" style="max-width:250px" onchange="cambiarHoja(this.value)"><option value="carta">Carta (21.6 × 27.9 cm)</option><option value="oficio">Oficio (21.6 × 33.0 cm)</option></select></div>
@@ -1397,6 +1399,7 @@ function aplicarPermisos(rol) {
  const ok = rol === 'control' || db.permisos[rol] === 'editar';
  $('.btn-accion-restringida').toggleClass('bloqueado-permiso', !ok).attr('title', ok ? null : 'Requiere autorización de Control Escolar');
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
+ bloquearEdicionCredencial();
  $('#bloque-permisos-roles').toggleClass('d-none', rol !== 'control');
  $('#bloque-claves').toggleClass('d-none', rol !== 'control');
  if (rol === 'control') cargarClaves();
@@ -2002,6 +2005,7 @@ function renderTablaPronto() { clearTimeout(_temporizadorTabla); _temporizadorTa
 function aplicarPermisosSolo() {
  const ok = rolActivo === 'control' || db.permisos[rolActivo] === 'editar';
  $('.btn-accion-restringida').toggleClass('bloqueado-permiso', !ok);
+ bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
 }
 function marcarSalida(id) { if (!permisoPermite()) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
@@ -2445,8 +2449,19 @@ function verCredencial(id) {
  const a = db.alumnos.find(x => x.id === id); idEditando = id;
  $('#edit-curp-alumno').val(a.curp); $('#edit-nombre-alumno').val(a.nombre);
  $('#resultado-credencial-box').addClass('d-none'); $('#vista-editar-credencial-individual').removeClass('d-none');
+ bloquearEdicionCredencial();
  actualizarVistaPreviaCredencial();
 }
+/* Director y Subdirector no pueden escribir en este apartado a menos que Control Escolar les dé permiso de "editar". */
+function puedeEditarCredencial() { return rolActivo === 'control' || (!!rolActivo && db.permisos[rolActivo] === 'editar'); }
+function bloquearEdicionCredencial() {
+ const ok = puedeEditarCredencial();
+ $('#edit-curp-alumno, #edit-nombre-alumno, #sel-hoja-pdf-individual').prop('disabled', !ok);
+ $('#aviso-credencial-solo-lectura').toggleClass('d-none', ok);
+}
+/* La CURP debe tener exactamente 18 caracteres */
+const CURP_LARGO = 18;
+function curpLargoValido(curp) { return String(curp || '').length === CURP_LARGO; }
 function regresarListaGrupo() { selCred(credSel.grado, credSel.grupo); }
 /* Elimina un alumno (y sus asistencias) del servidor y de este navegador. Solo Control Escolar. */
 function eliminarAlumno(id) {
@@ -2469,6 +2484,7 @@ function guardarCambiosCredencial() {
  if (!permisoPermite()) return;
  const a = db.alumnos.find(x => x.id === idEditando), curp = $('#edit-curp-alumno').val().trim().toUpperCase(), nombre = $('#edit-nombre-alumno').val().trim();
  if (!curp || !nombre) { alert('CURP y nombre son obligatorios.'); return; }
+ if (!curpLargoValido(curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres (ahora tiene ' + curp.length + ').'); return; }
  a.curp = curp; a.nombre = nombre; save();
  actualizarVistaPreviaCredencial();
  alert('Cambios guardados en la credencial.');
@@ -2618,6 +2634,7 @@ function descargarCredencialIndividual() {
  const a = db.alumnos.find(x => x.id === idEditando);
  if (!a.curp) { alert('Este alumno aún no tiene CURP asignado. Sube su CURP desde "Subir lista de alumnos" antes de descargar su credencial.'); return; }
  const datos = Object.assign({}, a, {nombre: $('#edit-nombre-alumno').val().trim() || a.nombre, curp: $('#edit-curp-alumno').val().trim().toUpperCase() || a.curp});
+ if (!curpLargoValido(datos.curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres (ahora tiene ' + datos.curp.length + '). Corrígela antes de descargar.'); return; }
  generarPDFCredenciales([datos], 'credencial_' + datos.curp + '.pdf', document.getElementById('btn-pdf-individual'), 'Descargar PDF');
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
