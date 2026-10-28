@@ -111,6 +111,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .ori-lista{max-height:260px;overflow-y:auto}
 .ori-item{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.5rem .9rem;border-bottom:1px solid #f1e6e8}
 .ori-item:last-child{border-bottom:0}
+.ori-actual{background:#fdf3f5}
 /* ---- Contraseñas: botones de cuenta y ventana central ---- */
 .btn-cuenta{border:1.5px solid #d9c3c8;background:#fff;color:#5a1020;border-radius:999px;padding:.4rem .9rem;font-size:.85rem;font-weight:600;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;transition:all .15s}
 .btn-cuenta:hover{border-color:#800020;background:#fdf3f5}
@@ -323,8 +324,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="row">
  <div class="col-md-6">
  <div class="mb-3"><label class="form-label small">Matrícula (CURP)</label>
- <input type="text" id="edit-curp-alumno" class="form-control form-control-sm" maxlength="18" autocomplete="off" oninput="actualizarVistaPreviaCredencial()">
- <div class="form-text">La CURP debe tener exactamente 18 caracteres.</div></div>
+ <input type="text" id="edit-curp-alumno" class="form-control form-control-sm" autocomplete="off" oninput="actualizarVistaPreviaCredencial()">
+ <div id="curp-contador" class="form-text fw-semibold">La CURP debe tener exactamente 18 caracteres.</div></div>
  <div class="mb-3"><label class="form-label small">Nombre Completo (Apellido paterno, Apellido materno y Nombre)</label>
  <input type="text" id="edit-nombre-alumno" class="form-control form-control-sm" oninput="actualizarVistaPreviaCredencial()"></div>
  <div class="d-flex align-items-center gap-2 mb-2 flex-wrap"><label class="small fw-semibold m-0" for="sel-hoja-pdf-individual">Tamaño de hoja al imprimir:</label><select id="sel-hoja-pdf-individual" class="form-select form-select-sm sel-hoja-pdf" style="max-width:250px" onchange="cambiarHoja(this.value)"><option value="carta">Carta (21.6 × 27.9 cm)</option><option value="oficio">Oficio (21.6 × 33.0 cm)</option></select></div>
@@ -452,10 +453,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-md-2"><button onclick="guardarHorarioGrupo()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button></div>
  </div>
  <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small">Archivo de horarios (.xlsx/.xls/.csv): columnas Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador y Turno (opcional; si no se indica se usa el turno activo)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
+ <div class="col-md-6"><label class="form-label small">Archivo de horarios (.xlsx/.xls/.csv): columnas Grado, Grupo, HoraEntrada, HoraSalida (ej. 07:10 o 1:10 PM), NombreOrientador (opcional) y Turno (opcional: Matutino, Vespertino o Ambos; si no se indica se usa el turno activo)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
  <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-dark btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
+ <div id="lista-horarios-actual" class="small mt-3"></div>
  </div>
  <!-- Cámara (orientador / director / subdirector) -->
  <div id="bloque-camara-orientador" class="p-3 bg-light rounded-4 border mb-4 text-center">
@@ -937,6 +939,7 @@ function descargarEstadoServidor() {
    }
    if (rolActivo) {
     renderTabla();
+    if (rolActivo === 'control') renderListaOrientadores();
     // Portal del Alumno: si se está viendo la lista de un grupo, se actualiza (alumnos nuevos que subió otra computadora)
     if (credSel && !$('#resultado-credencial-box').hasClass('d-none') && !$('#panel-alumno').hasClass('d-none')) selCred(credSel.grado, credSel.grupo);
    }
@@ -1067,13 +1070,57 @@ function leerFilasDesdeArchivo(file, callback, onError) {
  } else {
  if (!libsOk('XLSX')) return;
  const rd = new FileReader();
+ rd.onerror = () => { onError && onError('No se pudo leer el archivo. Si lo tienes abierto en Excel, ciérralo e inténtalo de nuevo.'); };
  rd.onload = e => {
- const wb = XLSX.read(e.target.result, {type:'array'});
- callback(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1}));
+ let filas;
+ try {
+ const wb = /\.csv$/i.test(file.name) ? leerLibroCSV(e.target.result) : XLSX.read(e.target.result, {type:'array'});
+ filas = filasDeLibro(wb);
+ } catch (err) { onError && onError('No se pudo leer el archivo (¿está dañado o no es Excel/CSV?): ' + (err && err.message ? err.message : err)); return; }
+ callback(filas);
  };
  rd.readAsArrayBuffer(file);
  }
 }
+/* CSV: respeta los acentos (UTF-8 o, si no lo es, Windows-1252 de Excel) y detecta la coma, el punto y coma o el tabulador. */
+function leerLibroCSV(buffer) {
+ const bytes = new Uint8Array(buffer);
+ let texto = new TextDecoder('utf-8').decode(bytes);
+ if (texto.indexOf('\uFFFD') !== -1) texto = new TextDecoder('windows-1252').decode(bytes);
+ texto = texto.replace(/^\uFEFF/, "");
+ const l1 = texto.split(/\r?\n/).find(l => l.trim()) || "";
+ const cuenta = c => l1.split(c).length - 1;
+ const FS = [';', '\t', '|'].reduce((mejor, c) => cuenta(c) > cuenta(mejor) ? c : mejor, ',');
+ return XLSX.read(texto, {type:'string', raw:true, FS:FS});
+}
+/* Primera hoja que tenga datos (sin filas totalmente vacías) */
+function filasDeLibro(wb) {
+ for (const nombre of wb.SheetNames) {
+ const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombre], {header:1, defval:null, blankrows:false});
+ if (filas.length) return filas;
+ }
+ return [];
+}
+/* Hora de una celda -> "HH:MM". Acepta 7:10, 07:10, 7:10 AM, 1:10 pm, 13.10, 7h10 y la hora de Excel (fracción del día). Devuelve "" si no es válida. */
+function horaDe(v) {
+ if (v == null || v === "") return "";
+ if (v instanceof Date) return isNaN(v) ? "" : p2(v.getHours()) + ':' + p2(v.getMinutes());
+ if (typeof v === 'number') {
+ const fr = v - Math.floor(v);
+ if (!(fr > 0)) return "";
+ const min = Math.round(fr * 1440) % 1440;
+ return p2(Math.floor(min / 60)) + ':' + p2(min % 60);
+ }
+ const t = String(v).trim().toLowerCase().replace(/\s+/g, ' ');
+ const m = t.match(/^(\d{1,2})\s*[:.h]\s*(\d{2})(?:\s*:\s*\d{2})?\s*(?:([ap])\.?\s*m\.?)?$/);
+ if (!m) return "";
+ let h = Number(m[1]); const mi = Number(m[2]);
+ if (mi > 59) return "";
+ if (m[3]) { if (h < 1 || h > 12) return ""; h = (h % 12) + (m[3] === 'p' ? 12 : 0); }
+ else if (h > 23) return "";
+ return p2(h) + ':' + p2(mi);
+}
+const minAHora = m => p2(Math.floor(m / 60)) + ':' + p2(m % 60);
 /* ============ ORIENTADORES: alta y consulta ============ */
 /* Número desde una celda: acepta 1, "1", "1°", "Primero"... Devuelve 0 si no hay número. */
 function numeroDe(v) {
@@ -1108,6 +1155,7 @@ function subirOrientadores() {
  leerFilasDesdeArchivo(file, rows => {
   rows = rows.filter(r => r[0] && String(r[0]).trim());
   if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
+  if (!rows.length) { alert('El archivo no trae orientadores. Revisa que el nombre esté en la primera columna.'); return; }
   let nuevos = 0, existentes = 0, asignados = 0, iguales = 0;
   const avisos = [];
   rows.forEach(r => {
@@ -1147,6 +1195,7 @@ function subirOrientadores() {
 function renderListaOrientadores() {
  const caja = $('#lista-orientadores-actual');
  const abierta = caja.find('details').prop('open');   // si estaba abierta, sigue abierta después de eliminar
+ renderListaHorarios();
  if (!db.orientadores.length) { caja.html('<span class="text-muted">Aún no hay orientadores dados de alta.</span>'); return; }
  const filas = db.orientadores.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(o => {
   const chips = Object.entries(db.horarios).filter(([k, v]) => v.orientadorId === o.id).map(([k]) => { const c = parseClave(k);
@@ -1158,6 +1207,57 @@ function renderListaOrientadores() {
    '<button type="button" data-o="' + esc(o.id) + '" onclick="eliminarOrientador(this.dataset.o)" class="btn btn-outline-danger btn-sm py-0 px-2" title="Eliminar orientador">Eliminar</button></div></div>' + (oriEditando && oriEditando.id === o.id ? htmlEditorOrientador(oriEditando) : '');
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver orientadores dados de alta (' + db.orientadores.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
+}
+/* Lista desplegable con el horario y el orientador de cada grupo (igual que la de orientadores). */
+function renderListaHorarios() {
+ const caja = $('#lista-horarios-actual');
+ if (!caja.length) return;
+ const abierta = caja.find('details').prop('open');
+ const items = Object.entries(db.horarios).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
+  .filter(x => x.h && (x.h.entrada || x.h.salida || x.h.orientadorId))
+  .sort((a, b) => (a.c.turno === b.c.turno ? 0 : a.c.turno === 'Matutino' ? -1 : 1) || a.c.grado - b.c.grado || a.c.grupo - b.c.grupo);
+ if (!items.length) { caja.html('<span class="text-muted">Aún no hay horarios ni orientadores asignados a ningún grupo.</span>'); return; }
+ const claveAct = filtro ? claveGrupo(filtro.grado, filtro.grupo, turnoActivo) : '';
+ const filas = items.map(x => {
+  const o = x.h.orientadorId ? db.orientadores.find(y => y.id === x.h.orientadorId) : null;
+  const tieneHorario = x.h.entrada && x.h.salida;
+  const l = LIM[x.c.turno] || LIM.Matutino;
+  const horario = tieneHorario
+   ? 'Entrada límite <b>' + esc(x.h.entrada) + '</b> · Cierre <b>' + esc(x.h.salida) + '</b>'
+   : '<span class="text-danger">Sin horario propio</span> <span class="text-muted">(se usa ' + minAHora(l.retardo) + ' / ' + minAHora(l.fin) + ')</span>';
+  return '<div class="ori-item' + (x.k === claveAct ? ' ori-actual' : '') + '"><div>' +
+   '<div class="fw-semibold">' + x.c.grado + '° grado, grupo ' + x.c.grupo + ' · ' + esc(x.c.turno) + '</div>' +
+   '<div class="small">' + horario + '</div>' +
+   '<div class="small ' + (o ? '' : 'text-danger') + '">Orientador(a): ' + (o ? esc(o.nombre) : 'Sin asignar') + '</div></div>' +
+   '<div class="d-flex gap-1 flex-shrink-0">' +
+   '<button type="button" data-k="' + esc(x.k) + '" onclick="editarHorarioGrupo(this.dataset.k)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Cargar este grupo en el formulario para cambiarlo">Editar</button>' +
+   (tieneHorario ? '<button type="button" data-k="' + esc(x.k) + '" onclick="quitarHorarioGrupo(this.dataset.k)" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar la hora de entrada y de cierre de este grupo">Quitar horario</button>' : '') +
+   '</div></div>';
+ }).join('');
+ caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios por grupo (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
+}
+/* Carga un grupo de la lista en el formulario de horario (cambia el turno, el grado y el grupo seleccionados arriba). */
+function editarHorarioGrupo(k) {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede editar horarios.'); return; }
+ const c = parseClave(k);
+ turnoActivo = c.turno;
+ pintarBotonesTurno();
+ [1, 2, 3].forEach(g => $('#sel-grado-' + g).val(g === c.grado ? String(c.grupo) : ''));
+ filtro = {grado: c.grado, grupo: c.grupo};
+ refrescarHorarioForm();
+ renderTabla();
+ renderListaHorarios();
+ const el = document.getElementById('horario-entrada-limite');
+ if (el) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.focus(); }
+}
+/* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
+function quitarHorarioGrupo(k) {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede quitar horarios.'); return; }
+ const h = db.horarios[k]; if (!h) return;
+ const c = parseClave(k);
+ if (!confirm('¿Quitar el horario del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Volverá a usar el horario predeterminado. El orientador(a) no se modifica.')) return;
+ h.entrada = ''; h.salida = '';
+ guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
 }
 /* Quita a un orientador de UN grupo (conserva el horario del grupo y sus demás grupos). */
 function quitarGrupoOrientador(id, clave) {
@@ -2020,12 +2120,14 @@ function subirLista() {
  leerFilasDesdeArchivo(file, rows => {
  rows = rows.filter(r => r && r[0] != null && String(r[0]).trim());
  if (rows.length && /curp|matr|nombre|apellido/i.test(String(rows[0][0]))) rows.shift();
+ if (!rows.length) { alert('El archivo no trae alumnos. Pon la CURP en la columna A y el nombre en la B.'); return; }
  let nuevos = 0, actualizados = 0;
+ const curpsInvalidas = [];
  rows.forEach(r => {
  let curp = '', fila = r, desde = 0;
  const c0 = String(r[0]).trim();
  if (RX_CURP.test(c0)) { curp = c0.toUpperCase(); desde = 1; }   // Excel: CURP en columna A
- else { const m = c0.match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/); if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; } }   // PDF: "CURP Nombre"
+ else { const m = c0.match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/); if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; } else if (/^[A-Za-z0-9]{10,25}$/.test(c0) && /\d/.test(c0) && /[A-Za-z]/.test(c0)) { curpsInvalidas.push(c0 + ' (' + (c0.length === CURP_LARGO ? 'formato no válido' : curpDiferencia(c0).toLowerCase()) + ')'); return; } }   // PDF: "CURP Nombre"; si parece CURP pero no es válida, se omite
  const nombre = armarNombre(fila, desde, modo);
  if (!nombre) return;
  let a = curp ? db.alumnos.find(x => x.curp === curp) : null;
@@ -2036,7 +2138,7 @@ function subirLista() {
  save(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
  const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
- alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.'));
+ alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.') + (curpsInvalidas.length ? '\n\nSe omitieron ' + curpsInvalidas.length + ' fila(s) con CURP no válida (debe tener 18 caracteres): ' + curpsInvalidas.slice(0, 8).join(', ') + (curpsInvalidas.length > 8 ? '…' : '') + '. Corrígelas en el archivo y súbelo otra vez.' : ''));
  $('#archivo-lista').val('');
  }, msg => alert(msg));
 }
@@ -2045,6 +2147,7 @@ function guardarHorarioGrupo() {
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
  const e = $('#horario-entrada-limite').val(), s = $('#horario-salida-limite').val(), oid = $('#orientador-grupo-select').val();
  if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
+ if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
  db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)] = {entrada:e, salida:s, orientadorId: oid || ''};
  guardarOrientadoresServidor(); renderTabla(); poblarSelectOrientadorHorario(); renderListaOrientadores();
  const nombreOrientador = oid ? (db.orientadores.find(o => o.id === oid) || {}).nombre : 'Sin asignar';
@@ -2054,30 +2157,44 @@ function subirHorarios() {
  if (!permisoPermite()) return;
  const file = $('#archivo-horarios')[0].files[0];
  if (!file) { alert('Selecciona un archivo de horarios.'); return; }
- if (!libsOk('XLSX')) return;
- const rd = new FileReader();
- rd.onload = e => {
- const wb = XLSX.read(e.target.result, {type:'array'});
- const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1}).filter(r => r[0] !== undefined && r[1] !== undefined && r[2] && r[3]);
- if (rows.length && /grado/i.test(rows[0][0])) rows.shift();
- rows.forEach(r => {
- const grado = Number(r[0]), grupo = Number(r[1]), entrada = String(r[2]).trim(), salida = String(r[3]).trim(), nombreOrientador = r[4] ? String(r[4]).trim() : '';
- const turno = r[5] ? (/vesp/i.test(String(r[5])) ? 'Vespertino' : 'Matutino') : turnoActivo; // columna 6 (opcional)
- if (!grado || !grupo) return;
- let orientadorId = '';
- if (nombreOrientador) {
- let o = db.orientadores.find(x => norm(x.nombre) === norm(nombreOrientador));
- if (!o) { o = {id: generarId(), nombre: nombreOrientador}; db.orientadores.push(o); }
- orientadorId = o.id;
- }
- db.horarios[claveGrupo(grado, grupo, turno)] = {entrada:entrada, salida:salida, orientadorId: orientadorId};
- });
- guardarOrientadoresServidor(); renderTabla(); poblarSelectOrientadorHorario(); renderListaOrientadores();
- refrescarHorarioForm();
- alert('Horarios cargados para ' + rows.length + ' grupo(s).');
- $('#archivo-horarios').val('');
- };
- rd.readAsArrayBuffer(file);
+ if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { alert('Usa un archivo Excel (.xlsx/.xls) o .csv.'); return; }
+ leerFilasDesdeArchivo(file, rows => {
+  rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
+  if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
+  if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador y Turno (opcional).'); return; }
+  let aplicados = 0, orientadoresNuevos = 0;
+  const avisos = [];
+  rows.forEach(r => {
+   const etq = 'Grado ' + (r[0] == null ? '' : r[0]) + ', grupo ' + (r[1] == null ? '' : r[1]);
+   const grado = numeroDe(r[0]), grupo = numeroDe(r[1]);
+   const entrada = horaDe(r[2]), salida = horaDe(r[3]);
+   const nombreO = r[4] == null ? '' : String(r[4]).replace(/\s+/g, ' ').trim();
+   const turnoTxt = r[5] == null ? '' : String(r[5]).trim();
+   if (grado < 1 || grado > 3 || grupo < 1 || grupo > 4) { avisos.push(etq + ': grado o grupo no válido (grado 1 a 3, grupo 1 a 4); se omitió.'); return; }
+   if (!entrada || !salida) { avisos.push(etq + ': hora de entrada o de salida no válida (usa por ejemplo 07:10 o 1:10 PM); se omitió.'); return; }
+   if (toMin(salida) <= toMin(entrada)) { avisos.push(etq + ': la hora de cierre debe ser posterior a la de entrada; se omitió.'); return; }
+   const tn = turnoTxt ? turnoDe(turnoTxt) : turnoActivo;
+   const turnos = tn === 'Ambos' ? ['Matutino', 'Vespertino'] : [tn];
+   let orientadorId = '';
+   if (nombreO) {
+    let o = db.orientadores.find(x => norm(x.nombre) === norm(nombreO));
+    if (!o) { o = {id: generarId(), nombre: nombreO}; db.orientadores.push(o); orientadoresNuevos++; }
+    orientadorId = o.id;
+   }
+   turnos.forEach(turno => {
+    const clave = claveGrupo(grado, grupo, turno), previo = db.horarios[clave] || {};
+    // si el archivo no trae orientador(a), se conserva el que ya tenía el grupo
+    db.horarios[clave] = {entrada: entrada, salida: salida, orientadorId: orientadorId || previo.orientadorId || ''};
+    aplicados++;
+   });
+  });
+  if (aplicados) { guardarOrientadoresServidor(); renderTabla(); poblarSelectOrientadorHorario(); renderListaOrientadores(); refrescarHorarioForm(); }
+  let html = 'Horarios aplicados: ' + aplicados + (orientadoresNuevos ? '. Orientadores nuevos: ' + orientadoresNuevos : '') + '.';
+  if (avisos.length) html += '<div class="text-danger mt-1"><b>Revisa:</b><br>' + avisos.map(esc).join('<br>') + '</div>';
+  $('#resumen-horario-grupo').html(html);
+  alert(aplicados ? 'Horarios cargados para ' + aplicados + ' grupo(s).' + (avisos.length ? ' Hubo ' + avisos.length + ' fila(s) omitidas: revisa el aviso debajo.' : '') : 'No se cargó ningún horario: revisa el aviso debajo.');
+  $('#archivo-horarios').val('');
+ }, msg => alert(msg));
 }
 /* Descargas (Excel / PDF reales) */
 function descargar(nombre, filas, formato, titulo) {
@@ -2186,7 +2303,7 @@ function descargarGraficas(formato) {
  d.setFontSize(14); d.text('Estadísticas de asistencia - ' + tp, 14, 15);
  let startY = 22;
  const canvas = document.getElementById('grafica-asistencias');
- if (canvas && chartAsistencias) {
+ if (canvas && chartAsistencias && canvas.width > 0 && canvas.height > 0) {
  const img = canvas.toDataURL('image/png', 1.0);
  const ratio = canvas.height / canvas.width, imgW = 180, imgH = Math.round(imgW * ratio);
  d.addImage(img, 'PNG', 14, 22, imgW, imgH);
@@ -2462,6 +2579,20 @@ function bloquearEdicionCredencial() {
 /* La CURP debe tener exactamente 18 caracteres */
 const CURP_LARGO = 18;
 function curpLargoValido(curp) { return String(curp || '').length === CURP_LARGO; }
+/* Texto que dice cuántos caracteres faltan o sobran ('' si tiene los 18) */
+function curpDiferencia(curp) {
+ const n = String(curp || '').length, d = CURP_LARGO - n;
+ if (d === 0) return '';
+ return d > 0 ? 'Faltan ' + d + (d === 1 ? ' caracter' : ' caracteres') : 'Sobran ' + (-d) + (-d === 1 ? ' caracter' : ' caracteres');
+}
+function actualizarContadorCurp() {
+ const c = $('#curp-contador'); if (!c.length) return;
+ const v = $('#edit-curp-alumno').val().trim(), dif = curpDiferencia(v);
+ c.removeClass('text-danger text-success text-muted');
+ if (!v) c.addClass('text-muted').text('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres.');
+ else if (dif) c.addClass('text-danger').text('✖ ' + dif + ' (tiene ' + v.length + ' de ' + CURP_LARGO + ').');
+ else c.addClass('text-success').text('✔ La CURP tiene ' + CURP_LARGO + ' caracteres.');
+}
 function regresarListaGrupo() { selCred(credSel.grado, credSel.grupo); }
 /* Elimina un alumno (y sus asistencias) del servidor y de este navegador. Solo Control Escolar. */
 function eliminarAlumno(id) {
@@ -2483,8 +2614,9 @@ function eliminarAlumno(id) {
 function guardarCambiosCredencial() {
  if (!permisoPermite()) return;
  const a = db.alumnos.find(x => x.id === idEditando), curp = $('#edit-curp-alumno').val().trim().toUpperCase(), nombre = $('#edit-nombre-alumno').val().trim();
+ if (!a) { alert('Primero elige un alumno de la lista.'); return; }
  if (!curp || !nombre) { alert('CURP y nombre son obligatorios.'); return; }
- if (!curpLargoValido(curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres (ahora tiene ' + curp.length + ').'); return; }
+ if (!curpLargoValido(curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(curp) + ' (ahora tiene ' + curp.length + ').'); return; }
  a.curp = curp; a.nombre = nombre; save();
  actualizarVistaPreviaCredencial();
  alert('Cambios guardados en la credencial.');
@@ -2492,6 +2624,7 @@ function guardarCambiosCredencial() {
 /* Dibuja la vista previa en vivo (canvas) de frente y reverso mientras se edita al alumno,
  usando siempre los datos que hay en los inputs (aunque no se hayan guardado todavía). */
 function actualizarVistaPreviaCredencial() {
+ actualizarContadorCurp();
  const a = db.alumnos.find(x => x.id === idEditando);
  if (!a) return;
  const datosPreview = {
@@ -2632,9 +2765,10 @@ function descargarCredencialesPDF() {
 function descargarCredencialIndividual() {
  if (!permisoPermite()) return;
  const a = db.alumnos.find(x => x.id === idEditando);
+ if (!a) { alert('Primero elige un alumno de la lista.'); return; }
  if (!a.curp) { alert('Este alumno aún no tiene CURP asignado. Sube su CURP desde "Subir lista de alumnos" antes de descargar su credencial.'); return; }
  const datos = Object.assign({}, a, {nombre: $('#edit-nombre-alumno').val().trim() || a.nombre, curp: $('#edit-curp-alumno').val().trim().toUpperCase() || a.curp});
- if (!curpLargoValido(datos.curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres (ahora tiene ' + datos.curp.length + '). Corrígela antes de descargar.'); return; }
+ if (!curpLargoValido(datos.curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(datos.curp) + ' (ahora tiene ' + datos.curp.length + '). Corrígela antes de descargar.'); return; }
  generarPDFCredenciales([datos], 'credencial_' + datos.curp + '.pdf', document.getElementById('btn-pdf-individual'), 'Descargar PDF');
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */

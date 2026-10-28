@@ -538,13 +538,23 @@ class ControlEscolarController extends Controller
 
             $grupo = Grupo::firstOrNew(['grado' => $grado, 'nombre' => $nombre, 'turno' => $turno]);
             // Un grupo puede tener orientador sin horario todavía: la hora vacía se guarda como NULL
-            $grupo->hora_entrada = !empty($h['entrada']) ? $h['entrada'] : null;
-            $grupo->hora_salida = !empty($h['salida']) ? $h['salida'] : null;
+            $grupo->hora_entrada = $this->horaValida($h['entrada'] ?? null);
+            $grupo->hora_salida = $this->horaValida($h['salida'] ?? null);
             $grupo->orientador_id = (!empty($h['orientadorId']) && isset($mapaOrientadores[$h['orientadorId']]))
                 ? $mapaOrientadores[$h['orientadorId']]
                 : null;
             $grupo->save();
         }
+    }
+
+    /** Solo acepta horas con formato HH:MM (o HH:MM:SS); cualquier otra cosa se guarda como NULL en vez de tirar todo el guardado */
+    private function horaValida(mixed $hora): ?string
+    {
+        if (!is_string($hora) || !preg_match('/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', trim($hora))) {
+            return null;
+        }
+
+        return trim($hora);
     }
 
     /** Plantillas (frente/reverso) propias de cada grupo (opcional, ya casi no se usa) */
