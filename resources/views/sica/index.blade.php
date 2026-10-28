@@ -505,7 +505,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 </div>
 <!-- ===== 4. CONTROL ESCOLAR ===== -->
 <div id="panel-control" class="panel-perfil d-none">
- <div class="alert alert-warning py-2 mb-3 small fw-semibold">Control Escolar: estadísticas y asignación de permisos. Las listas, los orientadores y los horarios se suben en el <b>Panel de Orientadores</b> (elige turno, grado y grupo).</div>
  <div class="row text-center mb-4 g-3">
  <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">TOTAL ALUMNOS</span><h3 class="fw-bold mb-0" id="st-total">0</h3></div></div>
  <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">ASISTENCIAS DE HOY</span><h3 class="fw-bold text-success mb-0" id="st-asis">0</h3></div></div>
