@@ -15,4 +15,4 @@ RUN composer install --no-dev --optimize-autoloader \
     && chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 80
-CMD ["sh", "-c", "php artisan migrate --force && apache2-foreground"]
+CMD ["sh", "-c", "php artisan migrate --force && php artisan sica:crear-usuarios && apache2-foreground"]
