@@ -454,7 +454,11 @@ class ControlEscolarController extends Controller
     /** Un grupo sin horario, sin orientador, sin plantilla propia y sin alumnos no tiene por qué seguir en la base de datos */
     private function borrarGrupoSiEstaVacio(Grupo $grupo): bool
     {
-        if ($grupo->hora_entrada || $grupo->hora_salida || $grupo->orientador_id || $grupo->plantilla_frente || $grupo->plantilla_reverso) {
+        if ($grupo->hora_entrada || $grupo->hora_salida || $grupo->orientador_id) {
+            return false;
+        }
+        // Las plantillas no siempre vienen cargadas en el modelo: se revisan directo en la base
+        if (Grupo::whereKey($grupo->id)->where(fn ($q) => $q->whereNotNull('plantilla_frente')->orWhereNotNull('plantilla_reverso'))->exists()) {
             return false;
         }
         if (Alumno::where('grupo_id', $grupo->id)->exists()) {
@@ -564,14 +568,21 @@ class ControlEscolarController extends Controller
     private function guardarOrientadores(array $orientadores): array
     {
         $mapa = [];
+        // Una sola consulta con los que ya existen (antes era una consulta por cada orientador)
+        $existentes = Orientador::pluck('id', 'nombre');
 
         foreach ($orientadores as $o) {
             if (empty($o['nombre'])) {
                 continue;
             }
 
-            $registro = Orientador::updateOrCreate(['nombre' => $o['nombre']], []);
-            $mapa[$o['id']] = $registro->id;
+            $id = $existentes[$o['nombre']] ?? null;
+            if ($id === null) {
+                // No está tal cual: se busca/crea como antes (respeta mayúsculas y acentos de la base de datos)
+                $id = Orientador::updateOrCreate(['nombre' => $o['nombre']], [])->id;
+                $existentes[$o['nombre']] = $id;
+            }
+            $mapa[$o['id']] = $id;
         }
 
         return $mapa;
@@ -580,10 +591,14 @@ class ControlEscolarController extends Controller
     /** Horario límite de entrada/salida y orientador asignado por grupo Y turno */
     private function guardarHorarios(array $horarios, array $mapaOrientadores): void
     {
+        // Todos los grupos en una sola consulta, sin las plantillas (son imágenes pesadas)
+        $existentes = Grupo::select('id', 'grado', 'nombre', 'turno', 'hora_entrada', 'hora_salida', 'orientador_id')->get()->keyBy(fn ($g) => $g->grado . '|' . $g->nombre . '|' . $g->turno);
+
         foreach ($horarios as $clave => $h) {
             [$grado, , $nombre, $turno] = $this->datosDeClave($clave);
 
-            $grupo = Grupo::firstOrNew(['grado' => $grado, 'nombre' => $nombre, 'turno' => $turno]);
+            $grupo = $existentes[$grado . '|' . $nombre . '|' . $turno]
+                ?? Grupo::firstOrNew(['grado' => $grado, 'nombre' => $nombre, 'turno' => $turno]);
             // Un grupo puede tener orientador sin horario todavía: la hora vacía se guarda como NULL
             $grupo->hora_entrada = $this->horaValida($h['entrada'] ?? null);
             $grupo->hora_salida = $this->horaValida($h['salida'] ?? null);
