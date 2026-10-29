@@ -702,7 +702,7 @@ function guardarOrientadoresServidor() {
   if (r.status === 419) return refrescarCsrf().then(() => Promise.reject('csrf'));
   if (r.status === 401) { sesionExpirada(); return Promise.reject('sesion'); }
   if (!r.ok) return Promise.reject('error');
-  caja.removeClass('text-muted text-danger').addClass('text-success').text('Guardado en el servidor.');
+  caja.removeClass('text-muted text-danger').addClass('text-success').text('');   // guardado correcto: el aviso se oculta (los errores sí se siguen mostrando)
   return true;
  }).catch(e => {
   if (e !== 'sesion') caja.removeClass('text-muted text-success').addClass('text-danger').text('⚠ No se pudo guardar en el servidor (' + (e === 'csrf' ? 'la sesión se renovó, inténtalo otra vez' : 'revisa tu conexión') + '). Los cambios siguen en este equipo; vuelve a intentarlo.');
