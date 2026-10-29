@@ -45,6 +45,7 @@ class ControlEscolarController extends Controller
             'guardar_todo'         => $this->guardarTodo($validado['datos'], !$esControl),
             'registrar_asistencia' => $this->registrarAsistencia($validado['datos']),
             'eliminar_alumno'      => $this->eliminarAlumno($validado['datos']),
+            'eliminar_lista_grupo' => $this->eliminarListaGrupo($validado['datos']),
             'guardar_orientadores' => $this->guardarSoloOrientadores($validado['datos']),
             'eliminar_orientador'  => $this->eliminarOrientador($validado['datos']),
             default                => response()->json(['ok' => false, 'mensaje' => 'Acción no reconocida'], 400),
@@ -419,6 +420,52 @@ class ControlEscolarController extends Controller
     }
 
     /**
+     * Borra TODOS los alumnos de un grupo y turno junto con sus asistencias.
+     * Si el grupo se queda sin horario, sin orientador y sin alumnos, también se borra su registro (no queda basura en la BD).
+     */
+    private function eliminarListaGrupo(array $d): JsonResponse
+    {
+        $grado = (int) ($d['grado'] ?? 0);
+        $n     = (int) ($d['grupo'] ?? 0);
+        $turno = (($d['turno'] ?? '') === 'Vespertino') ? 'Vespertino' : 'Matutino';
+
+        if ($grado < 1 || $grado > 3 || $n < 1 || $n > 4) {
+            return response()->json(['ok' => false, 'mensaje' => 'Grado o grupo no válido'], 422);
+        }
+
+        $borrados = 0;
+        $grupo = Grupo::where('grado', $grado)->where('nombre', $grado . '° ' . $n)->where('turno', $turno)->first();
+
+        if ($grupo) {
+            DB::transaction(function () use ($grupo, &$borrados) {
+                $ids = Alumno::where('grupo_id', $grupo->id)->pluck('id');
+                $borrados = $ids->count();
+                foreach ($ids->chunk(500) as $lote) {
+                    Asistencia::whereIn('alumno_id', $lote)->delete();
+                }
+                Alumno::where('grupo_id', $grupo->id)->delete();
+                $this->borrarGrupoSiEstaVacio($grupo);
+            });
+        }
+
+        return response()->json(['ok' => true, 'borrados' => $borrados]);
+    }
+
+    /** Un grupo sin horario, sin orientador, sin plantilla propia y sin alumnos no tiene por qué seguir en la base de datos */
+    private function borrarGrupoSiEstaVacio(Grupo $grupo): bool
+    {
+        if ($grupo->hora_entrada || $grupo->hora_salida || $grupo->orientador_id || $grupo->plantilla_frente || $grupo->plantilla_reverso) {
+            return false;
+        }
+        if (Alumno::where('grupo_id', $grupo->id)->exists()) {
+            return false;
+        }
+        $grupo->delete();
+
+        return true;
+    }
+
+    /**
      * Elimina un orientador de forma permanente: su registro (con contraseña, bloqueo, etc.) desaparece de la BD
      * y los grupos que tenía quedan sin orientador. Se busca por id y, si no, por nombre.
      */
@@ -543,6 +590,11 @@ class ControlEscolarController extends Controller
             $grupo->orientador_id = (!empty($h['orientadorId']) && isset($mapaOrientadores[$h['orientadorId']]))
                 ? $mapaOrientadores[$h['orientadorId']]
                 : null;
+            // Grupo sin nada configurado y sin alumnos: no se guarda (o se borra si ya existía)
+            if ($grupo->exists ? $this->borrarGrupoSiEstaVacio($grupo) : (!$grupo->hora_entrada && !$grupo->hora_salida && !$grupo->orientador_id)) {
+                continue;
+            }
+
             $grupo->save();
         }
     }

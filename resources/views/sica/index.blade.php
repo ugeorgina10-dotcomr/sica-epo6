@@ -242,10 +242,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <div id="panel-alumno" class="panel-perfil d-none">
  <!-- ===== PLANTILLA OFICIAL DE CREDENCIALES (solo Control Escolar, dentro del Portal del Alumno) ===== -->
  <div id="bloque-plantilla-oficial" class="p-4 bg-white rounded-4 border shadow-sm mb-4 d-none">
- <h6 class="fw-bold mb-2" style="color:#800020">Plantilla Oficial de Credenciales <span id="turno-plantilla-actual" class="badge bg-secondary ms-2 align-middle">Matutino</span></h6>
- <p class="text-muted small mb-2">Aquí se suben los <b>diseños de la credencial hechos en Word (.docx) o en PDF</b>: uno de <b>frente</b> y uno de <b>reverso</b> por turno. Valen para <b>todos los grupos del turno elegido</b> (usa los botones Matutino / Vespertino de abajo para cambiar de turno; cada turno tiene su propio frente porque cambia el C.C.T.).</p>
- <p class="text-muted small mb-2">Cuando quieras cambiar el diseño, edítalo en Word y <b>guárdalo como .docx</b> (o expórtalo como <b>PDF</b>), luego elige el archivo aquí abajo y pulsa <b>Actualizar</b>: el sistema vuelve a acomodar solo el nombre, CURP, grado, grupo, turno y el código QR de cada alumno, todos con la <b>misma letra y el mismo tamaño</b>. En el frente deben existir el cuadro con el texto <b>QR</b> y las etiquetas <b>NOMBRE DEL ESTUDIANTE:, CURP:, GRADO:, GRUPO:, TURNO:</b>; no escribas nada a un lado de ellas, porque ahí escribe el sistema.</p>
- <p class="text-muted small mb-3">Si tu archivo es PDF, el texto debe poder seleccionarse (no una foto de la credencial) y se usa solo la <b>primera hoja</b>.</p>
+ <h6 class="fw-bold mb-2" style="color:#800020" title="Word (.docx) o PDF con texto seleccionable. En el frente debe existir el cuadro con el texto QR y las etiquetas NOMBRE DEL ESTUDIANTE:, CURP:, GRADO:, GRUPO: y TURNO:. Vale para todos los grupos del turno.">Plantilla Oficial de Credenciales <span id="turno-plantilla-actual" class="badge bg-secondary ms-2 align-middle">Matutino</span></h6>
  <div class="row g-3">
  <div class="col-md-6">
  <label class="form-label small">Frente (Word .docx o PDF)</label>
@@ -285,7 +282,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  
  <div class="text-center p-4 bg-light rounded-4 border mb-3">
  <h5 class="fw-bold text-uppercase mb-2" style="color:#800020">Credencial digital con código QR</h5>
- <p class="text-muted small mb-3">Elige el turno, selecciona el grupo y administra las credenciales. Cada turno usa su plantilla oficial (frente y reverso); solo el Encargado de Control Escolar puede cambiarla (bloque "Plantilla Oficial de Credenciales" de arriba).</p>
  <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
  <button onclick="setTurnoCred('Matutino')" id="btn-turno-cred-matutino" class="btn btn-vinotinto px-4 py-2 fw-semibold shadow-sm small">Matutino</button>
  <button onclick="setTurnoCred('Vespertino')" id="btn-turno-cred-vespertino" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm small">Vespertino</button>
@@ -355,7 +351,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <div id="panel-lector" class="panel-perfil d-none">
  <div class="text-center p-4 bg-light rounded-4 border mb-3">
  <h5 class="fw-bold text-uppercase mb-1" style="color:#800020">Lector Fijo - Control de Entradas y Salidas</h5>
- <p class="text-muted small mb-3">Elige el tipo de escaneo, enciende la cámara y muestra el QR de la credencial:</p>
  <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
  <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-success px-4 py-2 fw-semibold shadow-sm">Registrar Entrada</button>
  <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Salida</button>
@@ -412,9 +407,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
   <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
  <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
- <p class="text-muted small mb-3">Excel, CSV o PDF (.xlsx/.xls/.csv/.pdf) con <b>una fila por orientador(a)</b> y estas columnas: <b>Nombre completo</b>, <b>Grado</b> (1, 2 o 3), <b>Grupo</b> (1 al 4) y <b>Turno</b> (Matutino, Vespertino o Ambos; es opcional, si no lo pones se usa el turno que tienes activo arriba). Al subir el archivo, cada orientador(a) <b>queda asignado a ese grado, grupo y turno</b>.</p>
  <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small">Archivo</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
  <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
  </div>
  <div id="resumen-orientadores" class="small text-muted"></div>
@@ -424,11 +418,10 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <!-- SOLO CONTROL ESCOLAR: subir lista del grupo elegido arriba -->
  <div id="bloque-listas-orientador" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
- <p class="text-muted small mb-3">Excel, CSV o PDF (.xlsx/.xls/.csv/.pdf) con el <b>CURP en la columna A</b> y el <b>nombre completo en la columna B</b> (o Apellido paterno, Apellido materno y Nombre(s) en las columnas B, C y D), uno por fila. Se asigna al grado, grupo y turno elegidos arriba, con su CURP y su credencial digital; el nombre se guarda como <b>Apellido paterno, Apellido materno y Nombre(s)</b>. En el <b>Portal del Alumno</b> solo se ve y se edita la credencial. Si el archivo no trae CURP, se cargan solo los nombres.</p>
  <div class="row g-3 align-items-end">
- <div class="col-md-4"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
- <div class="col-md-5"><label class="form-label small">Archivo</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
- <div class="col-md-3"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button></div>
+ <div class="col-md-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
+ <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-5 d-flex gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm w-100 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
@@ -440,8 +433,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <!-- SOLO CONTROL ESCOLAR: horario de entrada/salida y orientador del grupo -->
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
- <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo</h6>
- <p class="text-muted small mb-3">Define la hora límite de entrada (para marcar retardo), la hora de cierre (para marcar permanencia) y el orientador(a) del grado, grupo y turno seleccionados arriba. El horario y el orientador son independientes en cada turno. Un orientador(a) puede tener varios grupos: basta elegirlo en cada uno. Para cambiar al orientador(a) de un grupo, elige otro aquí y guarda.</p>
+ <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
  <div class="row g-3 align-items-end mb-3">
  <div class="col-md-3"><label class="form-label small">Hora límite de entrada</label><input type="time" id="horario-entrada-limite" class="form-control form-control-sm"></div>
  <div class="col-md-3"><label class="form-label small">Hora de cierre (salida)</label><input type="time" id="horario-salida-limite" class="form-control form-control-sm"></div>
@@ -453,7 +445,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-md-2"><button onclick="guardarHorarioGrupo()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button></div>
  </div>
  <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small">Archivo de horarios (.xlsx/.xls/.csv): columnas Grado, Grupo, HoraEntrada, HoraSalida (ej. 07:10 o 1:10 PM), NombreOrientador (opcional) y Turno (opcional: Matutino, Vespertino o Ambos; si no se indica se usa el turno activo)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
+ <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
  <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-dark btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
@@ -531,7 +523,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 
 <div id="bloque-permisos-roles" class="p-4 bg-white rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Permisos y Roles</h6>
- <p class="text-muted small mb-3">Define si el rol solo visualiza o también puede realizar acciones (descargas, marcar salidas, subir listas, editar credenciales, usar la cámara de escaneo).</p>
  <div class="row g-3 align-items-end">
  <div class="col-md-4"><label class="form-label small">Rol</label>
  <select id="select-rol-permiso" class="form-select form-select-sm">
@@ -553,7 +544,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 
 <div id="bloque-claves" class="p-4 bg-white rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Contraseñas</h6>
- <p class="text-muted small mb-3">Control Escolar genera y entrega las contraseñas. Elige un rol; si es orientador con contraseña propia, elige su nombre. Después borra su contraseña, genera una nueva o quita el bloqueo.</p>
  <div class="fw-semibold small mb-2" style="color:#800020">Roles</div>
  <div id="botones-roles-clave" class="d-flex flex-wrap gap-2 mb-2"></div>
  <div id="resumen-bloqueadas" class="mt-3 small"></div>
@@ -595,7 +585,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
     <li data-req="escuela"><span class="casilla" aria-hidden="true"></span>Sin el nombre de la escuela ni la clave inicial (prepa06, epo6).</li>
     <li data-req="igual"><span class="casilla" aria-hidden="true"></span>Las dos casillas deben coincidir.</li>
    </ul>
-   <div class="text-muted">El botón <b>Generar</b> crea una que ya cumple todo. Evita nombres, CURP y fechas de nacimiento, y no repitas la misma contraseña en otro rol.</div>
   </div>
   <div id="entrega-clave" class="mt-3 p-3 rounded-3 d-none" style="background:#eef7f0;border:1px solid #b7dcc0">
    <div class="fw-semibold mb-1" style="color:#0f5132">Contraseña lista para entregar</div>
@@ -720,7 +709,7 @@ function guardarOrientadoresServidor() {
   if (r.status === 419) return refrescarCsrf().then(() => Promise.reject('csrf'));
   if (r.status === 401) { sesionExpirada(); return Promise.reject('sesion'); }
   if (!r.ok) return Promise.reject('error');
-  caja.removeClass('text-muted text-danger').addClass('text-success').text('✔ Guardado en el servidor: ya aparecen en la pantalla de inicio para elegir su nombre y escanear.');
+  caja.removeClass('text-muted text-danger').addClass('text-success').text('✔ Guardado en el servidor.');
   return true;
  }).catch(e => {
   if (e !== 'sesion') caja.removeClass('text-muted text-success').addClass('text-danger').text('⚠ No se pudo guardar en el servidor (' + (e === 'csrf' ? 'la sesión se renovó, inténtalo otra vez' : 'revisa tu conexión') + '). Los cambios siguen en este equipo; vuelve a intentarlo.');
@@ -807,7 +796,7 @@ function enviarTodo(sinVacios) {
    if (r.status === 401) { fallo = true; sesionExpirada(); return; }
    if (r.status === 403) { fallo = true; localStorage.removeItem(PEND_TODO); return r.json().then(d => avisoPermiso(d && d.mensaje)).catch(() => avisoPermiso()); }
    if (!r.ok) { fallo = true; return; }
-   lote.forEach(a => { _firmasGuardadas.set(a.id, firmaAlumno(a)); a.enServidor = true; });
+   lote.forEach(a => { _firmasGuardadas.set(a.id, firmaAlumno(a)); a.enServidor = true; a.enServidorTs = Date.now(); });
   });
  }), Promise.resolve()).catch(() => { fallo = true; }).then(() => {
   _enviando = false;
@@ -828,7 +817,7 @@ function sincronizarConServidor(accion, datos, reintento) {
 }
 /* Mezcla el estado del servidor con el local sin perder entradas/salidas ya registradas.
  Los alumnos se emparejan por CURP (el id del servidor es distinto al id local). */
-function fusionarServidor(s) {
+function fusionarServidor(s, inicioConsulta) {
  if (!s || !Array.isArray(s.alumnos)) return;
  const clv = a => a.curp ? 'c:' + a.curp : 'i:' + a.id;
  const locales = new Map(db.alumnos.map(a => [clv(a), a])), claves = new Set();
@@ -848,7 +837,8 @@ function fusionarServidor(s) {
   return sa;
  });
  // Se conservan los locales aún no enviados; los que ya estuvieron en el servidor y ya no están (eliminados) se quitan
- db.alumnos = lista.concat(db.alumnos.filter(a => !claves.has(clv(a)) && !a.enServidor));
+ // (un alumno guardado DESPUÉS de empezar esta consulta no se quita: la respuesta es anterior a su guardado)
+ db.alumnos = lista.concat(db.alumnos.filter(a => !claves.has(clv(a)) && (!a.enServidor || (inicioConsulta && a.enServidorTs > inicioConsulta))));
  if (s.horarios) db.horarios = s.horarios;
  if (s.orientadores) db.orientadores = s.orientadores;
  if (s.permisos) db.permisos = s.permisos;
@@ -910,6 +900,7 @@ let _etagEstado = null, _descargandoEstado = false;
 function descargarEstadoServidor() {
  if (_descargandoEstado) return Promise.resolve();   // no se amontonan consultas si el servidor tarda
  _descargandoEstado = true;
+ const inicioConsulta = Date.now();
  const cab = {'Accept':'application/json'};
  if (_etagEstado) cab['If-None-Match'] = _etagEstado;
  return fetchT('/api/sica/estado', {headers: cab, cache: 'no-store'}, 15000)
@@ -923,7 +914,7 @@ function descargarEstadoServidor() {
   .then(s => {
    _descargandoEstado = false;
    if (!s) return;
-   fusionarServidor(s);
+   fusionarServidor(s, inicioConsulta);
    autoSubirPendientes();
    if (orientadorActivo) {
     orientadorActivo = db.orientadores.find(o => o.id === orientadorActivo.id) || orientadorActivo;
@@ -1207,47 +1198,64 @@ function renderListaOrientadores() {
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver orientadores dados de alta (' + db.orientadores.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
 }
-/* Lista desplegable con el horario y el orientador de cada grupo (igual que la de orientadores). */
+/* Lista desplegable de horarios: un renglón por orientador(a) con SUS grupos. Se elige el grupo, se cambia la hora y se guarda ahí mismo. */
+let _horSel = {};   // grupo elegido en cada orientador(a) de esta lista
 function renderListaHorarios() {
  const caja = $('#lista-horarios-actual');
  if (!caja.length) return;
+ const foco = document.activeElement;
+ if (foco && caja[0].contains(foco) && /^(INPUT|SELECT)$/.test(foco.tagName)) return;   // no pisa lo que se está escribiendo
  const abierta = caja.find('details').prop('open');
- const items = Object.entries(db.horarios).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
+ const idsOri = new Set(db.orientadores.map(o => o.id));
+ const grupos = Object.entries(db.horarios).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
   .filter(x => x.h && (x.h.entrada || x.h.salida || x.h.orientadorId))
   .sort((a, b) => (a.c.turno === b.c.turno ? 0 : a.c.turno === 'Matutino' ? -1 : 1) || a.c.grado - b.c.grado || a.c.grupo - b.c.grupo);
+ const porOri = db.orientadores.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  .map(o => ({id: o.id, nombre: o.nombre, gr: grupos.filter(x => x.h.orientadorId === o.id)}));
+ porOri.push({id: '', nombre: 'Sin orientador(a)', gr: grupos.filter(x => !x.h.orientadorId || !idsOri.has(x.h.orientadorId))});
+ const items = porOri.filter(o => o.gr.length);
  if (!items.length) { caja.html('<span class="text-muted">Aún no hay horarios ni orientadores asignados a ningún grupo.</span>'); return; }
- const claveAct = filtro ? claveGrupo(filtro.grado, filtro.grupo, turnoActivo) : '';
- const filas = items.map(x => {
-  const o = x.h.orientadorId ? db.orientadores.find(y => y.id === x.h.orientadorId) : null;
-  const tieneHorario = x.h.entrada && x.h.salida;
-  const l = LIM[x.c.turno] || LIM.Matutino;
-  const horario = tieneHorario
-   ? 'Entrada límite <b>' + esc(x.h.entrada) + '</b> · Cierre <b>' + esc(x.h.salida) + '</b>'
-   : '<span class="text-danger">Sin horario propio</span> <span class="text-muted">(se usa ' + minAHora(l.retardo) + ' / ' + minAHora(l.fin) + ')</span>';
-  return '<div class="ori-item' + (x.k === claveAct ? ' ori-actual' : '') + '"><div>' +
-   '<div class="fw-semibold">' + x.c.grado + '° grado, grupo ' + x.c.grupo + ' · ' + esc(x.c.turno) + '</div>' +
-   '<div class="small">' + horario + '</div>' +
-   '<div class="small ' + (o ? '' : 'text-danger') + '">Orientador(a): ' + (o ? esc(o.nombre) : 'Sin asignar') + '</div></div>' +
-   '<div class="d-flex gap-1 flex-shrink-0">' +
-   '<button type="button" data-k="' + esc(x.k) + '" onclick="editarHorarioGrupo(this.dataset.k)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Cargar este grupo en el formulario para cambiarlo">Editar</button>' +
-   (tieneHorario ? '<button type="button" data-k="' + esc(x.k) + '" onclick="quitarHorarioGrupo(this.dataset.k)" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar la hora de entrada y de cierre de este grupo">Quitar horario</button>' : '') +
-   '</div></div>';
+ const filas = items.map(o => {
+  const llaves = o.gr.map(x => x.k);
+  let sel = _horSel[o.id];
+  if (!sel || llaves.indexOf(sel) < 0) { const delTurno = o.gr.find(x => x.c.turno === turnoActivo); sel = (delTurno || o.gr[0]).k; }
+  _horSel[o.id] = sel;
+  const hs = db.horarios[sel] || {};
+  const opciones = o.gr.map(x => '<option value="' + esc(x.k) + '"' + (x.k === sel ? ' selected' : '') + '>' + x.c.grado + '° grado, grupo ' + x.c.grupo + ' · ' + esc(x.c.turno) +
+   ((x.h.entrada && x.h.salida) ? ' — ' + esc(x.h.entrada) + ' a ' + esc(x.h.salida) : ' — sin horario propio') + '</option>').join('');
+  return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
+   '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
+   '<div class="row g-2 align-items-end mt-0">' +
+   '<div class="col-md-5"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
+   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
+   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
+   '<div class="col-md-3 d-flex flex-wrap gap-1">' +
+   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
+   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
+   '<button type="button" onclick="borrarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Quitar este grupo: borra su horario y su orientador(a)">Quitar grupo</button>' +
+   '</div></div></div></div>';
  }).join('');
- caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios por grupo (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
+ caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
 }
-/* Carga un grupo de la lista en el formulario de horario (cambia el turno, el grado y el grupo seleccionados arriba). */
-function editarHorarioGrupo(k) {
- if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede editar horarios.'); return; }
+const claveInline = btn => $(btn).closest('.ori-hor').find('select').val();
+/* Al elegir otro grupo del orientador(a), se cargan las horas de ese grupo */
+function cargarHorarioInline(sel) {
+ const it = $(sel).closest('.ori-hor'), h = db.horarios[sel.value] || {};
+ _horSel[it.attr('data-o')] = sel.value;
+ it.find('.hor-ent').val(h.entrada || ''); it.find('.hor-sal').val(h.salida || '');
+}
+/* Guarda la hora del grupo elegido en el renglón del orientador(a) */
+function guardarHorarioInline(btn) {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede cambiar horarios.'); return; }
+ const it = $(btn).closest('.ori-hor'), k = it.find('select').val();
+ const e = it.find('.hor-ent').val(), s = it.find('.hor-sal').val();
+ if (!k || !db.horarios[k]) return;
+ if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
+ if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
+ db.horarios[k].entrada = e; db.horarios[k].salida = s;
  const c = parseClave(k);
- turnoActivo = c.turno;
- pintarBotonesTurno();
- [1, 2, 3].forEach(g => $('#sel-grado-' + g).val(g === c.grado ? String(c.grupo) : ''));
- filtro = {grado: c.grado, grupo: c.grupo};
- refrescarHorarioForm();
- renderTabla();
- renderListaHorarios();
- const el = document.getElementById('horario-entrada-limite');
- if (el) { el.scrollIntoView({behavior: 'smooth', block: 'center'}); el.focus(); }
+ guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
+ $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(e) + ' a ' + esc(s) + '.');
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -1257,6 +1265,15 @@ function quitarHorarioGrupo(k) {
  if (!confirm('¿Quitar el horario del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Volverá a usar el horario predeterminado. El orientador(a) no se modifica.')) return;
  h.entrada = ''; h.salida = '';
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
+}
+/* Borra por completo lo configurado para un grupo: horario y orientador(a). Los alumnos no se tocan. */
+function borrarHorarioGrupo(k) {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar horarios.'); return; }
+ const h = db.horarios[k]; if (!h) return;
+ const c = parseClave(k);
+ if (!confirm('¿Borrar el horario y el orientador(a) del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Los alumnos no se modifican.')) return;
+ h.entrada = ''; h.salida = ''; h.orientadorId = '';
+ guardarOrientadoresServidor(); renderListaOrientadores(); poblarSelectOrientadorHorario(); refrescarHorarioForm(); renderTabla();
 }
 /* Quita a un orientador de UN grupo (conserva el horario del grupo y sus demás grupos). */
 function quitarGrupoOrientador(id, clave) {
@@ -1309,11 +1326,8 @@ function eliminarOrientador(id) {
  const o = db.orientadores.find(x => x.id === id); if (!o) return;
  const grupos = Object.entries(db.horarios).filter(([k, v]) => v.orientadorId === id).map(([k]) => { const c = parseClave(k); return 'Grado ' + c.grado + ' Grupo ' + c.grupo + ' (' + c.turno + ')'; });
  if (!confirm('¿Eliminar a ' + o.nombre + '?' + (grupos.length ? '\nSe quitará de: ' + grupos.join(', ') + ' (quedará sin orientador).' : '') + '\nSe borrará de forma permanente de la base de datos, junto con su contraseña. Esta acción no se puede deshacer.')) return;
- fetch('/api/sica/sync', {
- method: 'POST',
- headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
- body: JSON.stringify({accion:'eliminar_orientador', datos:{id:o.id, nombre:o.nombre}})
- }).then(r => r.json().catch(() => ({})).then(d => { if (!r.ok || d.ok === false) return Promise.reject(); }))
+ _postSync('eliminar_orientador', {id:o.id, nombre:o.nombre}, 30000)
+ .then(r => r.json().catch(() => ({})).then(d => { if (!r.ok || d.ok === false) return Promise.reject(); }))
  .then(() => {
  db.orientadores = db.orientadores.filter(x => x.id !== id);
  if (localStorage.getItem('sica_orientador') === id) localStorage.removeItem('sica_orientador');
@@ -2022,8 +2036,17 @@ function setModoEscaneo(m) {
 }
 function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : iniciarScanner('cam-fija', () => modoEscaneo); }
 /* ============ PANEL DE ORIENTADORES ============ */
+/* Las instrucciones de los archivos y el título del bloque cambian según el turno elegido (Matutino / Vespertino) */
+function actualizarTextosTurno() {
+ const t = turnoActivo;
+ $('.txt-turno-activo').text(t);
+ $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa ' + t + ')');
+ $('#lbl-archivo-lista').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): CURP y nombre');
+ $('#lbl-archivo-horarios').text('Archivo de horarios del turno ' + t + ' (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa ' + t + ')');
+}
 function pintarBotonesTurno() {
  const t = turnoActivo;
+ actualizarTextosTurno();
  $('#btn-turno-matutino').toggleClass('btn-vinotinto', t === 'Matutino').toggleClass('btn-outline-dark bg-white', t !== 'Matutino');
  $('#btn-turno-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
  $('#titulo-tabla-orientador').text('Turno ' + t);
@@ -2042,6 +2065,8 @@ function setTurno(t) {
  pintarBotonesTurno();
  refrescarHorarioForm();
  renderTabla();
+ _horSel = {};
+ renderListaHorarios();
 }
 function configurarPanelOrientador() {
  const c = rolActivo === 'control';
@@ -2141,6 +2166,26 @@ function subirLista() {
  $('#archivo-lista').val('');
  }, msg => alert(msg));
 }
+/* Borra de la base de datos a TODOS los alumnos (y sus asistencias) del grupo y turno elegidos arriba. Solo Control Escolar. */
+function borrarListaGrupo() {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar listas.'); return; }
+ if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
+ const g = filtro.grado, n = filtro.grupo, t = turnoActivo;
+ const lista = db.alumnos.filter(a => a.grado === g && a.grupo === n && a.turno === t);
+ if (!lista.length) { alert('El ' + g + '° grado, grupo ' + n + ' (' + t + ') no tiene alumnos cargados.'); return; }
+ if (!confirm('¿Borrar la lista completa del ' + g + '° grado, grupo ' + n + ' (' + t + ')?\n' + lista.length + ' alumno(s) y todos sus registros de asistencia se eliminarán de forma permanente. Esta acción no se puede deshacer.')) return;
+ _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
+  if (!r.ok) return Promise.reject();
+  const ids = new Set(lista.map(a => a.id));
+  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
+  ids.forEach(id => _firmasGuardadas.delete(id));
+  localStorage.setItem(LS, JSON.stringify(db));
+  $('#archivo-lista').val('');
+  renderTabla(); renderListaHorarios();
+  if (credSel) selCred(credSel.grado, credSel.grupo);
+  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
+ }).catch(() => alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+}
 function guardarHorarioGrupo() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
@@ -2162,6 +2207,7 @@ function subirHorarios() {
   if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
   if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador y Turno (opcional).'); return; }
   let aplicados = 0, orientadoresNuevos = 0;
+  const porTurno = {Matutino: 0, Vespertino: 0};
   const avisos = [];
   rows.forEach(r => {
    const etq = 'Grado ' + (r[0] == null ? '' : r[0]) + ', grupo ' + (r[1] == null ? '' : r[1]);
@@ -2184,11 +2230,11 @@ function subirHorarios() {
     const clave = claveGrupo(grado, grupo, turno), previo = db.horarios[clave] || {};
     // si el archivo no trae orientador(a), se conserva el que ya tenía el grupo
     db.horarios[clave] = {entrada: entrada, salida: salida, orientadorId: orientadorId || previo.orientadorId || ''};
-    aplicados++;
+    aplicados++; porTurno[turno]++;
    });
   });
   if (aplicados) { guardarOrientadoresServidor(); renderTabla(); poblarSelectOrientadorHorario(); renderListaOrientadores(); refrescarHorarioForm(); }
-  let html = 'Horarios aplicados: ' + aplicados + (orientadoresNuevos ? '. Orientadores nuevos: ' + orientadoresNuevos : '') + '.';
+  let html = 'Horarios aplicados: ' + aplicados + ' (Matutino: ' + porTurno.Matutino + ', Vespertino: ' + porTurno.Vespertino + ')' + (orientadoresNuevos ? '. Orientadores nuevos: ' + orientadoresNuevos : '') + '.';
   if (avisos.length) html += '<div class="text-danger mt-1"><b>Revisa:</b><br>' + avisos.map(esc).join('<br>') + '</div>';
   $('#resumen-horario-grupo').html(html);
   alert(aplicados ? 'Horarios cargados para ' + aplicados + ' grupo(s).' + (avisos.length ? ' Hubo ' + avisos.length + ' fila(s) omitidas: revisa el aviso debajo.' : '') : 'No se cargó ningún horario: revisa el aviso debajo.');
@@ -2603,11 +2649,8 @@ function eliminarAlumno(id) {
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
  };
- fetch('/api/sica/sync', {
- method: 'POST',
- headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
- body: JSON.stringify({accion:'eliminar_alumno', datos:{curp:a.curp || '', id:a.id}})
- }).then(r => r.ok ? quitarLocal() : Promise.reject())
+ _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
+ .then(r => r.ok ? quitarLocal() : Promise.reject())
  .catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 function guardarCambiosCredencial() {

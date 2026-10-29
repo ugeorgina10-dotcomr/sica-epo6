@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 class VerificarPermisoSica
 {
     /** Acciones de /api/sica/sync que SOLO puede hacer Control Escolar (el servidor manda, no el navegador). */
-    private const SOLO_CONTROL = ['guardar_permisos', 'guardar_orientadores', 'eliminar_orientador', 'eliminar_alumno'];
+    private const SOLO_CONTROL = ['guardar_permisos', 'guardar_orientadores', 'eliminar_orientador', 'eliminar_alumno', 'eliminar_lista_grupo'];
 
     /** Acciones que cualquier rol con permiso "editar" puede hacer. */
     private const ACCIONES_EDITAR = ['guardar_todo', 'registrar_asistencia'];
