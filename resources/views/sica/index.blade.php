@@ -615,7 +615,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  const grupos = [
   ['jszip.min.js', 'qrious.min.js', 'sica-docx.js'],                 // lo mínimo para dibujar credenciales (lector de Word + QR)
   ['html5-qrcode.min.js', 'chart.umd.min.js'],                        // escáner y gráficas
-  ['xlsx.full.min.js', 'jspdf.umd.min.js', 'pdf.min.js']              // Excel, PDF y lector de PDF
+  ['xlsx.full.min.js', 'exceljs.min.js', 'jspdf.umd.min.js', 'pdf.min.js']   // Excel, Excel con gráficas, PDF y lector de PDF
  ];
  const cargar = src => new Promise(ok => {
   const s = document.createElement('script');
@@ -2291,13 +2291,78 @@ function dibujarGraficaAsistencias(s) {
  scales:{y:{beginAtZero:true, ticks:{precision:0}}}
  }});
 }
-function descargarGraficas(formato) {
+/* ---- Gráficas como imagen (fondo blanco) para meterlas dentro del Excel y del PDF ---- */
+function imagenDeGrafica(cfg, ancho, alto) {
+ const cont = document.getElementById('canvas-temporal');
+ const canvas = document.createElement('canvas'); canvas.width = ancho; canvas.height = alto; cont.appendChild(canvas);
+ const fondo = {id:'fondoBlanco', beforeDraw: c => { const x = c.ctx; x.save(); x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#ffffff'; x.fillRect(0, 0, c.width, c.height); x.restore(); }};
+ cfg.plugins = (cfg.plugins || []).concat([fondo]);
+ cfg.options = Object.assign({responsive:false, animation:false, devicePixelRatio:2}, cfg.options || {});
+ const ch = new Chart(canvas.getContext('2d'), cfg);
+ ch.update();
+ const img = canvas.toDataURL('image/png', 1.0);
+ ch.destroy(); cont.removeChild(canvas);
+ return {img: img, ancho: ancho, alto: alto};
+}
+function cfgGraficaGeneral(s, titulo) {
+ return {type:'bar',
+ data:{labels: s.map(x => x.Grado), datasets:[
+ {label:'Asistencias', data: s.map(x => x.Asistencias), backgroundColor:'#198754'},
+ {label:'Retardos', data: s.map(x => x.Retardos), backgroundColor:'#ffc107'},
+ {label:'Permanencias', data: s.map(x => x.Permanencias), backgroundColor:'#dc3545'}]},
+ options:{ plugins:{ legend:{position:'bottom'}, title:{display:true, text:titulo, font:{size:15, weight:'bold'}, color:'#800020'} },
+ scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
+}
+function cfgGraficaGrupo(grado, g) {
+ return {type:'bar',
+ data:{ labels:['Asistencias','Retardos','Permanencias'], datasets:[{ data:[g.asistencias,g.retardos,g.permanencias], backgroundColor:['#198754','#ffc107','#dc3545'] }] },
+ options:{ plugins:{ legend:{display:false}, title:{display:true, text:nomGrado[grado]+' '+g.grupo+' ('+g.turno+') — Orientador(a): '+g.orientador, font:{size:15, weight:'bold'}, color:'#800020'} },
+ scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
+}
+/* Excel con la tabla Y las gráficas (imágenes) debajo. imagenes = lista de {img, ancho, alto} */
+async function descargarExcelConGraficas(nombre, titulo, filas, imagenes) {
+ if (!filas.length) { alert('No hay datos para descargar.'); return; }
+ if (!libsOk('ExcelJS')) return;
+ const wb = new ExcelJS.Workbook();
+ const ws = wb.addWorksheet('Reporte');
+ const claves = Object.keys(filas[0]);
+ ws.addRow([titulo]);
+ ws.getRow(1).font = {bold:true, size:14, color:{argb:'FF800020'}};
+ ws.addRow([]);
+ const enc = ws.addRow(claves);
+ enc.eachCell(c => { c.font = {bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF800020'}}; c.alignment = {horizontal:'center'}; });
+ filas.forEach(o => ws.addRow(claves.map(k => o[k])));
+ claves.forEach((k, i) => {
+ const largo = Math.max(String(k).length, ...filas.map(o => String(o[k] == null ? '' : o[k]).length));
+ ws.getColumn(i + 1).width = Math.min(Math.max(largo + 3, 12), 40);
+ });
+ let fila = ws.rowCount + 1;   // fila (base 0) donde empieza la primera gráfica, con una fila en blanco de separación
+ imagenes.forEach(im => {
+ const idImg = wb.addImage({base64: im.img, extension: 'png'});
+ const W = 640, H = Math.round(W * im.alto / im.ancho);
+ ws.addImage(idImg, {tl: {col: 0, row: fila}, ext: {width: W, height: H}});
+ fila += Math.ceil(H / 20) + 1;
+ });
+ const buf = await wb.xlsx.writeBuffer();
+ const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre + '.xlsx';
+ document.body.appendChild(a); a.click();
+ setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+async function descargarGraficas(formato) {
  if (!permisoPermite()) return;
- if (gradoSeleccionado) { if (formato === 'PDF') descargarComparativaGradoPDF(gradoSeleccionado); else descargarComparativaGradoExcel(gradoSeleccionado); return; }
+ try {
+ if (gradoSeleccionado) { if (formato === 'PDF') descargarComparativaGradoPDF(gradoSeleccionado); else await descargarComparativaGradoExcel(gradoSeleccionado); return; }
  const periodo = $('#sel-periodo-stats').val() || 'hoy';
  const s = statsGrados(periodo);
  const tp = tituloPeriodo(periodo);
- if (formato === 'Excel') { descargar('estadisticas_' + hoy(), s.map(x => ({Grado:x.Grado, Alumnos:x.Alumnos, Asistencias:x.Asistencias, '% Asistencias':x['% Asistencias'], Retardos:x.Retardos, '% Retardos':x['% Retardos'], Permanencias:x.Permanencias})), 'Excel', 'Estadísticas de asistencia - ' + tp); return; }
+ if (formato === 'Excel') {
+ if (!libsOk('Chart')) return;
+ const filas = s.map(x => ({Grado:x.Grado, Alumnos:x.Alumnos, Asistencias:x.Asistencias, '% Asistencias':x['% Asistencias'], Retardos:x.Retardos, '% Retardos':x['% Retardos'], Permanencias:x.Permanencias}));
+ const im = imagenDeGrafica(cfgGraficaGeneral(s, 'Estadísticas de asistencia - ' + tp), 800, 420);
+ await descargarExcelConGraficas('estadisticas_' + hoy(), 'Estadísticas de asistencia - ' + tp, filas, [im]);
+ return;
+ }
  if (!libsOk('jspdf')) return;
  const d = new window.jspdf.jsPDF();
  d.setFontSize(14); d.text('Estadísticas de asistencia - ' + tp, 14, 15);
@@ -2312,6 +2377,11 @@ function descargarGraficas(formato) {
  const k = ['Grado','Alumnos','Asistencias','% Asistencias','Retardos','% Retardos','Permanencias'];
  d.autoTable({head:[k], body: s.map(o => k.map(x => o[x])), startY: startY, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]}});
  d.save('estadisticas_' + hoy() + '.pdf');
+ } catch (e) { console.error(e); alert('No se pudo generar el archivo: ' + (e && e.message ? e.message : e)); }
+}
+/* Tabla de la comparativa de un grado (las mismas columnas en el Excel y en el PDF) */
+function filasComparativaGrado(grado, datos) {
+ return datos.map(g => ({Grupo: nomGrado[grado] + ' ' + g.grupo, Turno: g.turno, 'Orientador(a)': g.orientador, Alumnos: g.alumnos, Asistencias: g.asistencias, Retardos: g.retardos, Permanencias: g.permanencias}));
 }
 function descargarComparativaGradoPDF(grado) {
  if (!libsOk('Chart')) return;
@@ -2321,31 +2391,28 @@ function descargarComparativaGradoPDF(grado) {
  if (!libsOk('jspdf')) return;
  const d = new window.jspdf.jsPDF();
  d.setFontSize(14); d.text('Comparativa de asistencia - ' + nomGrado[grado] + ' grado - ' + tp, 14, 15);
- let y = 24, contadorEnPagina = 0;
- const cont = document.getElementById('canvas-temporal');
- datos.forEach((g) => {
- if (contadorEnPagina === 2) { d.addPage(); y = 15; contadorEnPagina = 0; }
- const canvas = document.createElement('canvas'); canvas.width = 700; canvas.height = 380; cont.appendChild(canvas);
- const tempChart = new Chart(canvas.getContext('2d'), { type:'bar',
- data:{ labels:['Asistencias','Retardos','Permanencias'], datasets:[{ data:[g.asistencias,g.retardos,g.permanencias], backgroundColor:['#198754','#ffc107','#dc3545'] }] },
- options:{ responsive:false, animation:false, devicePixelRatio:2,
- plugins:{ legend:{display:false}, title:{display:true, text:nomGrado[grado]+' '+g.grupo+' ('+g.turno+') — Orientador(a): '+g.orientador, font:{size:15, weight:'bold'}, color:'#800020'} },
- scales:{ y:{beginAtZero:true, ticks:{precision:0}} } }});
- tempChart.update();
- const img = canvas.toDataURL('image/png', 1.0);
- const imgW = 180, imgH = Math.round(imgW * (canvas.height/canvas.width));
- d.addImage(img, 'PNG', 14, y, imgW, imgH);
- y += imgH + 8; contadorEnPagina++;
- tempChart.destroy(); cont.removeChild(canvas);
+ // 1) La misma tabla que lleva el Excel
+ const filas = filasComparativaGrado(grado, datos), k = Object.keys(filas[0] || {});
+ d.autoTable({head:[k], body: filas.map(o => k.map(x => o[x])), startY: 20, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]}});
+ // 2) Una gráfica por grupo, debajo de la tabla (salta de hoja cuando ya no caben)
+ let y = d.lastAutoTable.finalY + 8;
+ datos.forEach(g => {
+ const im = imagenDeGrafica(cfgGraficaGrupo(grado, g), 700, 380);
+ const imgW = 180, imgH = Math.round(imgW * im.alto / im.ancho);
+ if (y + imgH > 285) { d.addPage(); y = 15; }
+ d.addImage(im.img, 'PNG', 14, y, imgW, imgH);
+ y += imgH + 8;
  });
  d.save('comparativa_' + nomGrado[grado] + '_grado_' + hoy() + '.pdf');
 }
-function descargarComparativaGradoExcel(grado) {
+async function descargarComparativaGradoExcel(grado) {
+ if (!libsOk('Chart')) return;
  const periodo = $('#sel-periodo-stats').val() || 'hoy';
  const tp = tituloPeriodo(periodo);
  const datos = statsPorGrupo(grado, periodo);
- const filas = datos.map(g => ({Grupo: nomGrado[grado] + ' ' + g.grupo, Turno: g.turno, 'Orientador(a)': g.orientador, Alumnos: g.alumnos, Asistencias: g.asistencias, Retardos: g.retardos, Permanencias: g.permanencias}));
- descargar('comparativa_' + nomGrado[grado] + '_grado_' + hoy(), filas, 'Excel', 'Comparativa - ' + nomGrado[grado] + ' grado - ' + tp);
+ const filas = filasComparativaGrado(grado, datos);
+ const imagenes = datos.map(g => imagenDeGrafica(cfgGraficaGrupo(grado, g), 700, 380));
+ await descargarExcelConGraficas('comparativa_' + nomGrado[grado] + '_grado_' + hoy(), 'Comparativa - ' + nomGrado[grado] + ' grado - ' + tp, filas, imagenes);
 }
 /* ============ PLANTILLAS OFICIALES EN WORD (frente y reverso, por turno) ============
  Las plantillas son archivos de Word (.docx) o PDF. El sistema los lee (public/vendor/sica-docx.js), los acomoda
