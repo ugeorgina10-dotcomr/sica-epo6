@@ -1225,7 +1225,6 @@ function renderListaHorarios() {
    '<div class="col-md-3 d-flex flex-wrap gap-1">' +
    '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
    '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
-   '<button type="button" onclick="borrarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Quitar este grupo: borra su horario y su orientador(a)">Quitar grupo</button>' +
    '</div></div></div></div>';
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios del turno ' + esc(turnoActivo) + ' por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
@@ -1258,15 +1257,6 @@ function quitarHorarioGrupo(k) {
  if (!confirm('¿Quitar el horario del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Volverá a usar el horario predeterminado. El orientador(a) no se modifica.')) return;
  h.entrada = ''; h.salida = '';
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
-}
-/* Borra por completo lo configurado para un grupo: horario y orientador(a). Los alumnos no se tocan. */
-function borrarHorarioGrupo(k) {
- if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar horarios.'); return; }
- const h = db.horarios[k]; if (!h) return;
- const c = parseClave(k);
- if (!confirm('¿Borrar el horario y el orientador(a) del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Los alumnos no se modifican.')) return;
- h.entrada = ''; h.salida = ''; h.orientadorId = '';
- guardarOrientadoresServidor(); renderListaOrientadores();refrescarHorarioForm(); renderTabla();
 }
 /* Quita a un orientador de UN grupo (conserva el horario del grupo y sus demás grupos). */
 function quitarGrupoOrientador(id, clave) {
