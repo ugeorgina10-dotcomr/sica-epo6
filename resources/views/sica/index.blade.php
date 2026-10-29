@@ -434,16 +434,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <!-- SOLO CONTROL ESCOLAR: horario de entrada/salida y orientador del grupo -->
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
- <div class="row g-3 align-items-end mb-3">
- <div class="col-md-3"><label class="form-label small">Hora límite de entrada</label><input type="time" id="horario-entrada-limite" class="form-control form-control-sm"></div>
- <div class="col-md-3"><label class="form-label small">Hora de cierre (salida)</label><input type="time" id="horario-salida-limite" class="form-control form-control-sm"></div>
- <div class="col-md-4"><label class="form-label small">Orientador(a) del grupo</label>
- <select id="orientador-grupo-select" class="form-select form-select-sm">
- <option value="" selected>Sin asignar</option>
- </select>
- </div>
- <div class="col-md-2"><button onclick="guardarHorarioGrupo()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button></div>
- </div>
  <div class="row g-3 align-items-end">
  <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
  <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-dark btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
@@ -697,8 +687,11 @@ Object.keys(db.horarios).forEach(k => {
 });
 /* Guarda SOLO orientadores y grupos en el servidor (rápido, sin mandar alumnos ni plantillas) y avisa si quedó guardado.
    Es lo que hace que los orientadores aparezcan en la pantalla de inicio (lista de nombres) en cualquier equipo. */
+/* Mientras se guardan orientadores/horarios (o justo después), una consulta de sincronización más vieja no debe pisarlos */
+let _oriGuardando = 0, _oriUltimoCambio = 0;
 function guardarOrientadoresServidor() {
  localStorage.setItem(LS, JSON.stringify(db));
+ _oriGuardando++; _oriUltimoCambio = Date.now();
  const caja = $('#estado-sync-orientadores');
  caja.removeClass('text-danger text-success').addClass('text-muted').text('Guardando en el servidor…');
  return fetchT('/api/sica/sync', {
@@ -714,7 +707,7 @@ function guardarOrientadoresServidor() {
  }).catch(e => {
   if (e !== 'sesion') caja.removeClass('text-muted text-success').addClass('text-danger').text('⚠ No se pudo guardar en el servidor (' + (e === 'csrf' ? 'la sesión se renovó, inténtalo otra vez' : 'revisa tu conexión') + '). Los cambios siguen en este equipo; vuelve a intentarlo.');
   return false;
- });
+ }).finally(() => { _oriGuardando--; _oriUltimoCambio = Date.now(); });
 }
 // El teléfono nunca sobrescribe toda la base en el servidor: solo envía cada escaneo (registrar_asistencia).
 let _temporizadorSave = null;
@@ -839,8 +832,9 @@ function fusionarServidor(s, inicioConsulta) {
  // Se conservan los locales aún no enviados; los que ya estuvieron en el servidor y ya no están (eliminados) se quitan
  // (un alumno guardado DESPUÉS de empezar esta consulta no se quita: la respuesta es anterior a su guardado)
  db.alumnos = lista.concat(db.alumnos.filter(a => !claves.has(clv(a)) && (!a.enServidor || (inicioConsulta && a.enServidorTs > inicioConsulta))));
- if (s.horarios) db.horarios = s.horarios;
- if (s.orientadores) db.orientadores = s.orientadores;
+ const oriProtegidos = _oriGuardando > 0 || _oriUltimoCambio > (inicioConsulta || 0);
+ if (s.horarios && !oriProtegidos) db.horarios = s.horarios;
+ if (s.orientadores && !oriProtegidos) db.orientadores = s.orientadores;
  if (s.permisos) db.permisos = s.permisos;
  localStorage.setItem(LS, JSON.stringify(db));
 }
@@ -1171,7 +1165,6 @@ function subirOrientadores() {
    });
   });
   guardarOrientadoresServidor();
-  poblarSelectOrientadorHorario();
   renderListaOrientadores();
   refrescarHorarioForm();
   renderTabla();
@@ -1208,20 +1201,20 @@ function renderListaHorarios() {
  const abierta = caja.find('details').prop('open');
  const idsOri = new Set(db.orientadores.map(o => o.id));
  const grupos = Object.entries(db.horarios).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
-  .filter(x => x.h && (x.h.entrada || x.h.salida || x.h.orientadorId))
-  .sort((a, b) => (a.c.turno === b.c.turno ? 0 : a.c.turno === 'Matutino' ? -1 : 1) || a.c.grado - b.c.grado || a.c.grupo - b.c.grupo);
+  .filter(x => x.c.turno === turnoActivo && x.h && (x.h.entrada || x.h.salida || x.h.orientadorId))
+  .sort((a, b) => a.c.grado - b.c.grado || a.c.grupo - b.c.grupo);
  const porOri = db.orientadores.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   .map(o => ({id: o.id, nombre: o.nombre, gr: grupos.filter(x => x.h.orientadorId === o.id)}));
  porOri.push({id: '', nombre: 'Sin orientador(a)', gr: grupos.filter(x => !x.h.orientadorId || !idsOri.has(x.h.orientadorId))});
  const items = porOri.filter(o => o.gr.length);
- if (!items.length) { caja.html('<span class="text-muted">Aún no hay horarios ni orientadores asignados a ningún grupo.</span>'); return; }
+ if (!items.length) { caja.html('<span class="text-muted">Aún no hay horarios ni orientadores asignados a grupos del turno ' + esc(turnoActivo) + '.</span>'); return; }
  const filas = items.map(o => {
   const llaves = o.gr.map(x => x.k);
   let sel = _horSel[o.id];
-  if (!sel || llaves.indexOf(sel) < 0) { const delTurno = o.gr.find(x => x.c.turno === turnoActivo); sel = (delTurno || o.gr[0]).k; }
+  if (!sel || llaves.indexOf(sel) < 0) sel = o.gr[0].k;
   _horSel[o.id] = sel;
   const hs = db.horarios[sel] || {};
-  const opciones = o.gr.map(x => '<option value="' + esc(x.k) + '"' + (x.k === sel ? ' selected' : '') + '>' + x.c.grado + '° grado, grupo ' + x.c.grupo + ' · ' + esc(x.c.turno) +
+  const opciones = o.gr.map(x => '<option value="' + esc(x.k) + '"' + (x.k === sel ? ' selected' : '') + '>' + x.c.grado + '° grado, grupo ' + x.c.grupo +
    ((x.h.entrada && x.h.salida) ? ' — ' + esc(x.h.entrada) + ' a ' + esc(x.h.salida) : ' — sin horario propio') + '</option>').join('');
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
@@ -1235,7 +1228,7 @@ function renderListaHorarios() {
    '<button type="button" onclick="borrarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Quitar este grupo: borra su horario y su orientador(a)">Quitar grupo</button>' +
    '</div></div></div></div>';
  }).join('');
- caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
+ caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios del turno ' + esc(turnoActivo) + ' por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
 }
 const claveInline = btn => $(btn).closest('.ori-hor').find('select').val();
 /* Al elegir otro grupo del orientador(a), se cargan las horas de ese grupo */
@@ -1273,7 +1266,7 @@ function borrarHorarioGrupo(k) {
  const c = parseClave(k);
  if (!confirm('¿Borrar el horario y el orientador(a) del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Los alumnos no se modifican.')) return;
  h.entrada = ''; h.salida = ''; h.orientadorId = '';
- guardarOrientadoresServidor(); renderListaOrientadores(); poblarSelectOrientadorHorario(); refrescarHorarioForm(); renderTabla();
+ guardarOrientadoresServidor(); renderListaOrientadores();refrescarHorarioForm(); renderTabla();
 }
 /* Quita a un orientador de UN grupo (conserva el horario del grupo y sus demás grupos). */
 function quitarGrupoOrientador(id, clave) {
@@ -1282,7 +1275,7 @@ function quitarGrupoOrientador(id, clave) {
  const c = parseClave(clave), o = db.orientadores.find(x => x.id === id);
  if (!confirm('¿Quitar a ' + (o ? o.nombre : 'este orientador(a)') + ' del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? El grupo quedará sin orientador.')) return;
  h.orientadorId = '';
- guardarOrientadoresServidor(); renderListaOrientadores(); poblarSelectOrientadorHorario(); refrescarHorarioForm(); renderTabla();
+ guardarOrientadoresServidor(); renderListaOrientadores();refrescarHorarioForm(); renderTabla();
 }
 /* ---- Editar los grados y grupos de un orientador (puede tener varios) ---- */
 let oriEditando = null;   // {id, filas:[{turno, grado, grupo}]}
@@ -1318,7 +1311,7 @@ function guardarGruposOrientador() {
  Object.keys(db.horarios).forEach(k => { if (db.horarios[k].orientadorId === id && !nuevas.includes(k)) db.horarios[k].orientadorId = ''; });
  nuevas.forEach(k => { const h = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''}; h.orientadorId = id; db.horarios[k] = h; });
  oriEditando = null;
- guardarOrientadoresServidor(); renderListaOrientadores(); poblarSelectOrientadorHorario(); refrescarHorarioForm(); renderTabla();
+ guardarOrientadoresServidor(); renderListaOrientadores();refrescarHorarioForm(); renderTabla();
 }
 /* Elimina un orientador del servidor y de este navegador. Sus grupos quedan "sin asignar". Solo Control Escolar. */
 function eliminarOrientador(id) {
@@ -1333,7 +1326,7 @@ function eliminarOrientador(id) {
  if (localStorage.getItem('sica_orientador') === id) localStorage.removeItem('sica_orientador');
  Object.values(db.horarios).forEach(h => { if (h.orientadorId === id) h.orientadorId = ''; });
  localStorage.setItem(LS, JSON.stringify(db));
- renderListaOrientadores(); poblarSelectOrientadorHorario(); renderTabla();
+ renderListaOrientadores();renderTabla();
  }).catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 /* Grupos que le corresponden a un orientador, según lo que asignó Control Escolar */
@@ -1347,19 +1340,6 @@ function gruposDeOrientadores(claveActual) {
  const m = {};
  Object.entries(db.horarios).forEach(([k, v]) => { if (v.orientadorId && k !== claveActual) (m[v.orientadorId] = m[v.orientadorId] || []).push(k); });
  return m;
-}
-function poblarSelectOrientadorHorario() {
- const sel = $('#orientador-grupo-select');
- const claveAct = filtro ? claveGrupo(filtro.grado, filtro.grupo, turnoActivo) : '';
- const actualId = filtro ? (db.horarios[claveAct] || {}).orientadorId : '';
- const otros = filtro ? gruposDeOrientadores(claveAct) : {};
- let html = '<option value="">Sin asignar</option>';
- db.orientadores.slice().sort((x, y) => x.nombre.localeCompare(y.nombre, 'es')).forEach(o => {
- const extra = (otros[o.id] || []).map(k => { const c = parseClave(k); return c.grado + '°' + c.grupo + ' ' + c.turno.slice(0, 3) + '.'; });
- html += '<option value="' + esc(o.id) + '">' + esc(o.nombre) + (extra.length ? ' (también en: ' + extra.join(', ') + ')' : '') + '</option>';
- });
- sel.html(html);
- sel.val(actualId || '');
 }
 /* ============ NAVEGACIÓN / ROLES ============ */
 function actualizarCredenciales() {
@@ -2051,14 +2031,10 @@ function pintarBotonesTurno() {
  $('#btn-turno-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
  $('#titulo-tabla-orientador').text('Turno ' + t);
 }
-/* Rellena horario, orientador y etiqueta del grupo según el grupo y el turno activos */
+/* Etiqueta del grupo seleccionado (para subir la lista) y lista de horarios del turno activo */
 function refrescarHorarioForm() {
- if (!filtro) return;
- $('#lbl-grupo-lista').val(filtro.grado + '° grado - Grupo ' + filtro.grupo + ' (' + turnoActivo + ')');
- const h = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)];
- $('#horario-entrada-limite').val(h ? h.entrada : '');
- $('#horario-salida-limite').val(h ? h.salida : '');
- poblarSelectOrientadorHorario();
+ if (filtro) $('#lbl-grupo-lista').val(filtro.grado + '° grado - Grupo ' + filtro.grupo + ' (' + turnoActivo + ')');
+ renderListaHorarios();
 }
 function setTurno(t) {
  turnoActivo = t;
@@ -2078,7 +2054,7 @@ function configurarPanelOrientador() {
  $('#bloque-visualizar-grupo').toggleClass('d-none', o);
  $('#bloque-mi-grupo-orientador').toggleClass('d-none', !o);
  $('#bloque-turno-panel').toggleClass('d-none', o); // el orientador ve solo el turno de su grupo
- if (c) { renderListaOrientadores(); poblarSelectOrientadorHorario(); }
+ if (c) { renderListaOrientadores();}
  if (o) configurarMiGrupoOrientador();
 }
 function configurarMiGrupoOrientador() {
@@ -2186,17 +2162,6 @@ function borrarListaGrupo() {
   alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
  }).catch(() => alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
-function guardarHorarioGrupo() {
- if (!permisoPermite()) return;
- if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
- const e = $('#horario-entrada-limite').val(), s = $('#horario-salida-limite').val(), oid = $('#orientador-grupo-select').val();
- if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
- if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
- db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)] = {entrada:e, salida:s, orientadorId: oid || ''};
- guardarOrientadoresServidor(); renderTabla(); poblarSelectOrientadorHorario(); renderListaOrientadores();
- const nombreOrientador = oid ? (db.orientadores.find(o => o.id === oid) || {}).nombre : 'Sin asignar';
- $('#resumen-horario-grupo').text('Datos guardados para ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): entrada límite ' + e + ', cierre ' + s + ', orientador(a): ' + nombreOrientador + '.');
-}
 function subirHorarios() {
  if (!permisoPermite()) return;
  const file = $('#archivo-horarios')[0].files[0];
@@ -2233,7 +2198,7 @@ function subirHorarios() {
     aplicados++; porTurno[turno]++;
    });
   });
-  if (aplicados) { guardarOrientadoresServidor(); renderTabla(); poblarSelectOrientadorHorario(); renderListaOrientadores(); refrescarHorarioForm(); }
+  if (aplicados) { guardarOrientadoresServidor(); renderTabla();renderListaOrientadores(); refrescarHorarioForm(); }
   let html = 'Horarios aplicados: ' + aplicados + ' (Matutino: ' + porTurno.Matutino + ', Vespertino: ' + porTurno.Vespertino + ')' + (orientadoresNuevos ? '. Orientadores nuevos: ' + orientadoresNuevos : '') + '.';
   if (avisos.length) html += '<div class="text-danger mt-1"><b>Revisa:</b><br>' + avisos.map(esc).join('<br>') + '</div>';
   $('#resumen-horario-grupo').html(html);
