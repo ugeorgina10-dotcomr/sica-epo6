@@ -290,13 +290,16 @@ class ControlEscolarController extends Controller
 
     private function calcularHuella(): string
     {
-        $a  = DB::table('asistencias')->selectRaw('COUNT(*) c, MAX(id) i, MAX(updated_at) u')->first();
-        $al = DB::table('alumnos')->selectRaw('COUNT(*) c, MAX(updated_at) u')->first();
-        $g  = DB::table('grupos')->selectRaw('COUNT(*) c, MAX(updated_at) u')->first();
-        $o  = DB::table('orientadores')->selectRaw('COUNT(*) c, MAX(updated_at) u')->first();
-        $p  = DB::table('permisos')->selectRaw('COUNT(*) c, MAX(updated_at) u')->first();
+        // UNA sola consulta (antes eran 5): con la base en la nube cada ida y vuelta al servidor cuesta decenas de milisegundos
+        $filas = DB::select(
+            "select 'asistencias' as t, count(*) as c, max(id) as i, max(updated_at) as u from asistencias
+             union all select 'alumnos', count(*), 0, max(updated_at) from alumnos
+             union all select 'grupos', count(*), 0, max(updated_at) from grupos
+             union all select 'orientadores', count(*), 0, max(updated_at) from orientadores
+             union all select 'permisos', count(*), 0, max(updated_at) from permisos"
+        );
 
-        return md5(json_encode([$a, $al, $g, $o, $p]));
+        return md5(json_encode($filas));
     }
 
     /** Estado completo para que computadoras y teléfonos lo descarguen */
