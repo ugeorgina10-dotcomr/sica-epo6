@@ -84,7 +84,8 @@ class AuthController extends Controller
             'orientador' => 'nullable|string|max:150',
         ]);
 
-        $usuario = User::where('email', Str::lower(trim($d['email'])))->first();
+        // Solo id y rol: no hace falta traer el hash de la contraseña para bloquear la cuenta
+        $usuario = User::select('id', 'rol')->where('email', Str::lower(trim($d['email'])))->first();
         $bloqueada = ['ok' => true, 'bloqueada' => true, 'mensaje' => self::MENSAJE_OLVIDO];
 
         if (!$usuario) {
@@ -104,20 +105,19 @@ class AuthController extends Controller
                 return response()->json(['ok' => false, 'mensaje' => 'Selecciona tu nombre de la lista.'], 422);
             }
 
-            $orientador = Orientador::where('nombre', $d['orientador'])->first();
-
-            if ($orientador && $orientador->olvido_at === null) {
-                $orientador->olvido_at = now();
-                $orientador->save();
-            }
+            // Un solo UPDATE (antes: buscar + guardar). Si ya estaba bloqueado no cambia la hora de la solicitud.
+            DB::table('orientadores')
+                ->where('nombre', $d['orientador'])
+                ->whereNull('olvido_at')
+                ->update(['olvido_at' => now()]);
 
             return response()->json($bloqueada);
         }
 
-        if ($usuario->olvido_at === null) {
-            $usuario->olvido_at = now();
-            $usuario->save();
-        }
+        DB::table('users')
+            ->where('id', $usuario->id)
+            ->whereNull('olvido_at')
+            ->update(['olvido_at' => now()]);
 
         DB::table('sessions')->where('user_id', $usuario->id)->delete();
 

@@ -6,6 +6,7 @@ use App\Models\Orientador;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -59,11 +60,12 @@ class ClavesController extends Controller
      * Roles: borrada = sin contraseña; bloqueada = la persona marcó "olvidé mi contraseña".
      * Orientadores: estado propia (personal) | general (usa la del rol) | borrada; bloqueada igual que en los roles.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse|Response
     {
-        return response()->json([
+        $datos = [
             'ok' => true,
-            'roles' => User::whereIn('rol', ['director', 'subdirector', 'orientador'])->get()
+            'roles' => User::select('rol', 'password', 'olvido_at')
+                ->whereIn('rol', ['director', 'subdirector', 'orientador'])->get()
                 ->map(fn ($u) => [
                     'rol'       => $u->rol,
                     'borrada'   => (string) $u->getAuthPassword() === '',
@@ -71,7 +73,7 @@ class ClavesController extends Controller
                     'olvido_at' => $u->olvido_at ? (string) $u->olvido_at : null,
                 ])
                 ->values(),
-            'orientadores' => Orientador::orderBy('nombre')->get()
+            'orientadores' => Orientador::select('id', 'nombre', 'password', 'olvido_at')->orderBy('nombre')->get()
                 ->map(fn ($o) => [
                     'id'        => (string) $o->id,
                     'nombre'    => $o->nombre,
@@ -80,7 +82,17 @@ class ClavesController extends Controller
                     'olvido_at' => $o->olvido_at ? (string) $o->olvido_at : null,
                 ])
                 ->values(),
-        ]);
+        ];
+
+        // ETag: Control Escolar consulta esto cada pocos segundos para ver quién pulsó "¿Olvidaste tu contraseña?".
+        // Si nada cambió se responde 304 (sin cuerpo) y la pantalla no se vuelve a dibujar.
+        $etag = '"' . md5(json_encode($datos)) . '"';
+
+        if (in_array($request->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
+            return response('', 304)->header('ETag', $etag);
+        }
+
+        return response()->json($datos)->header('ETag', $etag);
     }
 
     /** Cambia la contraseña de la cuenta de un rol. */
@@ -208,8 +220,10 @@ class ClavesController extends Controller
     /** ¿La contraseña nueva ya es la de otra cuenta de rol? (se compara contra sus hashes) */
     private function laUsaOtraCuenta(string $password, ?int $exceptoUserId): bool
     {
+        // Solo id y hash, y sin cuentas vacías (borradas): cada Hash::check cuesta ~0.2 s, así que no se gasta en vano
         return User::when($exceptoUserId, fn ($q) => $q->where('id', '!=', $exceptoUserId))
-            ->get()
+            ->where('password', '!=', '')
+            ->get(['id', 'password'])
             ->contains(fn ($u) => Hash::check($password, $u->getAuthPassword()));
     }
 }

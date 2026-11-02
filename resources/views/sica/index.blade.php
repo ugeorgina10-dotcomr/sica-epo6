@@ -561,6 +561,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    <div class="col-md-4 d-flex gap-2">
     <button type="button" onclick="generarClave()" class="btn btn-outline-dark btn-sm py-2 text-nowrap" title="Crea una contraseña segura al azar">Generar</button>
     <button type="button" onclick="guardarClave()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button>
+    <button type="button" id="btn-generar-guardar" onclick="generarYGuardar()" class="btn btn-success btn-sm py-2 text-nowrap fw-semibold d-none" title="Crea una contraseña al azar, la guarda y la deja lista para entregar (no hace falta borrar la anterior)">Generar y guardar</button>
    </div>
   </div>
   <div class="form-check mt-2 small"><input class="form-check-input" type="checkbox" id="ver-claves" onchange="verClavesNuevas()"><label class="form-check-label" for="ver-claves">Mostrar lo que escribo</label></div>
@@ -1485,7 +1486,7 @@ function aplicarPermisos(rol) {
  bloquearEdicionCredencial();
  $('#bloque-permisos-roles').toggleClass('d-none', rol !== 'control');
  $('#bloque-claves').toggleClass('d-none', rol !== 'control');
- if (rol === 'control') cargarClaves();
+ if (rol === 'control') cargarClaves(true);
  $('#bloque-plantilla-oficial').toggleClass('d-none', rol !== 'control'); // solo Control Escolar ve el bloque
  configurarPanelOrientador();
 }
@@ -1521,15 +1522,30 @@ let temporizadorClaves = null;
 function etiquetaCuenta(borrada, bloqueada) {
  return bloqueada ? '<span class="etq mal">Bloqueada</span>' : borrada ? '<span class="etq mal">Sin contraseña</span>' : '<span class="etq bien">Activa</span>';
 }
-function cargarClaves() {
- return llamarClaves('/api/sica/claves', 'GET').then(d => {
-  if (!d.ok) return;
+/* Control Escolar revisa cada 4 s si alguien pulsó "¿Olvidaste tu contraseña?". Se manda el ETag a mano para que,
+   si nada cambió, el servidor responda 304 sin cuerpo y no se vuelva a dibujar nada (así se puede revisar seguido sin costo). */
+let _etagClaves = null, _cargandoClaves = false;
+function cargarClaves(forzar) {
+ if (_cargandoClaves && !forzar) return Promise.resolve();
+ _cargandoClaves = true;
+ if (forzar) _etagClaves = null;
+ const cab = {'Accept': 'application/json'};
+ if (_etagClaves) cab['If-None-Match'] = _etagClaves;
+ return fetchT('/api/sica/claves', {headers: cab, cache: 'no-store'}, 10000).then(r => {
+  if (r.status === 304) return null;
+  if (r.status === 401) { sesionExpirada(); return null; }
+  if (!r.ok) return null;
+  _etagClaves = r.headers.get('ETag');
+  return r.json();
+ }).then(d => {
+  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 4000);
+  if (!d || !d.ok) return;
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
   renderClaves();
-  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 10000);
- });
+ }).catch(() => {}).then(() => { _cargandoClaves = false; });
 }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo === 'control' && temporizadorClaves) cargarClaves(); });
 function datosCuenta() {
  if (cuentaSel.startsWith('ori:')) {
   const o = clavesOrientadores.find(x => x.id === cuentaSel.slice(4));
@@ -1574,6 +1590,7 @@ function renderPanelCuenta() {
  $('#panel-titulo').text(c.nombre);
  $('#panel-estado').html(c.control ? '' : etiquetaCuenta(c.borrada, c.bloqueada));
  $('#campo-clave-actual').toggleClass('d-none', !c.control);
+ $('#btn-generar-guardar').toggleClass('d-none', !!c.control);   // en un clic: genera + guarda (no aplica a la propia de Control, que pide la actual)
  $('#btn-borrar-clave').toggleClass('d-none', !!c.control || c.borrada);
  $('#btn-desbloquear-clave').toggleClass('d-none', !c.bloqueada);
  $('#btn-quitar-clave').toggleClass('d-none', !(c.tipo === 'ori' && c.propia));
@@ -1632,6 +1649,7 @@ function abrirSolicitud(btn) {
  try { seleccionarPerfil('control'); } catch (e) {}   // abre el panel de Control Escolar aunque falle la gráfica
  cuentaSel = '';
  elegirCuenta(v);
+ generarClave();   // ya queda una contraseña segura escrita: solo falta pulsar Guardar (o usar "Generar y guardar")
  setTimeout(() => { const el = document.getElementById('bloque-claves'); if (el && el.scrollIntoView) el.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 50);
 }
 /* Indicaciones en vivo: se marcan en verde las que ya cumple la contraseña escrita */
@@ -1674,6 +1692,11 @@ function generarClave() {
  $('#clave-nueva,#clave-confirmar').val(c);
  $('#ver-claves').prop('checked', true); verClavesNuevas(); revisarRequisitosClave();
 }
+/* Un solo clic: contraseña al azar + guardar. Guardar ya reemplaza la anterior y quita el bloqueo, no hace falta "Borrar" antes. */
+function generarYGuardar() {
+ generarClave();
+ guardarClave();
+}
 function guardarClave() {
  const c = datosCuenta();
  if (!c) { alert('Primero elige una cuenta.'); return; }
@@ -1698,7 +1721,7 @@ function guardarClave() {
    $('#resumen-claves').text('Contraseña nueva guardada para ' + c.nombre + '. Ya puede entrar con ella.');
   }
   limpiarCamposClave();
-  cargarClaves();
+  cargarClaves(true);
  }).catch(() => alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 function ocultarEntrega() {
@@ -1739,7 +1762,7 @@ function borrarClaveCuenta() {
   if (!d.ok) { alert(d.mensaje || 'No se pudo borrar la contraseña.'); return; }
   ocultarEntrega();
   $('#resumen-claves').text('Se borró la contraseña anterior de ' + c.nombre + '. Pulsa Generar, luego Guardar, y entrégasela.');
-  cargarClaves();
+  cargarClaves(true);
  }).catch(() => alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 /* Quita el bloqueo sin cambiar la contraseña (por ejemplo, si alguien lo marcó por error) */
@@ -1751,7 +1774,7 @@ function desbloquearCuenta() {
  llamarClaves(url, 'POST').then(d => {
   if (!d.ok) { alert(d.mensaje || 'No se pudo desbloquear.'); return; }
   $('#resumen-claves').text('Se quitó el bloqueo de ' + c.nombre + '.');
-  cargarClaves();
+  cargarClaves(true);
  });
 }
 function quitarClaveOrientador() {
@@ -1760,7 +1783,7 @@ function quitarClaveOrientador() {
  llamarClaves('/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)), 'DELETE').then(d => {
   if (!d.ok) { alert(d.mensaje || 'No se pudo quitar la contraseña propia.'); return; }
   $('#resumen-claves').text('Se quitó la contraseña propia. Ahora usa la general del rol Orientador.');
-  cargarClaves();
+  cargarClaves(true);
  });
 }
 /* ---- Pantalla de inicio de sesión: ventana central de "¿Olvidaste tu contraseña?" ---- */
@@ -1800,17 +1823,18 @@ function confirmarOlvido(reintento) {
  // con otro rol o autocompletado con un correo guardado, y entonces el servidor rechazaba la petición sin avisar.
  const email = correosRoles[rol] || $('#input-correo').val();
  $('#input-correo').val(email);
- const btn = $('#modal-cuenta-botones button').prop('disabled', true);
- fetch('/auth/olvide', {
+ // Respuesta inmediata al tocar el botón: se ve "Enviando..." al instante y no se puede pulsar dos veces
+ const btn = $('#modal-cuenta-botones button').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Enviando...');
+ fetchT('/auth/olvide', {
   method: 'POST',
   credentials: 'same-origin',
   headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-Requested-With':'XMLHttpRequest', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
   body: JSON.stringify({email: email, orientador: o ? o.nombre : null})
- }).then(r => r.json().catch(() => ({})).then(d => ({status: r.status, ...d})))
+ }, 10000).then(r => r.json().catch(() => ({})).then(d => ({status: r.status, ...d})))
  .then(d => {
   // 419: la página llevaba mucho tiempo abierta y su token venció (pasa en computadoras) -> se pide uno nuevo y se reintenta UNA vez
   if (d.status === 419 && !reintento) return refrescarCsrf().then(() => confirmarOlvido(true));
-  btn.prop('disabled', false);
+  btn.prop('disabled', false);   // (el modal siguiente reemplaza los botones)
   $('#input-clave').val('');
   if (d.ok === false || !d.mensaje) {
    let msg = d.mensaje;

@@ -436,6 +436,43 @@ class SicaClavesTest extends TestCase
         $this->assertTrue($r->json('orientadores.0.bloqueada'));
     }
 
+    public function test_olvide_repetido_no_cambia_la_hora_de_la_solicitud(): void
+    {
+        $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk();
+        DB::table('users')->where('rol', 'director')->update(['olvido_at' => '2026-01-01 08:00:00']);
+
+        $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk();
+
+        $this->assertSame('2026-01-01 08:00:00', DB::table('users')->where('rol', 'director')->value('olvido_at'));
+    }
+
+    public function test_la_lista_de_claves_responde_304_si_nada_cambio(): void
+    {
+        $c = $this->como('control');
+        $r = $c->getJson('/api/sica/claves')->assertOk();
+        $etag = $r->headers->get('ETag');
+        $this->assertNotEmpty($etag);
+
+        $this->como('control')->getJson('/api/sica/claves', ['If-None-Match' => $etag])->assertStatus(304);
+
+        // Cuando alguien pulsa "¿Olvidaste tu contraseña?" el ETag cambia y vuelve a llegar el cuerpo completo
+        $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk();
+        $this->como('control')->getJson('/api/sica/claves', ['If-None-Match' => $etag])->assertOk()
+            ->assertJsonPath('roles.0.bloqueada', true);
+    }
+
+    public function test_guardar_una_contrasena_nueva_sin_borrar_la_anterior_tambien_desbloquea(): void
+    {
+        $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk();
+
+        $this->como('control')->postJson('/api/sica/claves/rol', [
+            'rol' => 'director', 'password' => 'DirectorRapida26', 'password_confirmation' => 'DirectorRapida26',
+        ])->assertOk();
+
+        $this->assertNull(DB::table('users')->where('rol', 'director')->value('olvido_at'));
+        $this->postJson('/auth/login', ['email' => 'director@epo6.edu.mx', 'password' => 'DirectorRapida26'])->assertOk();
+    }
+
     public function test_el_estado_trae_la_hora_de_la_solicitud_para_las_burbujas_de_control(): void
     {
         Orientador::create(['nombre' => 'Ana']);
