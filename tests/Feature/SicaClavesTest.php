@@ -436,6 +436,34 @@ class SicaClavesTest extends TestCase
         $this->assertTrue($r->json('orientadores.0.bloqueada'));
     }
 
+    public function test_olvide_no_necesita_token_csrf_ni_sesion(): void
+    {
+        $r = $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk()->assertJsonPath('bloqueada', true);
+
+        $this->assertNotNull(DB::table('users')->where('rol', 'director')->value('olvido_at'));
+        $this->assertNull($r->headers->get('Set-Cookie'));   // no abre sesión: no escribe nada en la tabla sessions
+    }
+
+    public function test_al_entrar_una_contrasena_con_costo_distinto_se_vuelve_a_guardar_con_el_actual(): void
+    {
+        $viejo = password_hash('prepa06', PASSWORD_BCRYPT, ['cost' => 5]);   // el costo de pruebas es 4
+        DB::table('users')->where('rol', 'director')->update(['password' => $viejo]);
+        $ana = Orientador::create(['nombre' => 'Ana']);
+        DB::table('orientadores')->where('id', $ana->id)->update(['password' => password_hash('ClaveDeAna2026', PASSWORD_BCRYPT, ['cost' => 5])]);
+
+        $this->postJson('/auth/login', ['email' => 'director@epo6.edu.mx', 'password' => 'prepa06'])->assertOk();
+        $nuevo = DB::table('users')->where('rol', 'director')->value('password');
+        $this->assertNotSame($viejo, $nuevo);
+        $this->assertTrue(Hash::check('prepa06', $nuevo));
+        $this->assertFalse(Hash::needsRehash($nuevo));
+
+        $this->postJson('/auth/login', ['email' => 'orientador1@epo6.edu.mx', 'password' => 'ClaveDeAna2026', 'orientador' => 'Ana'])->assertOk();
+        $this->assertFalse(Hash::needsRehash(DB::table('orientadores')->where('id', $ana->id)->value('password')));
+        $this->assertTrue(Hash::check('ClaveDeAna2026', DB::table('orientadores')->where('id', $ana->id)->value('password')));
+        // La contraseña general del rol no se tocó por entrar con la propia
+        $this->assertTrue(Hash::check('prepa06', DB::table('users')->where('rol', 'orientador')->value('password')));
+    }
+
     public function test_olvide_repetido_no_cambia_la_hora_de_la_solicitud(): void
     {
         $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk();

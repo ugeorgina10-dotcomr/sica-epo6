@@ -164,6 +164,7 @@ class AuthController extends Controller
 
         $hash = (string) $usuario->getAuthPassword();
         $olvido = $usuario->rol !== 'control' && $usuario->olvido_at !== null;
+        $orientador = null;
 
         if ($usuario->rol === 'orientador') {
             $orientador = $nombreOrientador ? Orientador::where('nombre', $nombreOrientador)->first() : null;
@@ -187,7 +188,23 @@ class AuthController extends Controller
             return [null, 'borrada'];
         }
 
-        return [Hash::check($password, $hash) ? $usuario : null, null];
+        if (!Hash::check($password, $hash)) {
+            return [null, null];
+        }
+
+        // Si la contraseña se guardó con un costo distinto al actual (config/hashing.php), se vuelve a guardar con el actual:
+        // así las siguientes veces que entre será más rápido. Va con DB::table para no pasar por el cast 'hashed' del modelo.
+        if (Hash::needsRehash($hash)) {
+            $nuevo = Hash::make($password);
+
+            if ($usuario->rol === 'orientador' && $orientador && $orientador->password !== null) {
+                DB::table('orientadores')->where('id', $orientador->id)->update(['password' => $nuevo]);
+            } else {
+                DB::table('users')->where('id', $usuario->id)->update(['password' => $nuevo]);
+            }
+        }
+
+        return [$usuario, null];
     }
 
     private function datosUsuario(Request $request): array

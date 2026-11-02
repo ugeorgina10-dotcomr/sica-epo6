@@ -1396,11 +1396,7 @@ function intentarEntrar() {
  if (orientadorActivo) localStorage.setItem('sica_orientador', orientadorActivo.id);   // para recordar quién eres si recargas la página
  $('#input-clave').val('').attr('type','password');
  $('#ojo-abierto').removeClass('d-none'); $('#ojo-cerrado').addClass('d-none');
- cargarDesdeServidor().then(() => {
- if (orientadorActivo) gruposDelOrientador = calcularGruposOrientador(orientadorActivo.id);
- mostrarSeccion('vista-sistema');
- guardarPaginaOffline();   // guarda la página con la sesión para poder abrir el sistema sin internet
- });
+ entrarAlSistema(false);
  })
  .catch(() => {
  orientadorActivo = null;
@@ -1522,7 +1518,7 @@ let temporizadorClaves = null;
 function etiquetaCuenta(borrada, bloqueada) {
  return bloqueada ? '<span class="etq mal">Bloqueada</span>' : borrada ? '<span class="etq mal">Sin contraseña</span>' : '<span class="etq bien">Activa</span>';
 }
-/* Control Escolar revisa cada 4 s si alguien pulsó "¿Olvidaste tu contraseña?". Se manda el ETag a mano para que,
+/* Control Escolar revisa cada 2 s si alguien pulsó "¿Olvidaste tu contraseña?". Se manda el ETag a mano para que,
    si nada cambió, el servidor responda 304 sin cuerpo y no se vuelva a dibujar nada (así se puede revisar seguido sin costo). */
 let _etagClaves = null, _cargandoClaves = false;
 function cargarClaves(forzar) {
@@ -1538,7 +1534,7 @@ function cargarClaves(forzar) {
   _etagClaves = r.headers.get('ETag');
   return r.json();
  }).then(d => {
-  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 4000);
+  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
   if (!d || !d.ok) return;
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
@@ -1624,6 +1620,39 @@ $(document).on('click', function (e) {
 });
 /* Burbujas para Control Escolar: aparecen cuando otra cuenta pulsa "¿Olvidaste tu contraseña?" */
 let burbujasVistas = {};
+/* ---- Avisos entre pestañas del mismo navegador ----
+   Cuando sale un aviso (como "X solicita su nueva contraseña"), las demás pestañas que siguen en la pantalla de inicio
+   lo reciben y ENTRAN SOLAS al sistema con la sesión que ya está abierta, para que el aviso no se quede sin verse.
+   Usa BroadcastChannel (y localStorage como respaldo en navegadores viejos); la sesión sigue siendo la del servidor. */
+const _canalAvisos = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_avisos') : null;
+function avisarOtrasPestanas(msg) {
+ try {
+  if (_canalAvisos) _canalAvisos.postMessage(msg);
+  else localStorage.setItem('sica_aviso', JSON.stringify({m: msg, t: Date.now()}));
+ } catch (e) {}
+}
+let _entrandoPorAviso = false;
+function entrarSiHaySesion() {
+ if (rolActivo || _entrandoPorAviso) return;
+ _entrandoPorAviso = true;
+ fetchT('/auth/me', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 8000)
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+   if (!d || !d.ok || rolActivo) return;   // sin sesión en el servidor: se queda en el login
+   if (d.csrf) $('meta[name="csrf-token"]').attr('content', d.csrf);
+   restaurarSesion({rol: d.rol, nombre: d.nombre, email: d.email});
+  })
+  .catch(() => {})
+  .then(() => { _entrandoPorAviso = false; });
+}
+function alRecibirAviso(msg) { if (msg && msg.tipo === 'aviso') entrarSiHaySesion(); }
+if (_canalAvisos) _canalAvisos.onmessage = e => alRecibirAviso(e.data);
+window.addEventListener('storage', e => {
+ if (e.key !== 'sica_aviso' || !e.newValue) return;
+ try { alRecibirAviso(JSON.parse(e.newValue).m); } catch (x) {}
+});
+// Una pestaña que se quedó en el login (o se "durmió") revisa al volver a verla si ya hay sesión abierta
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) entrarSiHaySesion(); });
 function sincronizarBurbujas() {
  if (rolActivo !== 'control') { $('#burbujas-claves').empty(); return; }
  const pend = [];
@@ -1634,6 +1663,7 @@ function sincronizarBurbujas() {
  pend.forEach(p => {
   if (burbujasVistas[p.k]) return;
   burbujasVistas[p.k] = true;
+  avisarOtrasPestanas({tipo: 'aviso', k: p.k, nombre: p.nombre});   // las otras pestañas en el login entran y lo ven también
   $('#burbujas-claves').append(
    '<div class="burbuja" role="alert" data-k="' + esc(p.k) + '" data-cuenta="' + esc(p.cuenta) + '">' +
    '<button type="button" class="burbuja-x" aria-label="Cerrar" onclick="$(this).closest(\'.burbuja\').remove()">&times;</button>' +
@@ -2859,6 +2889,25 @@ function descargarCredencialIndividual() {
  if (!curpLargoValido(datos.curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(datos.curp) + ' (ahora tiene ' + datos.curp.length + '). Corrígela antes de descargar.'); return; }
  generarPDFCredenciales([datos], 'credencial_' + datos.curp + '.pdf', document.getElementById('btn-pdf-individual'), 'Descargar PDF');
 }
+/* Entra al sistema. Si este equipo ya tiene datos guardados de la vez anterior (listas, horarios), la pantalla se abre AL INSTANTE
+   con esos datos y se actualizan en segundo plano (cada 3 s se vuelven a sincronizar de todos modos; el servidor manda siempre
+   la última palabra). Si es la primera vez en este equipo no hay nada guardado: ahí sí se espera la descarga para no mostrar tablas vacías. */
+function entrarAlSistema(restaurando) {
+ let abierto = false;
+ const abrir = () => {
+  if (abierto) return;
+  abierto = true;
+  if (orientadorActivo) gruposDelOrientador = calcularGruposOrientador(orientadorActivo.id);
+  if (!rolActivo) mostrarSeccion('vista-sistema');
+  if (restaurando) vaciarCola();   // si quedaron escaneos pendientes de otra vez, se envían ahora
+ };
+ if (db.alumnos.length || Object.keys(db.horarios).length) abrir();
+ return cargarDesdeServidor().then(() => {
+  abrir();
+  // Al recargar, el service worker ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
+  if (!restaurando) guardarPaginaOffline();   // al iniciar sesión sí: así se puede abrir sin internet
+ });
+}
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
 function restaurarSesion(S) {
  $('#rol-select').val(S.rol);
@@ -2867,12 +2916,7 @@ function restaurarSesion(S) {
  orientadorActivo = db.orientadores.find(o => o.id === id) || null;
  if (!orientadorActivo) { mostrarSeccion('vista-login'); return; }   // sesión abierta pero sin nombre elegido: que lo elija
  }
- cargarDesdeServidor().then(() => {
- if (orientadorActivo) gruposDelOrientador = calcularGruposOrientador(orientadorActivo.id);
- if (!rolActivo) mostrarSeccion('vista-sistema');
- guardarPaginaOffline();
- vaciarCola();   // si quedaron escaneos pendientes de otra vez, se envían ahora
- });
+ entrarAlSistema(true);
 }
 // Computadoras: al volver con "atrás" o recargar, el navegador restaura el rol elegido SIN avisar a la página -> se vuelve a sincronizar el correo
 window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredenciales(); });

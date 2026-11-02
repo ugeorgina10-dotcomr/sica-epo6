@@ -3,7 +3,10 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClavesController;
 use App\Http\Controllers\ControlEscolarController;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 // ===== Públicas =====
 
@@ -24,7 +27,12 @@ Route::get('/login', function () {
 
 // Autenticación
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:20,1')->name('auth.login');
-Route::post('/auth/olvide', [AuthController::class, 'olvide'])->middleware('throttle:5,1,olvide')->name('auth.olvide');
+// "Olvidé mi contraseña": no usa sesión ni token CSRF (se llama sin haber iniciado sesión y cualquiera podría llamarla igual;
+// el límite de 5 por minuto la protege). Sin sesión se ahorra leer y escribir la tabla sessions en cada petición.
+Route::post('/auth/olvide', [AuthController::class, 'olvide'])
+    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class])
+    ->middleware('throttle:5,1,olvide')
+    ->name('auth.olvide');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 
