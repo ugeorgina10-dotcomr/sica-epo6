@@ -298,7 +298,7 @@ class ControlEscolarController extends Controller
     }
 
     /**
-     * Código opaco que va dentro del QR de la credencial: no se puede sacar la CURP de él.
+     * Código opaco que va al final del texto del QR de la credencial: no se puede sacar la CURP de él.
      * Es un HMAC de la CURP con la APP_KEY (si cambias la APP_KEY, hay que volver a imprimir las credenciales).
      */
     public static function codigoQr(string $curp): string
@@ -310,12 +310,6 @@ class ControlEscolarController extends Controller
     public static function claveQr(): string
     {
         return hash_hmac('sha256', 'sica-qr-v1', (string) config('app.key'));
-    }
-
-    /** Dirección pública que lleva el QR (lo que ve otra app de escaneo): solo muestra el logo de la escuela */
-    public static function urlQr(string $codigo): string
-    {
-        return rtrim((string) env('SICA_QR_BASE', 'https://sica-epo6.onrender.com'), '/') . '/q/SICA' . $codigo;
     }
 
     /** código QR => id de alumno (se guarda unos minutos; solo cuenta la CURP de cada alumno) */
@@ -451,7 +445,6 @@ class ControlEscolarController extends Controller
 
         return [
             'qrClave'      => self::claveQr(),
-            'qrBase'       => self::urlQr(''),   // termina en "/q/SICA": el cliente le agrega el código del alumno
             'alumnos'      => $alumnos,
             'horarios'     => (object) $horarios,
             'orientadores' => DB::table('orientadores')->select('id', 'nombre')->get()

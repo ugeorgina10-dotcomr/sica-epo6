@@ -36,15 +36,6 @@ Route::post('/auth/olvide', [AuthController::class, 'olvide'])
 Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 
-// Pantalla que ve cualquiera que escanee el QR de una credencial con OTRA app (cámara del teléfono, etc.):
-// solo el logo y el nombre de la escuela. No consulta la base ni usa sesión; el código de la dirección no revela nada.
-Route::get('/q/{codigo}', function () {
-    return response()->view('sica.qr_publico')->header('X-Robots-Tag', 'noindex, nofollow');
-})->where('codigo', '[A-Za-z0-9]{1,60}')
-  ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class])
-  ->middleware('throttle:60,1')
-  ->name('sica.qr.publico');
-
 // Solo nombres de orientadores, para llenar la lista de la pantalla de login.
 // No incluye alumnos, CURP ni asistencias.
 Route::get('/api/sica/orientadores', function () {

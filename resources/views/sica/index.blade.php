@@ -862,7 +862,6 @@ function fusionarServidor(s, inicioConsulta) {
  if (s.horarios && !oriProtegidos) db.horarios = s.horarios;
  if (s.orientadores && !oriProtegidos) db.orientadores = s.orientadores;
  if (s.permisos) db.permisos = s.permisos;
- if (s.qrBase) db.qrBase = s.qrBase;
  if (s.qrClave) db.qrClave = s.qrClave;
  localStorage.setItem(LS, JSON.stringify(db));
 }
@@ -2104,7 +2103,12 @@ function vaciarCola() {
 }
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
-const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
+const orientadorDe = x => {
+ const h = x && x.grado ? (db.horarios || {})[claveGrupo(x.grado, x.grupo, x.turno)] : null;
+ const o = h && h.orientadorId ? (db.orientadores || []).find(y => String(y.id) === String(h.orientadorId)) : null;
+ return o ? o.nombre : '';
+};
+const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' + (orientadorDe(x) ? ' — Orientador(a): ' + orientadorDe(x) : '') : 'grupo sin asignar');
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
  if (scanners[el]) return;
@@ -2148,7 +2152,7 @@ function detener(el) {
  const s = scanners[el]; if (!s) return; delete scanners[el];
  s.stop().then(() => s.clear()).catch(() => {}); $('#' + el).siblings('.cam-ph').show();
 }
-/* El QR de la credencial es una dirección (".../q/SICA<código>"). Se reconoce aunque el lector cambie los signos (: / .)
+/* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
    porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
 const reQr = /SICA([0-9A-F]{20})$/;
 function claveDeLectura(txt) {
@@ -2988,7 +2992,8 @@ function _hmacSha256Hex(clave, texto) {
  const i1 = _sha256(a), b = new Uint8Array(96); b.set(ok); b.set(i1, 64);
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
-const QR_BASE_DEFECTO = 'https://sica-epo6.onrender.com/q/SICA';
+/* Texto del QR: solo datos de la escuela (lo que ve cualquier otra app de escaneo, sin ningún enlace) y al final el código propio del alumno */
+const QR_TEXTO_ESCUELA = 'PREPARATORIA OFICIAL NUM 6 CCT 15EBH0008G MAT 15EBH0199N VESP ';
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
@@ -2999,8 +3004,8 @@ function qrCodigo(curp) {
  if (_memoQr.size > 6000) _memoQr.clear();
  _memoQr.set(k, c); return c;
 }
-/* Lo que lleva el QR impreso: una dirección con el código (no la CURP). */
-const qrValorDe = curp => { const c = qrCodigo(curp); return c ? (db.qrBase || QR_BASE_DEFECTO) + c : ''; };
+/* Lo que lleva el QR impreso: datos de la escuela + código del alumno (no la CURP). */
+const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + 'SICA' + c : ''; };
 const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:valor, size:220}).toDataURL();
 const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred);
 /* CAMBIO: al elegir Matutino/Vespertino abajo, la etiqueta del turno y la
@@ -3095,7 +3100,7 @@ function actualizarVistaPreviaCredencial() {
 function datosCredencial(a) {
  return {
   nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)',
-  // El QR sale de la CURP del alumno: lleva una dirección con un código propio de cada alumno (no la CURP a la vista)
+  // El QR sale de la CURP del alumno: datos de la escuela + un código propio de cada alumno (no la CURP a la vista)
   qr: qrValorDe(a.curp), conQR: !!(a.curp && qrValorDe(a.curp)),
   grado: nomGrado[a.grado] || '',
   grupo: ROMANOS[a.grupo] || String(a.grupo || ''), turno: a.turno || ''
