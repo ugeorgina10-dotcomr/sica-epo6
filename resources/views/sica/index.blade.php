@@ -363,6 +363,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
+ <div class="small text-muted mb-3">Lector físico (USB / inalámbrico) <span id="estado-lector-fisico" class="fw-semibold text-success">listo</span>: solo escanea el QR de la credencial, no hace falta tocar nada ni encender la cámara.</div>
  <button onclick="toggleCamaraFija()" class="btn btn-vinotinto px-4">Encender / Apagar Cámara</button>
  </div>
 </div>
@@ -2183,6 +2184,57 @@ function setModoEscaneo(m) {
  $('#lbl-modo').text(m);
 }
 function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : iniciarScanner('cam-fija', () => modoEscaneo); }
+/* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
+   Estos lectores funcionan como un teclado: "teclean" muy rápido el texto del QR (la CURP) y terminan con Enter.
+   Se distinguen de una persona porque entre tecla y tecla pasan menos de ~80 ms. Solo se atienden en el panel del
+   Lector Fijo y si no se está escribiendo en un campo (contraseñas, nombres, etc.). Si el lector está configurado
+   "sin terminador", la lectura se da por terminada tras una breve pausa al completar los 18 caracteres. */
+(function () {
+ let buf = '', ultimaTecla = 0, pausa = null;
+ const panelActivo = () => rolActivo && !$('#vista-sistema').hasClass('d-none') && !$('#panel-lector').hasClass('d-none');
+ const enCampo = el => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+ function tono(ok) {
+  try {
+   desbloquearAudio();
+   if (!_audioCtx || _audioCtx.state !== 'running') return;
+   const t0 = _audioCtx.currentTime;
+   (ok ? [[1320, 0, 0.12]] : [[330, 0, 0.14], [330, 0.2, 0.14]]).forEach(([hz, ret, dur]) => {
+    const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
+    osc.type = 'square'; osc.frequency.value = hz;
+    vol.gain.setValueAtTime(0.0001, t0 + ret);
+    vol.gain.exponentialRampToValueAtTime(0.15, t0 + ret + 0.01);
+    vol.gain.exponentialRampToValueAtTime(0.0001, t0 + ret + dur);
+    osc.connect(vol); vol.connect(_audioCtx.destination);
+    osc.start(t0 + ret); osc.stop(t0 + ret + dur + 0.05);
+   });
+  } catch (e) {}
+ }
+ function terminar() {
+  clearTimeout(pausa); pausa = null;
+  const curp = buf.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  buf = '';
+  if (curp.length < 10) return;                       // ruido o tecleo normal: se ignora
+  const el = $('#res-cam-fija');
+  procesarQR(curp, modoEscaneo, 'cam-fija');
+  // procesarQR escribe el resultado en #res-cam-fija (puede tardar si busca en el servidor): se suena según el color final
+  setTimeout(() => tono(!el.hasClass('text-danger')), 350);
+ }
+ document.addEventListener('keydown', e => {
+  if (!panelActivo() || enCampo(e.target) || e.ctrlKey || e.altKey || e.metaKey) return;
+  const ahora = Date.now();
+  if (e.key === 'Enter') {
+   if (buf.length) { e.preventDefault(); terminar(); }   // evita que el Enter "pulse" el botón que tenga el foco
+   return;
+  }
+  if (e.key.length !== 1) return;                       // Shift, CapsLock, etc.
+  if (ahora - ultimaTecla > 80) buf = '';               // pausa larga: era una persona tecleando, empieza lectura nueva
+  ultimaTecla = ahora;
+  buf += e.key;
+  e.preventDefault();
+  clearTimeout(pausa);
+  pausa = setTimeout(() => { if (buf.length >= CURP_LARGO) terminar(); else buf = ''; }, 150);   // lector sin terminador
+ }, true);
+})();
 /* ============ PANEL DE ORIENTADORES ============ */
 /* Las instrucciones de los archivos y el título del bloque cambian según el turno elegido (Matutino / Vespertino) */
 function actualizarTextosTurno() {
