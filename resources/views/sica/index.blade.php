@@ -363,8 +363,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
- <div class="small text-muted mb-1">Lector físico (USB / inalámbrico) <span id="estado-lector-fisico" class="fw-semibold text-success">listo</span>: solo escanea el QR de la credencial, no hace falta tocar nada ni encender la cámara.</div>
- <div id="diag-lector-fisico" class="small text-muted mb-3">Último dato recibido del lector: ninguno todavía</div>
  <button onclick="toggleCamaraFija()" class="btn btn-vinotinto px-4">Encender / Apagar Cámara</button>
  </div>
 </div>
@@ -630,7 +628,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
  // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
- const pantallaLista = new Promise(ok => document.readyState === 'complete' ? ok() : window.addEventListener('load', () => setTimeout(ok, 30)));
+ const pantallaLista = new Promise(ok => setTimeout(ok, 0));   // justo después de pintar la pantalla: todo se va cargando mientras escribes tu contraseña
  window.SICA_DOCX_LISTO = pantallaLista.then(() => Promise.all(grupos[0].map(cargar)));
  const resto = window.SICA_DOCX_LISTO.then(() => Promise.all([
   Promise.all(grupos[1].map(cargar)),
@@ -2666,6 +2664,26 @@ const errorPlantilla = {};   // 'Matutino-frente' -> texto del problema, si lo h
 const origenPlantilla = {};  // 'Matutino-frente' -> 'servidor' (la que subió Control Escolar) | 'original' (el Word de public/plantillas)
 const existeOriginal = {};   // 'FrenteMatutino.docx' -> true/false (false = ya se eliminó para siempre)
 try { localStorage.removeItem('sica_epo6_plantilla_oficial'); } catch (e) {}   // ya no se guardan imágenes de plantilla en el navegador
+/* Lee y analiza un Word/PDF de plantilla UNA sola vez (url -> promesa). Se usa al iniciar y también por adelantado en la pantalla de login. */
+const _plantillasLeidas = {};
+function leerPlantilla(url, forzar) {
+ return (!forzar && _plantillasLeidas[url]) || (_plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
+  .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
+  .then(buf => {
+   const esPdf = new Uint8Array(buf, 0, 5).join() === '37,80,68,70,45';   // "%PDF-": el lector de PDF puede tardar en cargar
+   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf));
+  }).catch(e => { delete _plantillasLeidas[url]; throw e; }));
+}
+/* Deja listos (ya leídos) los Word originales mientras la persona escribe su contraseña: al entrar, las plantillas aparecen al instante. */
+function precalentarPlantillas() {
+ if (!window.SICA_DOCX_LISTO) return;
+ window.SICA_DOCX_LISTO.then(() => {
+  if (!window.SicaDocx) return;
+  const urls = {};
+  Object.keys(ARCHIVOS_PLANTILLA).forEach(t => ['frente', 'reverso'].forEach(l => { urls[BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[t][l]] = 1; }));
+  Object.keys(urls).forEach(u => leerPlantilla(u).catch(() => {}));
+ });
+}
 function cargarPlantillasDefault() {
  revisarOriginales();
  const hecho = (turno, lado, modelo, error, origen) => {
@@ -2676,13 +2694,7 @@ function cargarPlantillasDefault() {
   if (idEditando) actualizarVistaPreviaCredencial();
  };
  // Se esperan solo las librerías de Word (no Excel/PDF/gráficas). El mismo archivo (p. ej. Reverso.docx, igual en los dos turnos) se lee UNA sola vez.
- const leidos = {};   // url -> promesa del modelo ya leído
- const leer = (url, forzar) => (!forzar && leidos[url]) || (leidos[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
-  .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
-  .then(buf => {
-   const esPdf = new Uint8Array(buf, 0, 5).join() === '37,80,68,70,45';   // "%PDF-": el lector de PDF puede tardar en cargar
-   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf));
-  }).catch(e => { delete leidos[url]; throw e; }));
+ const leer = leerPlantilla;
  (window.SICA_DOCX_LISTO || window.SICA_LIBS_LISTAS || Promise.resolve()).then(() => {
   if (!window.SicaDocx) { Object.keys(plantillasDefault).forEach(t => ['frente','reverso'].forEach(l => hecho(t, l, null, 'No se pudo cargar el lector de plantillas. Revisa tu internet y recarga la página.'))); return; }
   // el turno que se está viendo primero
@@ -2721,6 +2733,7 @@ function refrescarPreviewPlantillaOficial() {
   const m = plantillasDefault[t] && plantillasDefault[t][l];
   const msg = $('#msg-prev-plantilla-' + l);
   if (m && window.SicaDocx) {
+   if ($('#panel-alumno').hasClass('d-none')) return;   // oculto: no se gasta tiempo dibujando; al abrir el Portal del Alumno se dibuja
    SicaDocx.dibujar(cv, m, null, {ancho: 900});
    $(cv).show();
    const falta = l === 'frente' ? problemasFrente(m) : [];
@@ -3091,7 +3104,7 @@ function entrarAlSistema(restaurando) {
  return cargarDesdeServidor().then(() => {
   abrir();
   // Al recargar, el service worker ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
-  if (!restaurando) guardarPaginaOffline();   // al iniciar sesión sí: así se puede abrir sin internet
+  if (!restaurando) setTimeout(guardarPaginaOffline, 4000);   // al iniciar sesión sí: así se puede abrir sin internet
  });
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
@@ -3107,6 +3120,7 @@ function restaurarSesion(S) {
 // Computadoras: al volver con "atrás" o recargar, el navegador restaura el rol elegido SIN avisar a la página -> se vuelve a sincronizar el correo
 window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredenciales(); });
 $(function () {
+ precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
  try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
  if (Array.isArray(window.SICA_ORIENTADORES)) db.orientadores = window.SICA_ORIENTADORES;   // ya vienen en la página
  actualizarCredenciales();
