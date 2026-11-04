@@ -354,14 +354,13 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <div id="panel-lector" class="panel-perfil d-none">
  <div class="text-center p-4 bg-light rounded-4 border mb-3">
  <h5 class="fw-bold text-uppercase mb-1" style="color:#800020">Lector Fijo - Control de Entradas y Salidas</h5>
- <p class="small text-muted mb-2">Modo <b>Automático</b>: el alumno solo muestra su credencial al lector y el sistema registra su entrada o su salida en su grupo. No hay que pulsar nada.</p>
+ <p class="small text-muted mb-2">Modo <b>Automático</b>: el alumno solo muestra su credencial al lector y el sistema registra su entrada o su salida en su grupo. No hay que pulsar nada. (Si pulsas Entrada o Salida se fuerza ese modo; vuelve a pulsarlo para regresar al automático.)</p>
  <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
- <button onclick="setModoEscaneo('Auto')" id="btn-modo-auto" class="btn btn-vinotinto px-4 py-2 fw-semibold shadow-sm">Automático</button>
- <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Solo Entrada</button>
- <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Solo Salida</button>
+ <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Entrada</button>
+ <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Salida</button>
  </div>
  <div class="camera-box-ref mb-2 border border-danger shadow">
- <div class="cam-ph text-center text-warning"><span class="small d-block fw-semibold">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada (el lector físico sigue activo)</span></div>
+ <div class="cam-ph text-center text-warning"><span class="small d-block fw-semibold">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
@@ -1518,7 +1517,7 @@ function seleccionarPerfil(perfil) {
  if (perfil === 'orientador') { configurarPanelOrientador(); renderTabla(); }
  if (perfil === 'control') renderStats();
  // La cámara del lector fijo ya NO se enciende sola: solo con el botón "Encender / Apagar Cámara". El lector físico funciona sin cámara.
- if (perfil === 'lector') { camFijaManual = true; setTimeout(() => $('#res-cam-fija').removeClass('text-success text-danger').text('Lector listo: acerca la credencial al lector.'), 0); }
+ if (perfil === 'lector') { camFijaManual = true; setTimeout(() => $('#res-cam-fija').removeClass('text-success text-danger').text(''), 0); }
  if (perfil === 'alumno') refrescarPreviewPlantillaOficial(); // vista previa de la plantilla oficial (solo la ve Control Escolar)
  const i = ordenPaneles.indexOf(perfil); if (i !== -1) indicePanelActual = i;
 }
@@ -2219,8 +2218,8 @@ function registrarDesconocido(curp, modo) {
 function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
 /* ============ LECTOR FIJO ============ */
 function setModoEscaneo(m) {
+ if (m === modoEscaneo) m = 'Auto';   // pulsar de nuevo el modo activo regresa al automático
  modoEscaneo = m;
- $('#btn-modo-auto').toggleClass('btn-vinotinto', m === 'Auto').toggleClass('btn-outline-dark bg-white', m !== 'Auto');
  $('#btn-modo-entrada').toggleClass('btn-success', m === 'Entrada').toggleClass('btn-outline-dark bg-white', m !== 'Entrada');
  $('#btn-modo-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
  $('#lbl-modo').text(m === 'Auto' ? 'Automático' : m);
@@ -2237,7 +2236,7 @@ function modoAutomatico(a) {
 }
 let camFijaManual = true, camFijaError = 0;   // la cámara solo se enciende cuando alguien pulsa el botón
 function toggleCamaraFija() {
- if (scanners['cam-fija']) { camFijaManual = true; detener('cam-fija'); $('#res-cam-fija').removeClass('text-success text-danger').text('Cámara apagada. El lector físico sigue activo.'); }
+ if (scanners['cam-fija']) { camFijaManual = true; detener('cam-fija'); $('#res-cam-fija').removeClass('text-success text-danger').text(''); }
  else {
   if ($('#vista-sistema').hasClass('d-none') || $('#panel-lector').hasClass('d-none') || !rolActivo) return;
   camFijaManual = false; camFijaError = 0;
