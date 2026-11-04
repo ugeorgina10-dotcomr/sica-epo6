@@ -15,7 +15,7 @@ RUN { \
 # Apache: comprime las respuestas (página, JSON, JS) y deja que el navegador guarde librerías e imágenes un día
 RUN a2enmod rewrite deflate headers \
     && { \
-      echo 'AddOutputFilterByType DEFLATE application/json application/manifest+json image/svg+xml'; \
+      echo 'AddOutputFilterByType DEFLATE text/html text/css text/plain text/javascript application/javascript application/json application/manifest+json image/svg+xml'; \
       echo '<LocationMatch "^/(vendor|img|plantillas)/">'; \
       echo '    Header set Cache-Control "public, max-age=86400"'; \
       echo '</LocationMatch>'; \

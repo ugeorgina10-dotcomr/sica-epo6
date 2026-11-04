@@ -11,6 +11,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SICA-EPO6">
 <link rel="apple-touch-icon" href="{{ asset('img/logo6.png') }}">
+<link rel="preload" as="image" href="{{ asset('img/logo6.png') }}">
+<link rel="prefetch" as="image" href="{{ asset('img/epo6.png') }}">   {{-- el fondo del login ya está listo cuando se pulsa Ingresar --}}
 {{-- Librerías servidas desde public/vendor (sin CDN): así el sistema abre aunque no haya internet --}}
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
@@ -146,7 +148,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <!-- ============ INICIO ============ -->
 <div id="vista-inicio" class="card main-card p-4 p-md-5 text-center col-12 col-md-8 col-lg-6">
  <div class="d-flex justify-content-center mb-3">
- <img src="{{ asset('img/logo6.png') }}" alt="Logo EPO6" class="institution-logo">
+ <img src="{{ asset('img/logo6.png') }}" alt="Logo EPO6" class="institution-logo" width="130" height="127" decoding="async" fetchpriority="high">
  </div>
 <h2 class="fw-bold mb-1">SICA - EPO6</h2>
 <p class="text-muted fw-semibold mb-3">Sistema de Identificación y Control de Acceso</p>
@@ -625,7 +627,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
- window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(cargar));
+ // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
+ const pantallaLista = new Promise(ok => document.readyState === 'complete' ? ok() : window.addEventListener('load', () => setTimeout(ok, 30)));
+ window.SICA_DOCX_LISTO = pantallaLista.then(() => Promise.all(grupos[0].map(cargar)));
  const resto = window.SICA_DOCX_LISTO.then(() => Promise.all([
   Promise.all(grupos[1].map(cargar)),
   Promise.all(grupos[2].map(cargar)).then(() => cargar('jspdf.plugin.autotable.min.js'))   // autotable depende de jsPDF
