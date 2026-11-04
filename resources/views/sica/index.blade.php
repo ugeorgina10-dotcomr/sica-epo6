@@ -158,7 +158,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  INGRESAR AL SISTEMA
 </button>
 </div>
-</div>
 <!-- ============ LOGIN ============ -->
 <div id="vista-login" class="card login-card p-4 p-md-5 col-12 col-sm-10 col-md-7 col-lg-5 d-none">
 <div class="text-center mb-2">
