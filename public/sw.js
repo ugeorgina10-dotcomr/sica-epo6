@@ -74,14 +74,20 @@ self.addEventListener('fetch', e => {
 
   // Páginas: servidor primero, copia guardada si no hay internet
   if (req.mode === 'navigate') {
+    // Servidor primero, pero si tarda más de 4 s y hay copia guardada (solo existe con sesión abierta), se abre esa
+    // y la consulta sigue en segundo plano. Sin copia guardada se espera al servidor como siempre.
+    const red = fetch(req).then(res => {
+      if (res.ok && !res.redirected && url.pathname === '/') {
+        const copia = res.clone();
+        caches.open(C_PAGINAS).then(c => c.put('/', copia));
+      }
+      return res;
+    });
+    const rapido = url.pathname === '/'
+      ? Promise.race([red, new Promise((ok, no) => setTimeout(() => caches.match('/', { cacheName: C_PAGINAS }).then(r => r ? ok(r) : null), 4000))])
+      : red;
     e.respondWith(
-      fetch(req).then(res => {
-        if (res.ok && !res.redirected && url.pathname === '/') {
-          const copia = res.clone();
-          caches.open(C_PAGINAS).then(c => c.put('/', copia));
-        }
-        return res;
-      }).catch(() =>
+      rapido.catch(() =>
         caches.match('/', { cacheName: C_PAGINAS }).then(r => r || new Response(
           '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
           '<body style="font-family:sans-serif;text-align:center;padding:40px"><h2>Sin conexión</h2>' +

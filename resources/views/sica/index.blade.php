@@ -11,6 +11,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SICA-EPO6">
 <link rel="apple-touch-icon" href="{{ asset('img/logo6.png') }}">
+<link rel="preload" as="image" href="{{ asset('img/logo6.png') }}">
+<link rel="prefetch" as="image" href="{{ asset('img/epo6.png') }}">   {{-- el fondo del login ya está listo cuando se pulsa Ingresar --}}
 {{-- Librerías servidas desde public/vendor (sin CDN): así el sistema abre aunque no haya internet --}}
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
@@ -146,7 +148,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <!-- ============ INICIO ============ -->
 <div id="vista-inicio" class="card main-card p-4 p-md-5 text-center col-12 col-md-8 col-lg-6">
  <div class="d-flex justify-content-center mb-3">
- <img src="{{ asset('img/logo6.png') }}" alt="Logo EPO6" class="institution-logo">
+ <img src="{{ asset('img/logo6.png') }}" alt="Logo EPO6" class="institution-logo" width="130" height="127" decoding="async" fetchpriority="high">
  </div>
 <h2 class="fw-bold mb-1">SICA - EPO6</h2>
 <p class="text-muted fw-semibold mb-3">Sistema de Identificación y Control de Acceso</p>
@@ -205,6 +207,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <div class="text-end mb-3" style="margin-top:-1rem"><a href="#" class="small text-muted text-decoration-underline" onclick="olvideContrasena(); return false;">¿Olvidaste tu contraseña?</a></div>
  <button type="button" onclick="intentarEntrar()" class="btn btn-vinotinto w-100 py-3 rounded-3 shadow fs-5">Ingresar al Sistema</button>
+ <div class="text-center mt-3"><a href="#" class="small text-muted text-decoration-underline btn-recargar-sistema" onclick="recargarSistema(this); return false;" title="Si el sistema se trabó o tarda en responder">Recargar sistema</a></div>
 </form>
 </div>
 <!-- ============ SISTEMA ============ -->
@@ -219,8 +222,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <div class="d-flex align-items-center gap-2">
  <span id="badge-rol-activo" class="badge bg-dark px-3 py-2 fs-6">Rol: --</span>
- <button onclick="location.reload()" class="btn btn-outline-dark btn-sm rounded-pill px-3 shadow-sm">
- Recargar Sistema
+ <button onclick="recargarSistema(this)" class="btn btn-outline-dark btn-sm rounded-pill px-3 shadow-sm btn-recargar-sistema">
+ <span class="txt-recargar">Recargar Sistema</span>
  </button>
  </div>
 </div>
@@ -624,7 +627,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
- window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(cargar));
+ // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
+ const pantallaLista = new Promise(ok => setTimeout(ok, 0));   // justo después de pintar la pantalla: todo se va cargando mientras escribes tu contraseña
+ window.SICA_DOCX_LISTO = pantallaLista.then(() => Promise.all(grupos[0].map(cargar)));
  const resto = window.SICA_DOCX_LISTO.then(() => Promise.all([
   Promise.all(grupos[1].map(cargar)),
   Promise.all(grupos[2].map(cargar)).then(() => cargar('jspdf.plugin.autotable.min.js'))   // autotable depende de jsPDF
@@ -1435,6 +1440,30 @@ function mostrarSeccion(id) {
  if (ES_MOVIL && rol === 'orientador') setTimeout(activarCamaraOrientador, 400);
  }
 }
+/* Recarga completa del sistema: borra la copia guardada de la página (así no se queda una versión vieja o trabada),
+   pide al service worker que busque actualización y vuelve a abrir desde el inicio con un token de sesión nuevo.
+   NO borra datos: la sesión del servidor y los registros/escaneos pendientes del equipo se conservan. */
+let _recargando = false;
+function recargarSistema(btn) {
+ if (_recargando) return;
+ _recargando = true;
+ $('.btn-recargar-sistema').prop('disabled', true).css('pointer-events','none');
+ $('.btn-recargar-sistema').each(function(){ const t=$(this).find('.txt-recargar'); (t.length?t:$(this)).text('Recargando...'); });
+ try { Object.keys(scanners).forEach(detener); } catch (e) {}   // apaga la cámara si estaba encendida
+ const limpiar = () => {
+  const tareas = [];
+  try {
+   if (window.caches) tareas.push(caches.keys().then(ks => Promise.all(ks.filter(k => k.indexOf('sica-') === 0 && k.indexOf('-paginas') > -1).map(k => caches.delete(k)))));
+   if (navigator.serviceWorker) tareas.push(navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}));
+  } catch (e) {}
+  return Promise.all(tareas.map(t => t.catch(() => {})));
+ };
+ const irAlInicio = () => { location.replace('/?r=' + Date.now()); };   // el parámetro evita usar una copia vieja del navegador
+ // Si la limpieza tarda (justo cuando el sistema está trabado), no se espera más de 2 segundos
+ Promise.race([limpiar(), new Promise(res => setTimeout(res, 2000))]).then(irAlInicio, irAlInicio);
+ // Último recurso: si por algo no se movió, se fuerza la recarga normal
+ setTimeout(() => location.reload(), 5000);
+}
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
  // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
@@ -2154,6 +2183,80 @@ function setModoEscaneo(m) {
  $('#lbl-modo').text(m);
 }
 function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : iniciarScanner('cam-fija', () => modoEscaneo); }
+/* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
+   Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
+   Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
+   subdirector, con el mismo permiso que pide la cámara). Se ignora lo que se escribe a mano en cualquier campo, salvo el
+   buscador de alumnos: ahí, una ráfaga rápida de teclas seguida de Enter se toma como lectura y se borra del buscador.
+   Si el lector está configurado "sin terminador", la lectura se da por terminada tras una breve pausa. */
+(function () {
+ let buf = '', ultimaTecla = 0, pausa = null, campo = null;
+ // A dónde va la lectura según el panel que se está viendo (null = ninguno)
+ function destino() {
+  if (!rolActivo || $('#vista-sistema').hasClass('d-none')) return null;
+  if (!$('#panel-lector').hasClass('d-none')) return {modo: modoEscaneo, el: 'cam-fija', permitido: true};
+  if (!$('#panel-orientador').hasClass('d-none') && $('#bloque-camara-orientador').is(':visible'))
+   return {modo: modoOrient, el: 'cam-orient', permitido: rolActivo === 'control' || (db.permisos[rolActivo] || 'ver') === 'editar'};
+  return null;
+ }
+ // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
+ const enCampo = el => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && el.offsetParent !== null;
+ function tono(ok) {
+  try {
+   desbloquearAudio();
+   if (!_audioCtx || _audioCtx.state !== 'running') return;
+   const t0 = _audioCtx.currentTime;
+   (ok ? [[1320, 0, 0.12]] : [[330, 0, 0.14], [330, 0.2, 0.14]]).forEach(([hz, ret, dur]) => {
+    const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
+    osc.type = 'square'; osc.frequency.value = hz;
+    vol.gain.setValueAtTime(0.0001, t0 + ret);
+    vol.gain.exponentialRampToValueAtTime(0.15, t0 + ret + 0.01);
+    vol.gain.exponentialRampToValueAtTime(0.0001, t0 + ret + dur);
+    osc.connect(vol); vol.connect(_audioCtx.destination);
+    osc.start(t0 + ret); osc.stop(t0 + ret + dur + 0.05);
+   });
+  } catch (e) {}
+ }
+ function terminar() {
+  clearTimeout(pausa); pausa = null;
+  const crudo = buf, cb = campo; buf = ''; campo = null;
+  if (cb) {   // la ráfaga se escribió en el buscador: se quita de ahí y se actualiza la lista
+   cb.value = cb.value.slice(0, Math.max(0, cb.value.length - crudo.length));
+   $(cb).trigger('input');
+  }
+  const curp = crudo.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const d = destino();
+  if (!d || curp.length < 10) return;                 // ruido o tecleo normal: se ignora
+  const el = $('#res-' + d.el);
+  if (!d.permitido) {
+   el.removeClass('text-success').addClass('text-danger').text('No tienes permiso para registrar. Se requiere autorización de Control Escolar.');
+   tono(false); return;
+  }
+  procesarQR(curp, d.modo, d.el);
+  // procesarQR escribe el resultado en #res-... (puede tardar si busca en el servidor): se suena según el color final
+  setTimeout(() => tono(!el.hasClass('text-danger')), 350);
+ }
+ document.addEventListener('keydown', e => {
+  if (!destino() || e.ctrlKey || e.altKey || e.metaKey) return;
+  const buscador = e.target && e.target.id === 'buscador-alumno';
+  if (enCampo(e.target) && !buscador) return;
+  const ahora = Date.now();
+  if (e.key === 'Enter') {
+   if (buf.length >= 10) { e.preventDefault(); terminar(); }   // evita que el Enter "pulse" el botón que tenga el foco
+   else { buf = ''; campo = null; }
+   return;
+  }
+  if (e.key.length !== 1) return;                       // Shift, CapsLock, etc.
+  // En el buscador solo cuenta una ráfaga muy rápida (lector); fuera de él se tolera un lector inalámbrico más lento
+  if (ahora - ultimaTecla > (buscador ? 60 : 400)) buf = '';
+  ultimaTecla = ahora;
+  buf += e.key;
+  campo = buscador ? e.target : null;
+  if (!buscador) e.preventDefault();                    // en el buscador se deja escribir para no estorbar a quien teclea
+  clearTimeout(pausa);
+  pausa = setTimeout(() => { if (buf.length >= 10 && !buscador) terminar(); else { buf = ''; campo = null; } }, 400);   // lector sin terminador
+ }, true);
+})();
 /* ============ PANEL DE ORIENTADORES ============ */
 /* Las instrucciones de los archivos y el título del bloque cambian según el turno elegido (Matutino / Vespertino) */
 function actualizarTextosTurno() {
@@ -2579,6 +2682,26 @@ const errorPlantilla = {};   // 'Matutino-frente' -> texto del problema, si lo h
 const origenPlantilla = {};  // 'Matutino-frente' -> 'servidor' (la que subió Control Escolar) | 'original' (el Word de public/plantillas)
 const existeOriginal = {};   // 'FrenteMatutino.docx' -> true/false (false = ya se eliminó para siempre)
 try { localStorage.removeItem('sica_epo6_plantilla_oficial'); } catch (e) {}   // ya no se guardan imágenes de plantilla en el navegador
+/* Lee y analiza un Word/PDF de plantilla UNA sola vez (url -> promesa). Se usa al iniciar y también por adelantado en la pantalla de login. */
+const _plantillasLeidas = {};
+function leerPlantilla(url, forzar) {
+ return (!forzar && _plantillasLeidas[url]) || (_plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
+  .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
+  .then(buf => {
+   const esPdf = new Uint8Array(buf, 0, 5).join() === '37,80,68,70,45';   // "%PDF-": el lector de PDF puede tardar en cargar
+   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf));
+  }).catch(e => { delete _plantillasLeidas[url]; throw e; }));
+}
+/* Deja listos (ya leídos) los Word originales mientras la persona escribe su contraseña: al entrar, las plantillas aparecen al instante. */
+function precalentarPlantillas() {
+ if (!window.SICA_DOCX_LISTO) return;
+ window.SICA_DOCX_LISTO.then(() => {
+  if (!window.SicaDocx) return;
+  const urls = {};
+  Object.keys(ARCHIVOS_PLANTILLA).forEach(t => ['frente', 'reverso'].forEach(l => { urls[BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[t][l]] = 1; }));
+  Object.keys(urls).forEach(u => leerPlantilla(u).catch(() => {}));
+ });
+}
 function cargarPlantillasDefault() {
  revisarOriginales();
  const hecho = (turno, lado, modelo, error, origen) => {
@@ -2589,13 +2712,7 @@ function cargarPlantillasDefault() {
   if (idEditando) actualizarVistaPreviaCredencial();
  };
  // Se esperan solo las librerías de Word (no Excel/PDF/gráficas). El mismo archivo (p. ej. Reverso.docx, igual en los dos turnos) se lee UNA sola vez.
- const leidos = {};   // url -> promesa del modelo ya leído
- const leer = (url, forzar) => (!forzar && leidos[url]) || (leidos[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
-  .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
-  .then(buf => {
-   const esPdf = new Uint8Array(buf, 0, 5).join() === '37,80,68,70,45';   // "%PDF-": el lector de PDF puede tardar en cargar
-   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf));
-  }).catch(e => { delete leidos[url]; throw e; }));
+ const leer = leerPlantilla;
  (window.SICA_DOCX_LISTO || window.SICA_LIBS_LISTAS || Promise.resolve()).then(() => {
   if (!window.SicaDocx) { Object.keys(plantillasDefault).forEach(t => ['frente','reverso'].forEach(l => hecho(t, l, null, 'No se pudo cargar el lector de plantillas. Revisa tu internet y recarga la página.'))); return; }
   // el turno que se está viendo primero
@@ -2634,6 +2751,7 @@ function refrescarPreviewPlantillaOficial() {
   const m = plantillasDefault[t] && plantillasDefault[t][l];
   const msg = $('#msg-prev-plantilla-' + l);
   if (m && window.SicaDocx) {
+   if ($('#panel-alumno').hasClass('d-none')) return;   // oculto: no se gasta tiempo dibujando; al abrir el Portal del Alumno se dibuja
    SicaDocx.dibujar(cv, m, null, {ancho: 900});
    $(cv).show();
    const falta = l === 'frente' ? problemasFrente(m) : [];
@@ -3004,7 +3122,7 @@ function entrarAlSistema(restaurando) {
  return cargarDesdeServidor().then(() => {
   abrir();
   // Al recargar, el service worker ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
-  if (!restaurando) guardarPaginaOffline();   // al iniciar sesión sí: así se puede abrir sin internet
+  if (!restaurando) setTimeout(guardarPaginaOffline, 4000);   // al iniciar sesión sí: así se puede abrir sin internet
  });
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
@@ -3020,6 +3138,8 @@ function restaurarSesion(S) {
 // Computadoras: al volver con "atrás" o recargar, el navegador restaura el rol elegido SIN avisar a la página -> se vuelve a sincronizar el correo
 window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredenciales(); });
 $(function () {
+ precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
+ try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
  if (Array.isArray(window.SICA_ORIENTADORES)) db.orientadores = window.SICA_ORIENTADORES;   // ya vienen en la página
  actualizarCredenciales();
  $('#calendario-orientador').val(hoy());
