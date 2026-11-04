@@ -1,7 +1,7 @@
-FROM php:8.2-apache
+FROM php:8.5-apache
 
-RUN apt-get update && apt-get install -y git unzip libzip-dev libpng-dev libonig-dev libxml2-dev libpq-dev \
-    && docker-php-ext-install pdo_mysql pdo_pgsql mbstring zip gd bcmath opcache
+RUN apt-get update && apt-get install -y git unzip libzip-dev libpng-dev libonig-dev libxml2-dev libpq-dev libicu-dev \
+    && docker-php-ext-install pdo_mysql pdo_pgsql mbstring zip gd bcmath intl
 
 # --- Velocidad ---
 # PHP precompilado en memoria (opcache): el código no cambia dentro del contenedor, así que no revisa archivos en cada petición
