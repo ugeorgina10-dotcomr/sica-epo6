@@ -363,7 +363,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
- <button onclick="toggleCamaraFija()" class="btn btn-vinotinto px-4">Encender / Apagar Cámara</button>
+ <p class="small text-muted mb-2">La cámara escanea sola: solo muestra el QR de la credencial frente a ella.</p>
+ <button onclick="toggleCamaraFija()" id="btn-cam-fija" class="btn btn-outline-secondary btn-sm px-3">Apagar cámara</button>
  </div>
 </div>
 <!-- ===== 3. PANEL DE ORIENTADORES ===== -->
@@ -1489,6 +1490,7 @@ function seleccionarPerfil(perfil) {
  $('#tab-' + perfil).addClass('active'); $('#panel-' + perfil).removeClass('d-none');
  if (perfil === 'orientador') { configurarPanelOrientador(); renderTabla(); }
  if (perfil === 'control') renderStats();
+ if (perfil === 'lector') { camFijaManual = false; setTimeout(autoCamaraFija, 300); }   // el lector fijo enciende la cámara solo
  if (perfil === 'alumno') refrescarPreviewPlantillaOficial(); // vista previa de la plantilla oficial (solo la ve Control Escolar)
  const i = ordenPaneles.indexOf(perfil); if (i !== -1) indicePanelActual = i;
 }
@@ -2082,13 +2084,14 @@ function iniciarScanner(el, modoFn) {
   window.SICA_LIBS_LISTAS.then(() => { if (typeof Html5Qrcode === 'undefined') alert('No se cargó la librería del escáner. Revisa tu conexión a internet.'); else iniciarScanner(el, modoFn); });
   return;
  }
- const s = new Html5Qrcode(el); scanners[el] = s;
+ const s = new Html5Qrcode(el, {formatsToSupport: [0], experimentalFeatures: {useBarCodeDetectorIfSupported: true}, verbose: false}); scanners[el] = s;   // 0 = solo códigos QR
  $('#' + el).siblings('.cam-ph').hide();
  // Teléfono: cámara trasera ('environment'). Computadora: la que haya ('user').
- const cfg = {fps:10, qrbox: w => { const m = Math.min(w.width, w.height); return {width:Math.floor(m*0.7), height:Math.floor(m*0.7)}; }};
+ const cfg = {fps:15, qrbox: w => { const m = Math.min(w.width, w.height); return {width:Math.floor(m*0.7), height:Math.floor(m*0.7)}; }};
  const alLeer = txt => procesarQR(txt.trim().toUpperCase(), modoFn(), el);
  const fallo = e => {
  delete scanners[el]; $('#' + el).siblings('.cam-ph').show();
+ if (el === 'cam-fija') { camFijaError = Date.now(); $('#res-cam-fija').removeClass('text-success').addClass('text-danger').text('No se pudo abrir la cámara. Permite el acceso a la cámara en el navegador (requiere https o localhost).'); $('#btn-cam-fija').text('Encender cámara'); return; }
  alert('No se pudo abrir la cámara (requiere permiso y https o localhost): ' + e);
  };
  const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
@@ -2182,7 +2185,20 @@ function setModoEscaneo(m) {
  $('#btn-modo-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
  $('#lbl-modo').text(m);
 }
-function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : iniciarScanner('cam-fija', () => modoEscaneo); }
+let camFijaManual = false, camFijaError = 0;   // manual = alguien la apagó con el botón; error = hora del último fallo al abrirla
+function autoCamaraFija() {
+ if (camFijaManual || scanners['cam-fija'] || !rolActivo) return;
+ if ($('#vista-sistema').hasClass('d-none') || $('#panel-lector').hasClass('d-none')) return;
+ iniciarScanner('cam-fija', () => modoEscaneo);
+ $('#btn-cam-fija').text('Apagar cámara');
+}
+function toggleCamaraFija() {
+ if (scanners['cam-fija']) { camFijaManual = true; detener('cam-fija'); $('#btn-cam-fija').text('Encender cámara'); }
+ else { camFijaManual = false; camFijaError = 0; autoCamaraFija(); }
+}
+// Si la cámara se cayó (se desconectó, otra pestaña la usó...) vuelve a encenderse sola; si falló por permiso espera 30 s
+setInterval(() => { if (!camFijaManual && Date.now() - camFijaError > 30000) autoCamaraFija(); }, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoCamaraFija(); });
 /* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
    Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
    Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
