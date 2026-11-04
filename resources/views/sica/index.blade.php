@@ -365,6 +365,25 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="res-cam-fija" class="res-scan mb-2"></div>
  <button onclick="toggleCamaraFija()" class="btn btn-vinotinto px-4">Encender / Apagar Cámara</button>
  </div>
+ <!-- SOLO CONTROL ESCOLAR: registros de entradas y salidas (el buscador y la tabla se pasan aquí desde el Panel de Orientadores) -->
+ <div id="lector-registros-control" class="d-none">
+ <div class="p-3 bg-light rounded-4 border shadow-sm mb-3">
+ <h6 class="fw-bold mb-2 text-uppercase" style="color:#800020;font-size:.9rem">Registros de Entradas y Salidas</h6>
+ <div class="row g-2">
+ <div class="col-12 d-flex justify-content-center gap-2 flex-wrap mb-1">
+ <button onclick="setTurno('Matutino')" id="btn-turno-lector-matutino" class="btn btn-vinotinto px-4 py-2 fw-semibold shadow-sm small">Turno Matutino</button>
+ <button onclick="setTurno('Vespertino')" id="btn-turno-lector-vespertino" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm small">Turno Vespertino</button>
+ </div>
+ <div class="col-12 text-center text-muted small mb-1">Estos botones solo cambian qué alumnos ves en la tabla. La cámara registra la entrada y la salida de cualquier alumno, sea matutino o vespertino.</div>
+ <div class="col-12"><label class="form-label small mb-1">Grupo</label>
+ <select id="sel-grupo-lector" class="form-select form-select-sm shadow-sm" onchange="elegirGrupoLector(this.value)">
+ <option value="">Todos los grupos</option>
+ @foreach([1,2,3] as $g)@foreach([1,2,3,4] as $n)<option value="{{ $g }}-{{ $n }}">{{ $g }}° grado - Grupo {{ $n }}</option>@endforeach @endforeach
+ </select></div>
+ </div>
+ </div>
+ <div id="destino-tabla-lector"></div>
+ </div>
 </div>
 <!-- ===== 3. PANEL DE ORIENTADORES ===== -->
 <div id="panel-orientador" class="panel-perfil d-none">
@@ -1415,7 +1434,13 @@ function mostrarSeccion(id) {
  if (id === 'vista-login') actualizarCredenciales();
  if (id === 'vista-sistema') {
  const rol = rolActivo = $('#rol-select').val();
+ // Control Escolar: buscador + tabla de registros van en el Lector Fijo (así el Panel de Orientadores no queda tan cargado).
+ // Orientador, Director y Subdirector los siguen viendo en el Panel de Orientadores.
+ const esControl = rol === 'control';
+ $('#lector-registros-control').toggleClass('d-none', !esControl);
+ (esControl ? $('#destino-tabla-lector') : $('#panel-orientador')).append($('#bloque-buscador-orientador, #bloque-tabla-orientador'));
  if (!plantillasPedidas && !(ES_MOVIL && rol === 'orientador')) { plantillasPedidas = true; cargarPlantillasDefault(); }   // las plantillas de Word solo se bajan al entrar
+ sincronizarFiltroLector();
  $('#badge-rol-activo').text('Rol: ' + nombresRoles[rol] + (orientadorActivo ? ' — ' + orientadorActivo.nombre : ''));
  indicePanelActual = 0;
  if (rol === 'orientador') {
@@ -1489,6 +1514,7 @@ function seleccionarPerfil(perfil) {
  $('#tab-' + perfil).addClass('active'); $('#panel-' + perfil).removeClass('d-none');
  if (perfil === 'orientador') { configurarPanelOrientador(); renderTabla(); }
  if (perfil === 'control') renderStats();
+ if (perfil === 'lector') { camFijaManual = false; setTimeout(autoCamaraFija, 300); }   // el lector fijo enciende la cámara solo
  if (perfil === 'alumno') refrescarPreviewPlantillaOficial(); // vista previa de la plantilla oficial (solo la ve Control Escolar)
  const i = ordenPaneles.indexOf(perfil); if (i !== -1) indicePanelActual = i;
 }
@@ -2082,13 +2108,14 @@ function iniciarScanner(el, modoFn) {
   window.SICA_LIBS_LISTAS.then(() => { if (typeof Html5Qrcode === 'undefined') alert('No se cargó la librería del escáner. Revisa tu conexión a internet.'); else iniciarScanner(el, modoFn); });
   return;
  }
- const s = new Html5Qrcode(el); scanners[el] = s;
+ const s = new Html5Qrcode(el, {formatsToSupport: [0], experimentalFeatures: {useBarCodeDetectorIfSupported: true}, verbose: false}); scanners[el] = s;   // 0 = solo códigos QR
  $('#' + el).siblings('.cam-ph').hide();
  // Teléfono: cámara trasera ('environment'). Computadora: la que haya ('user').
- const cfg = {fps:10, qrbox: w => { const m = Math.min(w.width, w.height); return {width:Math.floor(m*0.7), height:Math.floor(m*0.7)}; }};
+ const cfg = {fps:15, qrbox: w => { const m = Math.min(w.width, w.height); return {width:Math.floor(m*0.7), height:Math.floor(m*0.7)}; }};
  const alLeer = txt => procesarQR(txt.trim().toUpperCase(), modoFn(), el);
  const fallo = e => {
  delete scanners[el]; $('#' + el).siblings('.cam-ph').show();
+ if (el === 'cam-fija') { camFijaError = Date.now(); $('#res-cam-fija').removeClass('text-success').addClass('text-danger').text('No se pudo abrir la cámara. Permite el acceso a la cámara en el navegador (requiere https o localhost).'); return; }
  alert('No se pudo abrir la cámara (requiere permiso y https o localhost): ' + e);
  };
  const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
@@ -2182,7 +2209,19 @@ function setModoEscaneo(m) {
  $('#btn-modo-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
  $('#lbl-modo').text(m);
 }
-function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : iniciarScanner('cam-fija', () => modoEscaneo); }
+let camFijaManual = false, camFijaError = 0;   // manual = alguien la apagó con el botón; error = hora del último fallo al abrirla
+function autoCamaraFija() {
+ if (camFijaManual || scanners['cam-fija'] || !rolActivo) return;
+ if ($('#vista-sistema').hasClass('d-none') || $('#panel-lector').hasClass('d-none')) return;
+ iniciarScanner('cam-fija', () => modoEscaneo);
+}
+function toggleCamaraFija() {
+ if (scanners['cam-fija']) { camFijaManual = true; detener('cam-fija'); }
+ else { camFijaManual = false; camFijaError = 0; autoCamaraFija(); }
+}
+// Si la cámara se cayó (se desconectó, otra pestaña la usó...) vuelve a encenderse sola; si falló por permiso espera 30 s
+setInterval(() => { if (!camFijaManual && Date.now() - camFijaError > 30000) autoCamaraFija(); }, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoCamaraFija(); });
 /* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
    Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
    Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
@@ -2271,7 +2310,10 @@ function pintarBotonesTurno() {
  actualizarTextosTurno();
  $('#btn-turno-matutino').toggleClass('btn-vinotinto', t === 'Matutino').toggleClass('btn-outline-dark bg-white', t !== 'Matutino');
  $('#btn-turno-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
+ $('#btn-turno-lector-matutino').toggleClass('btn-vinotinto', t === 'Matutino').toggleClass('btn-outline-dark bg-white', t !== 'Matutino');
+ $('#btn-turno-lector-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
  $('#titulo-tabla-orientador').text('Turno ' + t);
+ sincronizarFiltroLector();
 }
 /* Etiqueta del grupo seleccionado (para subir la lista) y lista de horarios del turno activo */
 function refrescarHorarioForm() {
@@ -2320,8 +2362,23 @@ function elegirMiGrupo(valor) {
 function elegirGrupo(grado, grupo) {
  [1,2,3].filter(g => g !== grado).forEach(g => $('#sel-grado-' + g).val(''));
  filtro = {grado:grado, grupo:Number(grupo)};
+ sincronizarFiltroLector();
  refrescarHorarioForm();
  renderTabla();
+}
+/* Lector Fijo (Control Escolar): mismo filtro de turno y grupo que el Panel de Orientadores, siempre sincronizados */
+function elegirGrupoLector(v) {
+ if (!v) { filtro = null; [1,2,3].forEach(g => $('#sel-grado-' + g).val('')); $('#lbl-grupo-lista').val('Selecciona grado y grupo arriba'); }
+ else {
+  const p = v.split('-').map(Number);
+  [1,2,3].forEach(g => $('#sel-grado-' + g).val(g === p[0] ? String(p[1]) : ''));
+  filtro = {grado:p[0], grupo:p[1]};
+ }
+ refrescarHorarioForm();
+ renderTabla();
+}
+function sincronizarFiltroLector() {
+ $('#sel-grupo-lector').val(filtro ? filtro.grado + '-' + filtro.grupo : '');
 }
 function filtrados() {
  return db.alumnos.filter(a => a.turno === turnoActivo && (!filtro || (a.grado === filtro.grado && a.grupo === filtro.grupo)));
