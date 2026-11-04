@@ -603,11 +603,24 @@ class ControlEscolarController extends Controller
             $grupo = $existentes[$grado . '|' . $nombre . '|' . $turno]
                 ?? Grupo::firstOrNew(['grado' => $grado, 'nombre' => $nombre, 'turno' => $turno]);
             // Un grupo puede tener orientador sin horario todavía: la hora vacía se guarda como NULL
-            $grupo->hora_entrada = $this->horaValida($h['entrada'] ?? null);
-            $grupo->hora_salida = $this->horaValida($h['salida'] ?? null);
-            $grupo->orientador_id = (!empty($h['orientadorId']) && isset($mapaOrientadores[$h['orientadorId']]))
+            $entrada = $this->horaValida($h['entrada'] ?? null);
+            $salida = $this->horaValida($h['salida'] ?? null);
+            $orientadorId = (!empty($h['orientadorId']) && isset($mapaOrientadores[$h['orientadorId']]))
                 ? $mapaOrientadores[$h['orientadorId']]
                 : null;
+
+            // El navegador manda TODOS los horarios en cada guardado (cada lote de alumnos, cada lista que se sube).
+            // Si este grupo ya está igual en la base de datos no se hace nada: antes cada grupo gastaba varias consultas por nada.
+            if ($grupo->exists
+                && $this->normalizarHora($grupo->hora_entrada) === $this->normalizarHora($entrada)
+                && $this->normalizarHora($grupo->hora_salida) === $this->normalizarHora($salida)
+                && ($grupo->orientador_id === null ? null : (int) $grupo->orientador_id) === $orientadorId) {
+                continue;
+            }
+
+            $grupo->hora_entrada = $entrada;
+            $grupo->hora_salida = $salida;
+            $grupo->orientador_id = $orientadorId;
             // Grupo sin nada configurado y sin alumnos: no se guarda (o se borra si ya existía)
             if ($grupo->exists ? $this->borrarGrupoSiEstaVacio($grupo) : (!$grupo->hora_entrada && !$grupo->hora_salida && !$grupo->orientador_id)) {
                 continue;
@@ -615,6 +628,17 @@ class ControlEscolarController extends Controller
 
             $grupo->save();
         }
+    }
+
+    /** "7:10", "07:10" y "07:10:00" son la misma hora: se comparan siempre como HH:MM:SS */
+    private function normalizarHora(?string $hora): ?string
+    {
+        if ($hora === null || $hora === '') {
+            return null;
+        }
+        $p = explode(':', trim($hora));
+
+        return sprintf('%02d:%02d:%02d', (int) $p[0], (int) ($p[1] ?? 0), (int) ($p[2] ?? 0));
     }
 
     /** Solo acepta horas con formato HH:MM (o HH:MM:SS); cualquier otra cosa se guarda como NULL en vez de tirar todo el guardado */
