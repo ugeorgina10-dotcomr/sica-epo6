@@ -363,7 +363,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
- <div class="small text-muted mb-3">Lector físico (USB / inalámbrico) <span id="estado-lector-fisico" class="fw-semibold text-success">listo</span>: solo escanea el QR de la credencial, no hace falta tocar nada ni encender la cámara.</div>
+ <div class="small text-muted mb-1">Lector físico (USB / inalámbrico) <span id="estado-lector-fisico" class="fw-semibold text-success">listo</span>: solo escanea el QR de la credencial, no hace falta tocar nada ni encender la cámara.</div>
+ <div id="diag-lector-fisico" class="small text-muted mb-3">Último dato recibido del lector: ninguno todavía</div>
  <button onclick="toggleCamaraFija()" class="btn btn-vinotinto px-4">Encender / Apagar Cámara</button>
  </div>
 </div>
@@ -2185,14 +2186,16 @@ function setModoEscaneo(m) {
 }
 function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : iniciarScanner('cam-fija', () => modoEscaneo); }
 /* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
-   Estos lectores funcionan como un teclado: "teclean" muy rápido el texto del QR (la CURP) y terminan con Enter.
-   Se distinguen de una persona porque entre tecla y tecla pasan menos de ~80 ms. Solo se atienden en el panel del
-   Lector Fijo y si no se está escribiendo en un campo (contraseñas, nombres, etc.). Si el lector está configurado
-   "sin terminador", la lectura se da por terminada tras una breve pausa al completar los 18 caracteres. */
+   Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
+   Solo se atienden en el panel del Lector Fijo y si no se está escribiendo en un campo visible (contraseñas, nombres, etc.).
+   Cada lectura se muestra en pantalla ("Último dato recibido") para ver qué llegó de verdad. Si el lector está configurado
+   "sin terminador", la lectura se da por terminada tras una breve pausa. */
 (function () {
  let buf = '', ultimaTecla = 0, pausa = null;
  const panelActivo = () => rolActivo && !$('#vista-sistema').hasClass('d-none') && !$('#panel-lector').hasClass('d-none');
- const enCampo = el => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+ // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
+ const enCampo = el => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && el.offsetParent !== null;
+ const estado = (txt, cls) => $('#estado-lector-fisico').removeClass('text-success text-danger text-warning').addClass(cls || 'text-success').text(txt);
  function tono(ok) {
   try {
    desbloquearAudio();
@@ -2211,9 +2214,11 @@ function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : inici
  }
  function terminar() {
   clearTimeout(pausa); pausa = null;
-  const curp = buf.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  buf = '';
-  if (curp.length < 10) return;                       // ruido o tecleo normal: se ignora
+  const crudo = buf; buf = '';
+  const curp = crudo.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  $('#diag-lector-fisico').text('Último dato recibido del lector: "' + crudo + '" (' + crudo.length + ' caracteres)');
+  if (curp.length < 10) { estado('llegó un dato muy corto, escanea de nuevo', 'text-warning'); tono(false); return; }
+  estado('listo');
   const el = $('#res-cam-fija');
   procesarQR(curp, modoEscaneo, 'cam-fija');
   // procesarQR escribe el resultado en #res-cam-fija (puede tardar si busca en el servidor): se suena según el color final
@@ -2227,12 +2232,13 @@ function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : inici
    return;
   }
   if (e.key.length !== 1) return;                       // Shift, CapsLock, etc.
-  if (ahora - ultimaTecla > 80) buf = '';               // pausa larga: era una persona tecleando, empieza lectura nueva
+  if (ahora - ultimaTecla > 400) buf = '';              // pausa larga: es una lectura nueva (tolera lectores inalámbricos lentos)
   ultimaTecla = ahora;
   buf += e.key;
   e.preventDefault();
+  estado('recibiendo...', 'text-warning');
   clearTimeout(pausa);
-  pausa = setTimeout(() => { if (buf.length >= CURP_LARGO) terminar(); else buf = ''; }, 150);   // lector sin terminador
+  pausa = setTimeout(() => { if (buf.length >= 10) terminar(); else { buf = ''; estado('listo'); } }, 400);   // lector sin terminador
  }, true);
 })();
 /* ============ PANEL DE ORIENTADORES ============ */
