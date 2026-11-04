@@ -354,12 +354,13 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <div id="panel-lector" class="panel-perfil d-none">
  <div class="text-center p-4 bg-light rounded-4 border mb-3">
  <h5 class="fw-bold text-uppercase mb-1" style="color:#800020">Lector Fijo - Control de Entradas y Salidas</h5>
+ <p class="small text-muted mb-2">Modo <b>Automático</b>: el alumno solo muestra su credencial al lector y el sistema registra su entrada o su salida en su grupo. No hay que pulsar nada. (Si pulsas Entrada o Salida se fuerza ese modo; vuelve a pulsarlo para regresar al automático.)</p>
  <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
- <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-success px-4 py-2 fw-semibold shadow-sm">Registrar Entrada</button>
+ <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Entrada</button>
  <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Salida</button>
  </div>
  <div class="camera-box-ref mb-2 border border-danger shadow">
- <div class="cam-ph text-center text-warning"><span class="small d-block fw-semibold">[ <span id="lbl-modo">Entrada</span> ] - Cámara apagada</span></div>
+ <div class="cam-ph text-center text-warning"><span class="small d-block fw-semibold">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
@@ -642,7 +643,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  ];
  const cargar = src => new Promise(ok => {
   const s = document.createElement('script');
-  s.src = base + src + '?v=20'; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=21'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
@@ -861,6 +862,7 @@ function fusionarServidor(s, inicioConsulta) {
  if (s.horarios && !oriProtegidos) db.horarios = s.horarios;
  if (s.orientadores && !oriProtegidos) db.orientadores = s.orientadores;
  if (s.permisos) db.permisos = s.permisos;
+ if (s.qrClave) db.qrClave = s.qrClave;
  localStorage.setItem(LS, JSON.stringify(db));
 }
 /* Control Escolar: lo que tenga este equipo y aún no esté en el servidor se sube SOLO (sin respaldos manuales). */
@@ -956,7 +958,7 @@ function descargarEstadoServidor() {
   })
   .catch(() => { _descargandoEstado = false; });
 }
-let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Entrada';
+let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Auto';
 let filtro = null, credSel = null, idEditando = null, chartAsistencias = null, gradoSeleccionado = null;
 let turnoCred = 'Matutino'; // turno elegido en el Portal del Alumno (credenciales)
 let orientadorActivo = null; // {id, nombre} cuando el rol activo es 'orientador'
@@ -1514,7 +1516,8 @@ function seleccionarPerfil(perfil) {
  $('#tab-' + perfil).addClass('active'); $('#panel-' + perfil).removeClass('d-none');
  if (perfil === 'orientador') { configurarPanelOrientador(); renderTabla(); }
  if (perfil === 'control') renderStats();
- if (perfil === 'lector') { camFijaManual = false; setTimeout(autoCamaraFija, 300); }   // el lector fijo enciende la cámara solo
+ // La cámara del lector fijo ya NO se enciende sola: solo con el botón "Encender / Apagar Cámara". El lector físico funciona sin cámara.
+ if (perfil === 'lector') { camFijaManual = true; setTimeout(() => $('#res-cam-fija').removeClass('text-success text-danger').text(''), 0); }
  if (perfil === 'alumno') refrescarPreviewPlantillaOficial(); // vista previa de la plantilla oficial (solo la ve Control Escolar)
  const i = ordenPaneles.indexOf(perfil); if (i !== -1) indicePanelActual = i;
 }
@@ -2100,7 +2103,12 @@ function vaciarCola() {
 }
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
-const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
+const orientadorDe = x => {
+ const h = x && x.grado ? (db.horarios || {})[claveGrupo(x.grado, x.grupo, x.turno)] : null;
+ const o = h && h.orientadorId ? (db.orientadores || []).find(y => String(y.id) === String(h.orientadorId)) : null;
+ return o ? o.nombre : '';
+};
+const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' + (orientadorDe(x) ? ' — Orientador(a): ' + orientadorDe(x) : '') : 'grupo sin asignar');
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
  if (scanners[el]) return;
@@ -2112,7 +2120,7 @@ function iniciarScanner(el, modoFn) {
  $('#' + el).siblings('.cam-ph').hide();
  // Teléfono: cámara trasera ('environment'). Computadora: la que haya ('user').
  const cfg = {fps:15, qrbox: w => { const m = Math.min(w.width, w.height); return {width:Math.floor(m*0.7), height:Math.floor(m*0.7)}; }};
- const alLeer = txt => procesarQR(txt.trim().toUpperCase(), modoFn(), el);
+ const alLeer = txt => procesarQR(claveDeLectura(txt), modoFn(), el);
  const fallo = e => {
  delete scanners[el]; $('#' + el).siblings('.cam-ph').show();
  if (el === 'cam-fija') { camFijaError = Date.now(); $('#res-cam-fija').removeClass('text-success').addClass('text-danger').text('No se pudo abrir la cámara. Permite el acceso a la cámara en el navegador (requiere https o localhost).'); return; }
@@ -2144,6 +2152,14 @@ function detener(el) {
  const s = scanners[el]; if (!s) return; delete scanners[el];
  s.stop().then(() => s.clear()).catch(() => {}); $('#' + el).siblings('.cam-ph').show();
 }
+/* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
+   porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
+const reQr = /SICA([0-9A-F]{20})$/;
+function claveDeLectura(txt) {
+ const s = String(txt).toUpperCase().replace(/[^A-Z0-9]/g, ''), m = s.match(reQr);
+ return m ? 'SICA' + m[1] : String(txt).trim().toUpperCase();
+}
+const esClaveQr = c => /^SICA[0-9A-F]{20}$/.test(c);
 function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
@@ -2176,9 +2192,11 @@ function aplicarRegistro(a, modo) {
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 function registrarPorCurp(curp, modo) {
- const a = db.alumnos.find(x => x.curp && x.curp === curp);
+ const a = esClaveQr(curp)
+  ? db.alumnos.find(x => x.curp && qrCodigo(x.curp).toUpperCase() === curp.slice(4))
+  : db.alumnos.find(x => x.curp && x.curp === curp);
  if (!a) return registrarDesconocido(curp, modo);
- return aplicarRegistro(a, modo);
+ return aplicarRegistro(a, modo === 'Auto' ? modoAutomatico(a) : modo);
 }
 /* El QR no está en la lista de este equipo (p. ej. Control Escolar lo dio de alta hace un momento):
    se le pregunta al servidor, que busca al alumno por CURP en TODOS los grupos y lo registra en el suyo. */
@@ -2187,14 +2205,15 @@ function registrarDesconocido(curp, modo) {
  return fetch('/api/sica/sync', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
-  body: JSON.stringify({ accion: 'registrar_asistencia', datos: {curp: curp, modo: modo} })
+  body: JSON.stringify({ accion: 'registrar_asistencia', datos: esClaveQr(curp) ? {qr: curp.slice(4), modo: modo} : {curp: curp, modo: modo} })
  }).then(r => r.json().catch(() => ({})).then(d => {
   if (r.ok && d && d.ok) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
-   return {ok:true, msg:modo + ' registrada: ' + (al.nombre || curp) + ' — ' + etiquetaGrupo(al) + ' (' + (d.hora || horaAhora()) + ')'};
+   return {ok:true, msg:(d.modo || modo) + ' registrada: ' + (al.nombre || curp) + ' — ' + etiquetaGrupo(al) + ' (' + (d.hora || horaAhora()) + ')'};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
+  if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
   if (r.status === 401) { sesionExpirada(); return {ok:false, msg:'Tu sesión expiró. Inicia sesión de nuevo.'}; }
   if (r.status === 403) return {ok:false, msg:(d && d.mensaje) || 'No tienes permiso para registrar.'};
   if (r.status === 419) { refrescarCsrf(); return {ok:false, msg:'Escanea de nuevo (se renovó la sesión).'}; }
@@ -2204,24 +2223,31 @@ function registrarDesconocido(curp, modo) {
 function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
 /* ============ LECTOR FIJO ============ */
 function setModoEscaneo(m) {
+ if (m === modoEscaneo) m = 'Auto';   // pulsar de nuevo el modo activo regresa al automático
  modoEscaneo = m;
  $('#btn-modo-entrada').toggleClass('btn-success', m === 'Entrada').toggleClass('btn-outline-dark bg-white', m !== 'Entrada');
  $('#btn-modo-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
- $('#lbl-modo').text(m);
+ $('#lbl-modo').text(m === 'Auto' ? 'Automático' : m);
 }
-let camFijaManual = false, camFijaError = 0;   // manual = alguien la apagó con el botón; error = hora del último fallo al abrirla
-function autoCamaraFija() {
- if (camFijaManual || scanners['cam-fija'] || !rolActivo) return;
- if ($('#vista-sistema').hasClass('d-none') || $('#panel-lector').hasClass('d-none')) return;
- iniciarScanner('cam-fija', () => modoEscaneo);
+/* Modo Automático (por defecto en el Lector Fijo): el alumno solo muestra la credencial.
+   Sin entrada hoy -> Entrada; con entrada y sin salida -> Salida. Si vuelve a pasar la credencial en los
+   primeros MIN_ENTRE_ENTRADA_Y_SALIDA minutos se toma como lectura repetida y NO se registra la salida. */
+const MIN_ENTRE_ENTRADA_Y_SALIDA = 5;
+function modoAutomatico(a) {
+ const r = (a.reg || {})[hoy()];
+ if (!r || !r.entrada) return 'Entrada';
+ if (r.salida) return 'Salida';   // ya tiene ambas: aplicarRegistro avisa que ya estaba registrada
+ return (toMin(horaAhora()) - toMin(r.entrada) < MIN_ENTRE_ENTRADA_Y_SALIDA) ? 'Entrada' : 'Salida';   // 'Entrada' repetida -> aviso "ya estaba registrada"
 }
+let camFijaManual = true, camFijaError = 0;   // la cámara solo se enciende cuando alguien pulsa el botón
 function toggleCamaraFija() {
- if (scanners['cam-fija']) { camFijaManual = true; detener('cam-fija'); }
- else { camFijaManual = false; camFijaError = 0; autoCamaraFija(); }
+ if (scanners['cam-fija']) { camFijaManual = true; detener('cam-fija'); $('#res-cam-fija').removeClass('text-success text-danger').text(''); }
+ else {
+  if ($('#vista-sistema').hasClass('d-none') || $('#panel-lector').hasClass('d-none') || !rolActivo) return;
+  camFijaManual = false; camFijaError = 0;
+  iniciarScanner('cam-fija', () => modoEscaneo);
+ }
 }
-// Si la cámara se cayó (se desconectó, otra pestaña la usó...) vuelve a encenderse sola; si falló por permiso espera 30 s
-setInterval(() => { if (!camFijaManual && Date.now() - camFijaError > 30000) autoCamaraFija(); }, 5000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) autoCamaraFija(); });
 /* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
    Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
    Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
@@ -2263,7 +2289,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) auto
    cb.value = cb.value.slice(0, Math.max(0, cb.value.length - crudo.length));
    $(cb).trigger('input');
   }
-  const curp = crudo.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const curp = claveDeLectura(crudo).replace(/[^A-Z0-9]/g, '');
   const d = destino();
   if (!d || curp.length < 10) return;                 // ruido o tecleo normal: se ignora
   const el = $('#res-' + d.el);
@@ -2935,7 +2961,52 @@ function eliminarPlantillaAnterior() {
  });
 }
 /* ============ PORTAL DEL ALUMNO / CREDENCIALES ============ */
-const qrImg = curp => (typeof QRious === 'undefined') ? '' : new QRious({value:curp, size:220}).toDataURL();
+/* ---- Código del QR de la credencial (se calcula a partir de la CURP; igual que en el servidor) ----
+   SHA-256 y HMAC en JavaScript simple (la API del navegador es asíncrona y no sirve para dibujar la credencial). */
+const _K256 = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+function _sha256(bytes) {
+ const l = bytes.length, n = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(n);
+ m.set(bytes); m[l] = 0x80;
+ const dv = new DataView(m.buffer); dv.setUint32(n - 4, (l * 8) >>> 0); dv.setUint32(n - 8, Math.floor(l * 8 / 4294967296));
+ const h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19], w = new Uint32Array(64);
+ const rr = (x, k) => (x >>> k) | (x << (32 - k));
+ for (let o = 0; o < n; o += 64) {
+  for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+  for (let i = 16; i < 64; i++) { const a = rr(w[i-15],7) ^ rr(w[i-15],18) ^ (w[i-15] >>> 3), b = rr(w[i-2],17) ^ rr(w[i-2],19) ^ (w[i-2] >>> 10); w[i] = (w[i-16] + a + w[i-7] + b) >>> 0; }
+  let [a,b,c,d,e,f,g,hh] = h;
+  for (let i = 0; i < 64; i++) {
+   const t1 = (hh + (rr(e,6) ^ rr(e,11) ^ rr(e,25)) + ((e & f) ^ (~e & g)) + _K256[i] + w[i]) >>> 0;
+   const t2 = ((rr(a,2) ^ rr(a,13) ^ rr(a,22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+   hh = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+  }
+  h[0] = (h[0]+a)>>>0; h[1] = (h[1]+b)>>>0; h[2] = (h[2]+c)>>>0; h[3] = (h[3]+d)>>>0; h[4] = (h[4]+e)>>>0; h[5] = (h[5]+f)>>>0; h[6] = (h[6]+g)>>>0; h[7] = (h[7]+hh)>>>0;
+ }
+ const out = new Uint8Array(32), ov = new DataView(out.buffer); h.forEach((x, i) => ov.setUint32(i * 4, x)); return out;
+}
+function _hmacSha256Hex(clave, texto) {
+ const enc = new TextEncoder(); let k = enc.encode(clave);
+ if (k.length > 64) k = _sha256(k);
+ const ik = new Uint8Array(64), ok = new Uint8Array(64); ik.fill(0x36); ok.fill(0x5c);
+ k.forEach((b, i) => { ik[i] ^= b; ok[i] ^= b; });
+ const t = enc.encode(texto), a = new Uint8Array(64 + t.length); a.set(ik); a.set(t, 64);
+ const i1 = _sha256(a), b = new Uint8Array(96); b.set(ok); b.set(i1, 64);
+ return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
+}
+/* Texto del QR: solo datos de la escuela (lo que ve cualquier otra app de escaneo, sin ningún enlace) y al final el código propio del alumno */
+const QR_TEXTO_ESCUELA = 'PREPARATORIA OFICIAL NUM 6 CCT 15EBH0008G MAT 15EBH0199N VESP ';
+const _memoQr = new Map();
+/* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
+function qrCodigo(curp) {
+ if (!curp || !db.qrClave) return '';
+ const k = db.qrClave + '|' + curp, v = _memoQr.get(k);
+ if (v) return v;
+ const c = _hmacSha256Hex(db.qrClave, String(curp).toUpperCase()).slice(0, 20);
+ if (_memoQr.size > 6000) _memoQr.clear();
+ _memoQr.set(k, c); return c;
+}
+/* Lo que lleva el QR impreso: datos de la escuela + código del alumno (no la CURP). */
+const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + 'SICA' + c : ''; };
+const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:valor, size:220}).toDataURL();
 const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred);
 /* CAMBIO: al elegir Matutino/Vespertino abajo, la etiqueta del turno y la
  vista previa (frente y reverso) de arriba cambian al mismo turno. */
@@ -3020,6 +3091,7 @@ function actualizarVistaPreviaCredencial() {
  curp: $('#edit-curp-alumno').val().trim().toUpperCase() || a.curp,
  grado: a.grado, grupo: a.grupo, turno: a.turno
  };
+ datosPreview.qr = qrValorDe(datosPreview.curp); datosPreview.conQR = !!(datosPreview.curp && datosPreview.qr);
  pintarCredencialCanvas(document.getElementById('preview-canvas-frente'), datosPreview, 'frente');
  pintarCredencialCanvas(document.getElementById('preview-canvas-reverso'), datosPreview, 'reverso');
 }
@@ -3027,7 +3099,9 @@ function actualizarVistaPreviaCredencial() {
    Apellido paterno, Apellido materno y Nombre(s). */
 function datosCredencial(a) {
  return {
-  nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)', conQR: !!a.curp,
+  nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)',
+  // El QR sale de la CURP del alumno: datos de la escuela + un código propio de cada alumno (no la CURP a la vista)
+  qr: qrValorDe(a.curp), conQR: !!(a.curp && qrValorDe(a.curp)),
   grado: nomGrado[a.grado] || '',
   grupo: ROMANOS[a.grupo] || String(a.grupo || ''), turno: a.turno || ''
  };
