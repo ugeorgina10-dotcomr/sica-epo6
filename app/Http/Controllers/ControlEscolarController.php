@@ -206,8 +206,9 @@ class ControlEscolarController extends Controller
     private function registrarAsistencia(array $d): JsonResponse
     {
         $v = validator($d, [
-            'curp'     => 'required|string|max:30',
-            'modo'     => 'nullable|in:Entrada,Salida',
+            'curp'     => 'required_without:qr|nullable|string|max:30',
+            'qr'       => 'required_without:curp|nullable|string|max:40',   // código opaco del QR (sin CURP)
+            'modo'     => 'nullable|in:Entrada,Salida,Auto',
             'diferido' => 'nullable|boolean',
             'fecha'    => 'nullable|date_format:Y-m-d',
             'hora'     => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
@@ -217,7 +218,12 @@ class ControlEscolarController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'Datos de escaneo inválidos'], 422);
         }
 
-        $alumno = Alumno::select('id', 'nombre', 'grupo_id')->where('matricula', $d['curp'])->first();
+        if (!empty($d['curp'])) {
+            $alumno = Alumno::select('id', 'nombre', 'grupo_id')->where('matricula', $d['curp'])->first();
+        } else {
+            $id = $this->mapaQr()[strtolower($d['qr'])] ?? null;
+            $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id')->find($id) : null;
+        }
         if (!$alumno) {
             return response()->json(['ok' => false, 'mensaje' => 'Alumno no encontrado'], 404);
         }
@@ -238,7 +244,28 @@ class ControlEscolarController extends Controller
         $fechaHora = $ahora->format('Y-m-d H:i:00');
         $grupo     = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada')->find($alumno->grupo_id);
 
-        if (($d['modo'] ?? 'Entrada') === 'Salida') {
+        $modo = $d['modo'] ?? 'Entrada';
+
+        if ($modo === 'Auto') {
+            // Lector automático: sin entrada hoy -> Entrada; con entrada y sin salida -> Salida
+            // (si vuelve a pasar la credencial en menos de 5 min, se toma como lectura repetida)
+            $hoy = Asistencia::where('alumno_id', $alumno->id)
+                ->whereDate('fecha_hora', $ahora->toDateString())->orderBy('fecha_hora')->get();
+            $entrada = $hoy->first(fn ($x) => $x->estatus !== 'Salida');
+            $salida  = $hoy->first(fn ($x) => $x->estatus === 'Salida');
+
+            if (!$entrada) {
+                $modo = 'Entrada';
+            } elseif ($salida) {
+                return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada y la salida de hoy ya estaban registradas'], 409);
+            } elseif ($ahora->diffInMinutes(Carbon::parse($entrada->fecha_hora)) < 5) {
+                return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada ya estaba registrada (' . Carbon::parse($entrada->fecha_hora)->format('H:i') . ')'], 409);
+            } else {
+                $modo = 'Salida';
+            }
+        }
+
+        if ($modo === 'Salida') {
             $estatus = 'Salida';
         } else {
             // El retardo se calcula con el horario del grupo DEL ALUMNO
@@ -259,6 +286,7 @@ class ControlEscolarController extends Controller
             'fecha'   => $ahora->format('Y-m-d'),
             'hora'    => $hora,
             'estatus' => $estatus,
+            'modo'    => $modo,
             // A qué grupo se mandó el registro (para mostrarlo en el teléfono)
             'alumno'  => [
                 'nombre' => $alumno->nombre,
@@ -267,6 +295,33 @@ class ControlEscolarController extends Controller
                 'turno'  => $grupo ? ($grupo->turno ?: 'Matutino') : null,
             ],
         ]);
+    }
+
+    /**
+     * Código opaco que va dentro del QR de la credencial: no se puede sacar la CURP de él.
+     * Es un HMAC de la CURP con la APP_KEY (si cambias la APP_KEY, hay que volver a imprimir las credenciales).
+     */
+    public static function codigoQr(string $curp): string
+    {
+        return substr(hash_hmac('sha256', strtoupper($curp), (string) config('app.key')), 0, 20);
+    }
+
+    /** Dirección pública que lleva el QR (lo que ve otra app de escaneo): solo muestra el logo de la escuela */
+    public static function urlQr(string $codigo): string
+    {
+        return rtrim((string) env('SICA_QR_BASE', 'https://sica-epo6.onrender.com'), '/') . '/q/SICA' . $codigo;
+    }
+
+    /** código QR => id de alumno (se guarda unos minutos; solo cuenta la CURP de cada alumno) */
+    private function mapaQr(): array
+    {
+        return Cache::remember('sica.mapaqr.' . $this->huellaEstado(), 300, function () {
+            $mapa = [];
+            foreach (DB::table('alumnos')->whereNotNull('matricula')->where('matricula', '!=', '')->select('id', 'matricula')->cursor() as $a) {
+                $mapa[self::codigoQr($a->matricula)] = $a->id;
+            }
+            return $mapa;
+        });
     }
 
     /** Nombres de orientadores para la pantalla de login (se recalcula solo si la tabla cambió) */
@@ -373,6 +428,7 @@ class ControlEscolarController extends Controller
                 // Alumno sin CURP: su id es el que le puso el navegador (así todos los equipos lo reconocen)
                 'id'     => ($a->matricula !== null && $a->matricula !== '') ? (string) $a->id : (string) ($a->client_key ?: 'srv-' . $a->id),
                 'curp'   => (string) ($a->matricula ?? ''),
+                'qr'     => ($a->matricula !== null && $a->matricula !== '') ? self::codigoQr($a->matricula) : '',
                 'nombre' => $a->nombre,
                 'grado'  => $grado,
                 'grupo'  => $grupo,
@@ -387,6 +443,7 @@ class ControlEscolarController extends Controller
         }
 
         return [
+            'qrBase'       => self::urlQr(''),   // termina en "/q/SICA": el cliente le agrega el código del alumno
             'alumnos'      => $alumnos,
             'horarios'     => (object) $horarios,
             'orientadores' => DB::table('orientadores')->select('id', 'nombre')->get()

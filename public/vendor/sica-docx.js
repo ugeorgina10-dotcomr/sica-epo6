@@ -1016,7 +1016,7 @@
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const conQR = !!(datos && datos.conQR !== false && datos.curp && m.qr && global.QRious);
+  const conQR = !!(datos && datos.conQR !== false && datos.curp && datos.qr && m.qr && global.QRious);
   // El fondo de la plantilla es igual para todos los alumnos: se pinta una vez y se reutiliza (PDF de grupos mucho más rápido)
   m._bg = m._bg || {};
   const kbg = canvas.width + 'x' + canvas.height + (conQR ? 'q' : '') + (datos ? 'd' : '');
@@ -1042,7 +1042,7 @@
    escribir(ctx, plan);
    if (conQR) {
     // El QR ocupa todo el cuadro que se marcó en Word, centrado (el cuadro puede no ser exactamente cuadrado)
-    const q = qrRecortado(datos.curp), b = m.qr;
+    const q = qrRecortado(datos.qr), b = m.qr;
     const lado = Math.min(b.w, b.h);
     const mod = lado / (q.modulos + 2);          // 1 cuadrito de margen blanco alrededor
     const cx = b.x + (b.w - lado) / 2, cy = b.y + (b.h - lado) / 2;
