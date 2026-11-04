@@ -27,9 +27,6 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 #requisitos-clave li.cumple .casilla{background:#198754;border-color:#198754}
 #requisitos-clave li.cumple .casilla::after{content:"";position:absolute;left:3px;top:0;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .btn-vinotinto:hover{background:#600018;color:#fff}
-.btn-recargar{background:#fff;color:#800020;border:2px solid #800020;font-weight:600;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
-.btn-recargar:hover,.btn-recargar:focus-visible{background:#800020;color:#fff;border-color:#800020}
-.btn-recargar:disabled{opacity:.7;cursor:wait;background:#fff;color:#800020}
 .institution-logo{width:130px;height:130px;object-fit:contain}
 .small-logo{width:75px;height:75px;object-fit:contain}
 .cct-text{font-size:.9rem;color:#444;letter-spacing:.5px;font-weight:500}
@@ -160,11 +157,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <button onclick="mostrarSeccion('vista-login')" class="btn btn-vinotinto btn-lg rounded-pill py-3 px-5 shadow fs-5">
  INGRESAR AL SISTEMA
 </button>
-<div class="mt-3">
- <button type="button" onclick="recargarSistema(this)" class="btn btn-recargar btn-recargar-sistema rounded-pill px-5 py-2" title="Si el sistema se trabó o tarda en responder, púlsalo para empezar de nuevo">
-  <i class="fa-solid fa-rotate-right"></i><span class="txt-recargar">Recargar sistema</span>
- </button>
- <div class="small text-muted mt-2">¿Se trabó o tarda en cargar? Recarga y vuelve a intentar.</div>
 </div>
 </div>
 <!-- ============ LOGIN ============ -->
@@ -214,9 +206,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <div class="text-end mb-3" style="margin-top:-1rem"><a href="#" class="small text-muted text-decoration-underline" onclick="olvideContrasena(); return false;">¿Olvidaste tu contraseña?</a></div>
  <button type="button" onclick="intentarEntrar()" class="btn btn-vinotinto w-100 py-3 rounded-3 shadow fs-5">Ingresar al Sistema</button>
- <button type="button" onclick="recargarSistema(this)" class="btn btn-recargar btn-recargar-sistema w-100 py-2 rounded-3 mt-3" title="Si el sistema se trabó o tarda en responder, púlsalo para empezar de nuevo">
-  <i class="fa-solid fa-rotate-right"></i><span class="txt-recargar">Recargar sistema</span>
- </button>
+ <div class="text-center mt-3"><a href="#" class="small text-muted text-decoration-underline btn-recargar-sistema" onclick="recargarSistema(this); return false;" title="Si el sistema se trabó o tarda en responder">Recargar sistema</a></div>
 </form>
 </div>
 <!-- ============ SISTEMA ============ -->
@@ -232,7 +222,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="d-flex align-items-center gap-2">
  <span id="badge-rol-activo" class="badge bg-dark px-3 py-2 fs-6">Rol: --</span>
  <button onclick="recargarSistema(this)" class="btn btn-outline-dark btn-sm rounded-pill px-3 shadow-sm btn-recargar-sistema">
- <i class="fa-solid fa-rotate-right me-1"></i><span class="txt-recargar">Recargar Sistema</span>
+ <span class="txt-recargar">Recargar Sistema</span>
  </button>
  </div>
 </div>
@@ -1454,9 +1444,8 @@ let _recargando = false;
 function recargarSistema(btn) {
  if (_recargando) return;
  _recargando = true;
- $('.btn-recargar-sistema').prop('disabled', true);
- $('.btn-recargar-sistema .fa-rotate-right').addClass('fa-spin');
- $('.btn-recargar-sistema .txt-recargar').text('Recargando...');
+ $('.btn-recargar-sistema').prop('disabled', true).css('pointer-events','none');
+ $('.btn-recargar-sistema').each(function(){ const t=$(this).find('.txt-recargar'); (t.length?t:$(this)).text('Recargando...'); });
  try { Object.keys(scanners).forEach(detener); } catch (e) {}   // apaga la cámara si estaba encendida
  const limpiar = () => {
   const tareas = [];
