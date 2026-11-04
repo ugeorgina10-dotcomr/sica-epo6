@@ -303,7 +303,13 @@ class ControlEscolarController extends Controller
      */
     public static function codigoQr(string $curp): string
     {
-        return substr(hash_hmac('sha256', strtoupper($curp), (string) config('app.key')), 0, 20);
+        return substr(hash_hmac('sha256', strtoupper($curp), self::claveQr()), 0, 20);
+    }
+
+    /** Llave derivada de la APP_KEY (nunca se manda la APP_KEY). El sistema la recibe ya con sesión y calcula el código del QR de cualquier CURP */
+    public static function claveQr(): string
+    {
+        return hash_hmac('sha256', 'sica-qr-v1', (string) config('app.key'));
     }
 
     /** Dirección pública que lleva el QR (lo que ve otra app de escaneo): solo muestra el logo de la escuela */
@@ -315,7 +321,7 @@ class ControlEscolarController extends Controller
     /** código QR => id de alumno (se guarda unos minutos; solo cuenta la CURP de cada alumno) */
     private function mapaQr(): array
     {
-        return Cache::remember('sica.mapaqr.' . $this->huellaEstado(), 300, function () {
+        return Cache::remember('sica.mapaqr.v2.' . $this->huellaEstado(), 300, function () {
             $mapa = [];
             foreach (DB::table('alumnos')->whereNotNull('matricula')->where('matricula', '!=', '')->select('id', 'matricula')->cursor() as $a) {
                 $mapa[self::codigoQr($a->matricula)] = $a->id;
@@ -360,7 +366,8 @@ class ControlEscolarController extends Controller
     /** Estado completo para que computadoras y teléfonos lo descarguen */
     public function estado(Request $request): JsonResponse
     {
-        $huella = $this->huellaEstado();
+        // "-q2": al cambiar la forma del estado (llave del QR) los equipos con la versión anterior descargan todo de nuevo
+        $huella = $this->huellaEstado() . '-q2';
         $etag   = '"' . $huella . '"';
 
         // 304 inmediato: el navegador ya tiene la versión actual (sin leer asistencias ni armar JSON)
@@ -368,7 +375,7 @@ class ControlEscolarController extends Controller
             return response()->json(null, 304)->setEtag($huella);
         }
 
-        $datos = Cache::remember('sica.estado.' . $huella, 300, fn () => $this->construirEstado());
+        $datos = Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado());
 
         $respuesta = response()->json($datos);
         $respuesta->setEtag($huella);
@@ -443,6 +450,7 @@ class ControlEscolarController extends Controller
         }
 
         return [
+            'qrClave'      => self::claveQr(),
             'qrBase'       => self::urlQr(''),   // termina en "/q/SICA": el cliente le agrega el código del alumno
             'alumnos'      => $alumnos,
             'horarios'     => (object) $horarios,
