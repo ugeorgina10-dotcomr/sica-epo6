@@ -27,6 +27,9 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 #requisitos-clave li.cumple .casilla{background:#198754;border-color:#198754}
 #requisitos-clave li.cumple .casilla::after{content:"";position:absolute;left:3px;top:0;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .btn-vinotinto:hover{background:#600018;color:#fff}
+.btn-recargar{background:#fff;color:#800020;border:2px solid #800020;font-weight:600;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:.5rem}
+.btn-recargar:hover,.btn-recargar:focus-visible{background:#800020;color:#fff;border-color:#800020}
+.btn-recargar:disabled{opacity:.7;cursor:wait;background:#fff;color:#800020}
 .institution-logo{width:130px;height:130px;object-fit:contain}
 .small-logo{width:75px;height:75px;object-fit:contain}
 .cct-text{font-size:.9rem;color:#444;letter-spacing:.5px;font-weight:500}
@@ -157,6 +160,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <button onclick="mostrarSeccion('vista-login')" class="btn btn-vinotinto btn-lg rounded-pill py-3 px-5 shadow fs-5">
  INGRESAR AL SISTEMA
 </button>
+<div class="mt-3">
+ <button type="button" onclick="recargarSistema(this)" class="btn btn-recargar btn-recargar-sistema rounded-pill px-5 py-2" title="Si el sistema se trabó o tarda en responder, púlsalo para empezar de nuevo">
+  <i class="fa-solid fa-rotate-right"></i><span class="txt-recargar">Recargar sistema</span>
+ </button>
+ <div class="small text-muted mt-2">¿Se trabó o tarda en cargar? Recarga y vuelve a intentar.</div>
+</div>
 </div>
 <!-- ============ LOGIN ============ -->
 <div id="vista-login" class="card login-card p-4 p-md-5 col-12 col-sm-10 col-md-7 col-lg-5 d-none">
@@ -205,6 +214,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <div class="text-end mb-3" style="margin-top:-1rem"><a href="#" class="small text-muted text-decoration-underline" onclick="olvideContrasena(); return false;">¿Olvidaste tu contraseña?</a></div>
  <button type="button" onclick="intentarEntrar()" class="btn btn-vinotinto w-100 py-3 rounded-3 shadow fs-5">Ingresar al Sistema</button>
+ <button type="button" onclick="recargarSistema(this)" class="btn btn-recargar btn-recargar-sistema w-100 py-2 rounded-3 mt-3" title="Si el sistema se trabó o tarda en responder, púlsalo para empezar de nuevo">
+  <i class="fa-solid fa-rotate-right"></i><span class="txt-recargar">Recargar sistema</span>
+ </button>
 </form>
 </div>
 <!-- ============ SISTEMA ============ -->
@@ -219,8 +231,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <div class="d-flex align-items-center gap-2">
  <span id="badge-rol-activo" class="badge bg-dark px-3 py-2 fs-6">Rol: --</span>
- <button onclick="recargarSistema(this)" class="btn btn-outline-dark btn-sm rounded-pill px-3 shadow-sm">
- Recargar Sistema
+ <button onclick="recargarSistema(this)" class="btn btn-outline-dark btn-sm rounded-pill px-3 shadow-sm btn-recargar-sistema">
+ <i class="fa-solid fa-rotate-right me-1"></i><span class="txt-recargar">Recargar Sistema</span>
  </button>
  </div>
 </div>
@@ -811,11 +823,9 @@ function sincronizarConServidor(accion, datos, reintento) {
 }
 /* Mezcla el estado del servidor con el local sin perder entradas/salidas ya registradas.
  Los alumnos se emparejan por CURP (el id del servidor es distinto al id local). */
-const _borrandoClaves = new Set();   // alumnos que se acaban de borrar en pantalla y el servidor aún no confirma: una consulta anterior no debe devolverlos
 function fusionarServidor(s, inicioConsulta) {
  if (!s || !Array.isArray(s.alumnos)) return;
  const clv = a => a.curp ? 'c:' + a.curp : 'i:' + a.id;
- if (_borrandoClaves.size) s = Object.assign({}, s, {alumnos: s.alumnos.filter(sa => !_borrandoClaves.has(clv(sa)))});
  const locales = new Map(db.alumnos.map(a => [clv(a), a])), claves = new Set();
  const lista = s.alumnos.map(sa => {
   claves.add(clv(sa)); sa.reg = sa.reg || {}; sa.enServidor = true;
@@ -1437,6 +1447,31 @@ function mostrarSeccion(id) {
  if (ES_MOVIL && rol === 'orientador') setTimeout(activarCamaraOrientador, 400);
  }
 }
+/* Recarga completa del sistema: borra la copia guardada de la página (así no se queda una versión vieja o trabada),
+   pide al service worker que busque actualización y vuelve a abrir desde el inicio con un token de sesión nuevo.
+   NO borra datos: la sesión del servidor y los registros/escaneos pendientes del equipo se conservan. */
+let _recargando = false;
+function recargarSistema(btn) {
+ if (_recargando) return;
+ _recargando = true;
+ $('.btn-recargar-sistema').prop('disabled', true);
+ $('.btn-recargar-sistema .fa-rotate-right').addClass('fa-spin');
+ $('.btn-recargar-sistema .txt-recargar').text('Recargando...');
+ try { Object.keys(scanners).forEach(detener); } catch (e) {}   // apaga la cámara si estaba encendida
+ const limpiar = () => {
+  const tareas = [];
+  try {
+   if (window.caches) tareas.push(caches.keys().then(ks => Promise.all(ks.filter(k => k.indexOf('sica-') === 0 && k.indexOf('-paginas') > -1).map(k => caches.delete(k)))));
+   if (navigator.serviceWorker) tareas.push(navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}));
+  } catch (e) {}
+  return Promise.all(tareas.map(t => t.catch(() => {})));
+ };
+ const irAlInicio = () => { location.replace('/?r=' + Date.now()); };   // el parámetro evita usar una copia vieja del navegador
+ // Si la limpieza tarda (justo cuando el sistema está trabado), no se espera más de 2 segundos
+ Promise.race([limpiar(), new Promise(res => setTimeout(res, 2000))]).then(irAlInicio, irAlInicio);
+ // Último recurso: si por algo no se movió, se fuerza la recarga normal
+ setTimeout(() => location.reload(), 5000);
+}
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
  // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
@@ -1885,34 +1920,22 @@ function borrarClaveCuenta() {
  if (!c || c.control) return;
  if (!confirm('Se borrará la contraseña guardada de: ' + c.nombre + '.\nNo podrá entrar hasta que generes una nueva aquí mismo. No se borra ningún otro dato. ¿Continuar?')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/borrar' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol);
- const lista = c.tipo === 'ori' ? clavesOrientadores.find(o => String(o.id) === cuentaSel.slice(4)) : clavesRoles.find(r => r.rol === c.rol);
- const antes = lista ? (c.tipo === 'ori' ? lista.estado : lista.borrada) : null;
- if (lista) { if (c.tipo === 'ori') lista.estado = 'borrada'; else lista.borrada = true; renderClaves(); }   // se ve al instante
- ocultarEntrega();
- $('#resumen-claves').text('Se borró la contraseña anterior de ' + c.nombre + '. Pulsa Generar, luego Guardar, y entrégasela.');
- const deshacer = () => { if (lista) { if (c.tipo === 'ori') lista.estado = antes; else lista.borrada = antes; renderClaves(); } $('#resumen-claves').text(''); };
  llamarClaves(url, c.tipo === 'ori' ? 'POST' : 'DELETE').then(d => {
-  if (!d.ok) { deshacer(); alert(d.mensaje || 'No se pudo borrar la contraseña.'); return; }
+  if (!d.ok) { alert(d.mensaje || 'No se pudo borrar la contraseña.'); return; }
+  ocultarEntrega();
+  $('#resumen-claves').text('Se borró la contraseña anterior de ' + c.nombre + '. Pulsa Generar, luego Guardar, y entrégasela.');
   cargarClaves(true);
- }).catch(() => { deshacer(); alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'); });
+ }).catch(() => alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 /* Quita el bloqueo sin cambiar la contraseña (por ejemplo, si alguien lo marcó por error) */
 function desbloquearCuenta() {
  const c = datosCuenta();
- if (!c || !c.bloqueada) return;   // no hay confirmación: desbloquear no borra nada y se puede volver a bloquear
+ if (!c || !c.bloqueada) return;
+ if (!confirm('Se quitará el bloqueo de ' + c.nombre + ' sin cambiar su contraseña. ¿Continuar?')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
- // Se ve el cambio al instante; si el servidor no lo confirma, se deja como estaba y se avisa
- const lista = c.tipo === 'ori' ? clavesOrientadores.find(o => String(o.id) === cuentaSel.slice(4)) : clavesRoles.find(r => r.rol === c.rol);
- const antes = lista ? {bloqueada: lista.bloqueada, olvido_at: lista.olvido_at} : null;
- if (lista) { lista.bloqueada = false; lista.olvido_at = null; renderClaves(); }
- $('#resumen-claves').text('Se quitó el bloqueo de ' + c.nombre + '.');
  llamarClaves(url, 'POST').then(d => {
-  if (!d.ok) {
-   if (lista && antes) { lista.bloqueada = antes.bloqueada; lista.olvido_at = antes.olvido_at; renderClaves(); }
-   $('#resumen-claves').text('');
-   alert(d.mensaje || 'No se pudo desbloquear.');
-   return;
-  }
+  if (!d.ok) { alert(d.mensaje || 'No se pudo desbloquear.'); return; }
+  $('#resumen-claves').text('Se quitó el bloqueo de ' + c.nombre + '.');
   cargarClaves(true);
  });
 }
@@ -2303,29 +2326,17 @@ function borrarListaGrupo() {
  const lista = db.alumnos.filter(a => a.grado === g && a.grupo === n && a.turno === t);
  if (!lista.length) { alert('El ' + g + '° grado, grupo ' + n + ' (' + t + ') no tiene alumnos cargados.'); return; }
  if (!confirm('¿Borrar la lista completa del ' + g + '° grado, grupo ' + n + ' (' + t + ')?\n' + lista.length + ' alumno(s) y todos sus registros de asistencia se eliminarán de forma permanente. Esta acción no se puede deshacer.')) return;
- // Se quita de la pantalla al instante; el servidor lo confirma en segundo plano (si falla, la lista vuelve)
- const respaldo = db.alumnos.slice();
- const ids = new Set(lista.map(a => a.id));
- const clavesBorrando = lista.map(a => a.curp ? 'c:' + a.curp : 'i:' + a.id);
- clavesBorrando.forEach(k => _borrandoClaves.add(k));
- db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
- localStorage.setItem(LS, JSON.stringify(db));
- $('#archivo-lista').val('');
- renderTabla(); renderListaHorarios();
- if (credSel) selCred(credSel.grado, credSel.grupo);
  _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
   if (!r.ok) return Promise.reject();
+  const ids = new Set(lista.map(a => a.id));
+  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
   ids.forEach(id => _firmasGuardadas.delete(id));
-  setTimeout(() => clavesBorrando.forEach(k => _borrandoClaves.delete(k)), 4000);
-  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
- }).catch(() => {
-  clavesBorrando.forEach(k => _borrandoClaves.delete(k));
-  db.alumnos = respaldo;
   localStorage.setItem(LS, JSON.stringify(db));
+  $('#archivo-lista').val('');
   renderTabla(); renderListaHorarios();
   if (credSel) selCred(credSel.grado, credSel.grupo);
-  alert('No se pudo borrar en el servidor. La lista volvió a aparecer. Revisa tu conexión e inténtalo de nuevo.');
- });
+  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
+ }).catch(() => alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 function subirHorarios() {
  if (!permisoPermite()) return;
@@ -2841,22 +2852,14 @@ function eliminarAlumno(id) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede eliminar alumnos.'); return; }
  const a = db.alumnos.find(x => x.id === id); if (!a) return;
  if (!confirm('¿Eliminar a ' + a.nombre + (a.curp ? ' (' + a.curp + ')' : '') + '? Se borrarán también sus registros de asistencia. Esta acción no se puede deshacer.')) return;
- // Desaparece de la lista al instante; el servidor lo confirma en segundo plano (si falla, vuelve a aparecer)
- const posicion = db.alumnos.indexOf(a), claveBorrando = a.curp ? 'c:' + a.curp : 'i:' + a.id;
- _borrandoClaves.add(claveBorrando);
+ const quitarLocal = () => {
  db.alumnos = db.alumnos.filter(x => x.id !== id);
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
+ };
  _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
- .then(r => r.ok ? null : Promise.reject())
- .then(() => setTimeout(() => _borrandoClaves.delete(claveBorrando), 4000))   // se deja un margen: una consulta en vuelo pudo salir antes del borrado
- .catch(() => {
-  _borrandoClaves.delete(claveBorrando);
-  db.alumnos.splice(Math.min(posicion, db.alumnos.length), 0, a);
-  localStorage.setItem(LS, JSON.stringify(db));
-  if (credSel) selCred(credSel.grado, credSel.grupo); renderTabla();
-  alert('No se pudo eliminar en el servidor. El alumno volvió a la lista. Revisa tu conexión e inténtalo de nuevo.');
- });
+ .then(r => r.ok ? quitarLocal() : Promise.reject())
+ .catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 function guardarCambiosCredencial() {
  if (!permisoPermite()) return;
@@ -3018,31 +3021,6 @@ function descargarCredencialIndividual() {
  if (!curpLargoValido(datos.curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(datos.curp) + ' (ahora tiene ' + datos.curp.length + '). Corrígela antes de descargar.'); return; }
  generarPDFCredenciales([datos], 'credencial_' + datos.curp + '.pdf', document.getElementById('btn-pdf-individual'), 'Descargar PDF');
 }
-/* "Recargar Sistema": en vez de volver a cargar toda la página (librerías, estilos, plantillas...), solo se vuelve a pedir lo que cambia:
-   datos del servidor, contraseñas (Control Escolar) y token de seguridad, y se redibuja todo. Tarda una fracción de segundo.
-   Si el servidor no contesta en 8 s, ahí sí recarga la página completa. */
-let _recargando = false;
-function recargarSistema(btn) {
- if (_recargando) return;
- _recargando = true;
- const $b = $(btn), textoOriginal = $b.html();
- $b.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Actualizando');
- _etagEstado = null;   // fuerza a bajar el estado completo (no un "sin cambios")
- const limite = setTimeout(() => location.reload(), 8000);
- Promise.all([
-  cargarDesdeServidor(),
-  rolActivo === 'control' ? cargarClaves(true) : null,
-  refrescarCsrf()
- ]).then(() => {
-  clearTimeout(limite);
-  if (!_etagEstado) { location.reload(); return; }   // no llegó el estado: recarga completa
-  renderTabla();
-  if (rolActivo === 'control') { renderListaOrientadores(); renderStats(); }
-  if (credSel) selCred(credSel.grado, credSel.grupo);
-  $b.html('Actualizado');
-  setTimeout(() => { $b.prop('disabled', false).html(textoOriginal); _recargando = false; }, 900);
- }).catch(() => location.reload());
-}
 /* Entra al sistema. Si este equipo ya tiene datos guardados de la vez anterior (listas, horarios), la pantalla se abre AL INSTANTE
    con esos datos y se actualizan en segundo plano (cada 3 s se vuelven a sincronizar de todos modos; el servidor manda siempre
    la última palabra). Si es la primera vez en este equipo no hay nada guardado: ahí sí se espera la descarga para no mostrar tablas vacías. */
@@ -3079,6 +3057,7 @@ function restaurarSesion(S) {
 // Computadoras: al volver con "atrás" o recargar, el navegador restaura el rol elegido SIN avisar a la página -> se vuelve a sincronizar el correo
 window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredenciales(); });
 $(function () {
+ try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
  if (Array.isArray(window.SICA_ORIENTADORES)) db.orientadores = window.SICA_ORIENTADORES;   // ya vienen en la página
  actualizarCredenciales();
  $('#calendario-orientador').val(hoy());
