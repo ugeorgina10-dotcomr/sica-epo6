@@ -2185,15 +2185,22 @@ function setModoEscaneo(m) {
 function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : iniciarScanner('cam-fija', () => modoEscaneo); }
 /* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
    Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
-   Solo se atienden en el panel del Lector Fijo y si no se está escribiendo en un campo visible (contraseñas, nombres, etc.).
-   Cada lectura se muestra en pantalla ("Último dato recibido") para ver qué llegó de verdad. Si el lector está configurado
-   "sin terminador", la lectura se da por terminada tras una breve pausa. */
+   Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
+   subdirector, con el mismo permiso que pide la cámara). Se ignora lo que se escribe a mano en cualquier campo, salvo el
+   buscador de alumnos: ahí, una ráfaga rápida de teclas seguida de Enter se toma como lectura y se borra del buscador.
+   Si el lector está configurado "sin terminador", la lectura se da por terminada tras una breve pausa. */
 (function () {
- let buf = '', ultimaTecla = 0, pausa = null;
- const panelActivo = () => rolActivo && !$('#vista-sistema').hasClass('d-none') && !$('#panel-lector').hasClass('d-none');
+ let buf = '', ultimaTecla = 0, pausa = null, campo = null;
+ // A dónde va la lectura según el panel que se está viendo (null = ninguno)
+ function destino() {
+  if (!rolActivo || $('#vista-sistema').hasClass('d-none')) return null;
+  if (!$('#panel-lector').hasClass('d-none')) return {modo: modoEscaneo, el: 'cam-fija', permitido: true};
+  if (!$('#panel-orientador').hasClass('d-none') && $('#bloque-camara-orientador').is(':visible'))
+   return {modo: modoOrient, el: 'cam-orient', permitido: rolActivo === 'control' || (db.permisos[rolActivo] || 'ver') === 'editar'};
+  return null;
+ }
  // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
  const enCampo = el => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && el.offsetParent !== null;
- const estado = (txt, cls) => $('#estado-lector-fisico').removeClass('text-success text-danger text-warning').addClass(cls || 'text-success').text(txt);
  function tono(ok) {
   try {
    desbloquearAudio();
@@ -2212,31 +2219,42 @@ function toggleCamaraFija() { scanners['cam-fija'] ? detener('cam-fija') : inici
  }
  function terminar() {
   clearTimeout(pausa); pausa = null;
-  const crudo = buf; buf = '';
+  const crudo = buf, cb = campo; buf = ''; campo = null;
+  if (cb) {   // la ráfaga se escribió en el buscador: se quita de ahí y se actualiza la lista
+   cb.value = cb.value.slice(0, Math.max(0, cb.value.length - crudo.length));
+   $(cb).trigger('input');
+  }
   const curp = crudo.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  $('#diag-lector-fisico').text('Último dato recibido del lector: "' + crudo + '" (' + crudo.length + ' caracteres)');
-  if (curp.length < 10) { estado('llegó un dato muy corto, escanea de nuevo', 'text-warning'); tono(false); return; }
-  estado('listo');
-  const el = $('#res-cam-fija');
-  procesarQR(curp, modoEscaneo, 'cam-fija');
-  // procesarQR escribe el resultado en #res-cam-fija (puede tardar si busca en el servidor): se suena según el color final
+  const d = destino();
+  if (!d || curp.length < 10) return;                 // ruido o tecleo normal: se ignora
+  const el = $('#res-' + d.el);
+  if (!d.permitido) {
+   el.removeClass('text-success').addClass('text-danger').text('No tienes permiso para registrar. Se requiere autorización de Control Escolar.');
+   tono(false); return;
+  }
+  procesarQR(curp, d.modo, d.el);
+  // procesarQR escribe el resultado en #res-... (puede tardar si busca en el servidor): se suena según el color final
   setTimeout(() => tono(!el.hasClass('text-danger')), 350);
  }
  document.addEventListener('keydown', e => {
-  if (!panelActivo() || enCampo(e.target) || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (!destino() || e.ctrlKey || e.altKey || e.metaKey) return;
+  const buscador = e.target && e.target.id === 'buscador-alumno';
+  if (enCampo(e.target) && !buscador) return;
   const ahora = Date.now();
   if (e.key === 'Enter') {
-   if (buf.length) { e.preventDefault(); terminar(); }   // evita que el Enter "pulse" el botón que tenga el foco
+   if (buf.length >= 10) { e.preventDefault(); terminar(); }   // evita que el Enter "pulse" el botón que tenga el foco
+   else { buf = ''; campo = null; }
    return;
   }
   if (e.key.length !== 1) return;                       // Shift, CapsLock, etc.
-  if (ahora - ultimaTecla > 400) buf = '';              // pausa larga: es una lectura nueva (tolera lectores inalámbricos lentos)
+  // En el buscador solo cuenta una ráfaga muy rápida (lector); fuera de él se tolera un lector inalámbrico más lento
+  if (ahora - ultimaTecla > (buscador ? 60 : 400)) buf = '';
   ultimaTecla = ahora;
   buf += e.key;
-  e.preventDefault();
-  estado('recibiendo...', 'text-warning');
+  campo = buscador ? e.target : null;
+  if (!buscador) e.preventDefault();                    // en el buscador se deja escribir para no estorbar a quien teclea
   clearTimeout(pausa);
-  pausa = setTimeout(() => { if (buf.length >= 10) terminar(); else { buf = ''; estado('listo'); } }, 400);   // lector sin terminador
+  pausa = setTimeout(() => { if (buf.length >= 10 && !buscador) terminar(); else { buf = ''; campo = null; } }, 400);   // lector sin terminador
  }, true);
 })();
 /* ============ PANEL DE ORIENTADORES ============ */
