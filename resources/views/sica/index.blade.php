@@ -2158,12 +2158,12 @@ function detener(el) {
 }
 /* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
    porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
-const reQr = /SICA([0-9A-F]{20})$/;
+const reQr = /SICA([0-9A-F]{16,20})$/;   // 16 = código actual; hasta 20 = versión anterior del QR
 function claveDeLectura(txt) {
  const s = String(txt).toUpperCase().replace(/[^A-Z0-9]/g, ''), m = s.match(reQr);
- return m ? 'SICA' + m[1] : String(txt).trim().toUpperCase();
+ return m ? 'SICA' + m[1].slice(0, 16) : String(txt).trim().toUpperCase();
 }
-const esClaveQr = c => /^SICA[0-9A-F]{20}$/.test(c);
+const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
 function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
@@ -2999,15 +2999,15 @@ function _hmacSha256Hex(clave, texto) {
  const i1 = _sha256(a), b = new Uint8Array(96); b.set(ok); b.set(i1, 64);
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
-/* Texto del QR: solo datos de la escuela (lo que ve cualquier otra app de escaneo, sin ningún enlace) y al final el código propio del alumno */
-const QR_TEXTO_ESCUELA = 'PREPARATORIA OFICIAL NUM 6 CCT 15EBH0008G MAT 15EBH0199N VESP ';
+/* Texto del QR: nombre corto de la escuela (lo que ve cualquier otra app de escaneo, sin enlace) y al final el código propio del alumno. Total: 25 caracteres, igual de simple que el QR con la CURP */
+const QR_TEXTO_ESCUELA = 'EPO6 ';   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
  if (!curp || !db.qrClave) return '';
  const k = db.qrClave + '|' + curp, v = _memoQr.get(k);
  if (v) return v;
- const c = _hmacSha256Hex(db.qrClave, String(curp).toUpperCase()).slice(0, 20);
+ const c = _hmacSha256Hex(db.qrClave, String(curp).toUpperCase()).slice(0, 16);
  if (_memoQr.size > 6000) _memoQr.clear();
  _memoQr.set(k, c); return c;
 }

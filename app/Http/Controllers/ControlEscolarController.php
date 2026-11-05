@@ -221,7 +221,7 @@ class ControlEscolarController extends Controller
         if (!empty($d['curp'])) {
             $alumno = Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->where('matricula', $d['curp'])->first();
         } else {
-            $id = $this->mapaQr()[strtolower($d['qr'])] ?? null;
+            $id = $this->mapaQr()[substr(strtolower($d['qr']), 0, 16)] ?? null;   // acepta también los códigos largos (20) de la versión anterior
             $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->find($id) : null;
         }
         if (!$alumno) {
@@ -304,7 +304,7 @@ class ControlEscolarController extends Controller
      */
     public static function codigoQr(string $curp): string
     {
-        return substr(hash_hmac('sha256', strtoupper($curp), self::claveQr()), 0, 20);
+        return substr(hash_hmac('sha256', strtoupper($curp), self::claveQr()), 0, 16);
     }
 
     /** Llave derivada de la APP_KEY (nunca se manda la APP_KEY). El sistema la recibe ya con sesión y calcula el código del QR de cualquier CURP */
