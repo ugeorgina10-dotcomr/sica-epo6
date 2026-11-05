@@ -383,6 +383,17 @@ class ControlEscolarController extends Controller
         return $respuesta;
     }
 
+    /** Lo mismo que /api/sica/estado, pero para incrustarlo en la página al abrirla con sesión (misma caché y mismo ETag) */
+    public function paraPagina(): array
+    {
+        $huella = $this->huellaEstado() . '-q2';
+
+        return [
+            'etag'  => '"' . $huella . '"',
+            'datos' => Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado()),
+        ];
+    }
+
     private function construirEstado(): array
     {
         $grupos = DB::table('grupos')

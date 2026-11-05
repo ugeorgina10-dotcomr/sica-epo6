@@ -18,6 +18,8 @@ Route::get('/', function () {
         // Se incrusta en la página: así al abrir no hace falta pedir /auth/me ni /api/sica/orientadores
         'sesion' => $u ? ['rol' => $u->rol, 'nombre' => $u->name, 'email' => $u->email] : null,
         'orientadoresLogin' => ControlEscolarController::orientadoresLogin(),
+        // Con sesión, el estado completo va dentro de la página: al recargar entra sin esperar otra petición
+        'estado' => $u ? app(ControlEscolarController::class)->paraPagina() : null,
     ]);
 });
 

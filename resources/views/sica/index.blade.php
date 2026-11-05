@@ -12,14 +12,21 @@
 <meta name="apple-mobile-web-app-title" content="SICA-EPO6">
 <link rel="apple-touch-icon" href="{{ asset('img/logo6.png') }}">
 <link rel="preload" as="image" href="{{ asset('img/logo6.png') }}">
-<link rel="prefetch" as="image" href="{{ asset('img/epo6.png') }}">   {{-- el fondo del login ya está listo cuando se pulsa Ingresar --}}
+<link rel="prefetch" as="image" href="{{ asset('img/epo6.jpg') }}">   {{-- el fondo del login ya está listo cuando se pulsa Ingresar --}}
 {{-- Librerías servidas desde public/vendor (sin CDN): así el sistema abre aunque no haya internet --}}
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
+{{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
+     Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
+@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
+<link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
+@endforeach
+<link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
+<link rel="prefetch" href="{{ asset('vendor/pdf.worker.min.js') }}">
 <style>
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
-/* Fondo epo6.png: public/img/epo6.png. Se ve a partir del login, con brillo y color originales. */
-.bg-escuela{background:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.png') }}") center/cover no-repeat fixed !important;min-height:100vh}
+/* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
+.bg-escuela{background:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.jpg') }}") center/cover no-repeat fixed !important;min-height:100vh}
 #input-clave::-ms-reveal,#input-clave::-ms-clear{display:none}
 .bg-login{background:#fff !important;min-height:100vh}
 .main-card{background:rgba(255,255,255,.95);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.3);border:1px solid rgba(128,0,32,.25)}
@@ -649,12 +656,13 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
  // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
- const pantallaLista = new Promise(ok => setTimeout(ok, 0));   // justo después de pintar la pantalla: todo se va cargando mientras escribes tu contraseña
- window.SICA_DOCX_LISTO = pantallaLista.then(() => Promise.all(grupos[0].map(cargar)));
- const resto = window.SICA_DOCX_LISTO.then(() => Promise.all([
+ // Todo arranca de inmediato y en paralelo (ya están precargados desde la cabecera); solo autotable espera a jsPDF
+ window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(cargar));
+ const resto = Promise.all([
+  window.SICA_DOCX_LISTO,
   Promise.all(grupos[1].map(cargar)),
   Promise.all(grupos[2].map(cargar)).then(() => cargar('jspdf.plugin.autotable.min.js'))   // autotable depende de jsPDF
- ]));
+ ]);
  window.SICA_LIBS_LISTAS = resto.then(() => {
   if (window.Chart) Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
@@ -672,6 +680,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    OJO: esto solo sirve para mostrar la pantalla; los permisos reales los decide siempre el servidor. */
 window.SICA_SESION = @json($sesion ?? null);
 window.SICA_ORIENTADORES = @json($orientadoresLogin ?? []);
+window.SICA_ESTADO = @json($estado ?? null);   // solo con sesión iniciada: listas, horarios y asistencias ya vienen en la página
 </script>
 <script>
 /* ============ DATOS (localStorage del navegador) ============ */
@@ -3297,6 +3306,10 @@ $(function () {
  precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
  try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
  if (Array.isArray(window.SICA_ORIENTADORES)) db.orientadores = window.SICA_ORIENTADORES;   // ya vienen en la página
+ // Con sesión abierta el estado completo ya viene dentro de la página: se usa al instante y la primera consulta al servidor responde 304
+ if (window.SICA_SESION && window.SICA_ESTADO && window.SICA_ESTADO.datos) {
+  try { fusionarServidor(window.SICA_ESTADO.datos, 0); _etagEstado = window.SICA_ESTADO.etag; } catch (e) {}
+ }
  actualizarCredenciales();
  $('#calendario-orientador').val(hoy());
  if (window.SICA_SESION) restaurarSesion(window.SICA_SESION);   // solo pide datos al servidor si hay sesión (cero errores 401 al abrir)
