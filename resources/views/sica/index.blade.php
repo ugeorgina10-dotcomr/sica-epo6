@@ -206,7 +206,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  <div class="text-end mb-3" style="margin-top:-1rem"><a href="#" class="small text-muted text-decoration-underline" onclick="olvideContrasena(); return false;">¿Olvidaste tu contraseña?</a></div>
- <button type="button" onclick="intentarEntrar()" class="btn btn-vinotinto w-100 py-3 rounded-3 shadow fs-5">Ingresar al Sistema</button>
+ <button type="button" id="btn-ingresar" onclick="intentarEntrar()" class="btn btn-vinotinto w-100 py-3 rounded-3 shadow fs-5">Ingresar al Sistema</button>
  <div class="text-center mt-3"><a href="#" class="small text-muted text-decoration-underline btn-recargar-sistema" onclick="recargarSistema(this); return false;" title="Si el sistema se trabó o tarda en responder">Recargar sistema</a></div>
 </form>
 </div>
@@ -747,6 +747,8 @@ const save = () => {
  clearTimeout(_temporizadorSave);
  _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 600);
 };
+/* Envía YA lo guardado (sin esperar el medio segundo de agrupación de save()). Para acciones grandes y únicas, como subir una lista. */
+const guardarYa = () => { if (ES_MOVIL) return; clearTimeout(_temporizadorSave); _temporizadorSave = null; enviarTodo(); };
 /* ============ SINCRONIZACIÓN CON EL SERVIDOR (MySQL vía Laravel) ============
  Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
  Si el backend no responde, falla en silencio y el sistema sigue con localStorage. */
@@ -779,7 +781,7 @@ const PEND_TODO = 'sica_epo6_pend_todo';   // marca: hay cambios guardados solo 
    pesaba megas, tardaba y el servidor podía rechazarla por tamaño sin avisar. Ahora:
    - solo se envían los alumnos que cambiaron desde la última vez que el servidor los guardó (se compara su "firma"),
    - y se mandan por lotes chicos, uno tras otro. */
-const LOTE_ALUMNOS = 150;
+const LOTE_ALUMNOS = 250;
 const _firmasGuardadas = new Map();   // id del alumno -> firma de lo que ya tiene el servidor
 const firmaAlumno = a => JSON.stringify([a.curp, a.nombre, a.grado, a.grupo, a.turno, a.reg]);
 let _enviando = false, _hayOtroEnvio = false;
@@ -811,7 +813,8 @@ function enviarTodo(sinVacios) {
  let fallo = false;
  return lotes.reduce((prev, lote, n) => prev.then(() => {
   if (fallo) return;
-  const datos = {orientadores: db.orientadores, horarios: db.horarios, plantillas: n === 0 && hayPlantillas ? db.plantillas : {}, alumnos: lote};
+  // Orientadores y horarios solo en el primer lote: los demás van más ligeros y el servidor no repite ese trabajo
+  const datos = {orientadores: n === 0 ? db.orientadores : [], horarios: n === 0 ? db.horarios : {}, plantillas: n === 0 && hayPlantillas ? db.plantillas : {}, alumnos: lote};
   return _postSync('guardar_todo', datos).then(r => {
    if (r.status === 401) { fallo = true; sesionExpirada(); return; }
    if (r.status === 403) { fallo = true; localStorage.removeItem(PEND_TODO); return r.json().then(d => avisoPermiso(d && d.mensaje)).catch(() => avisoPermiso()); }
@@ -1388,7 +1391,9 @@ function verOcultarClave() {
  boton.setAttribute('aria-pressed', mostrar ? 'true' : 'false');
  campo.focus();
 }
-function intentarEntrar() {
+let _entrando = false;
+function intentarEntrar(reintento) {
+ if (_entrando) return;   // un solo intento a la vez (Enter + clic mandaban dos y el segundo gastaba otro intento)
  const rol = $('#rol-select').val();
  const clave = $('#input-clave').val();
  if (!clave) { alert('Escribe tu contraseña.'); return; }
@@ -1400,13 +1405,21 @@ function intentarEntrar() {
  } else {
  orientadorActivo = null;
  }
- fetch('/auth/login', {
+ // Respuesta inmediata al pulsar: se ve "Entrando..." al instante (revisar la contraseña tarda una fracción de segundo)
+ _entrando = true;
+ const btnIngresar = $('#btn-ingresar').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Entrando...');
+ const listo = () => { _entrando = false; btnIngresar.prop('disabled', false).text('Ingresar al Sistema'); };
+ fetchT('/auth/login', {
  method: 'POST',
  headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
  body: JSON.stringify({email: $('#input-correo').val(), password: clave, orientador: orientadorActivo ? orientadorActivo.nombre : null})
- })
- .then(r => r.json().then(d => ({status: r.status, ...d})))
+ }, 20000)
+ .then(r => r.json().catch(() => ({})).then(d => ({status: r.status, ...d})))
  .then(d => {
+ listo();
+ // 419: la página llevaba mucho abierta y su token venció -> se pide uno nuevo y se reintenta UNA vez, sin que la persona haga nada
+ if (d.status === 419 && !reintento) { orientadorActivo = null; return refrescarCsrf().then(() => intentarEntrar(true)); }
+ if (d.status === 429 && !d.mensaje) d.mensaje = 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
  if (!d.ok) {
  orientadorActivo = null;
  if (d.bloqueada) { $('#input-clave').val(''); abrirModalCuenta('bloqueada', d.mensaje); return; }
@@ -1428,6 +1441,7 @@ function intentarEntrar() {
  entrarAlSistema(false);
  })
  .catch(() => {
+ listo();
  orientadorActivo = null;
  alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
@@ -1484,13 +1498,14 @@ function recargarSistema(btn) {
   const tareas = [];
   try {
    if (window.caches) tareas.push(caches.keys().then(ks => Promise.all(ks.filter(k => k.indexOf('sica-') === 0 && k.indexOf('-paginas') > -1).map(k => caches.delete(k)))));
-   if (navigator.serviceWorker) tareas.push(navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}));
+   // La búsqueda de actualización del service worker va por red: se lanza SIN esperarla (antes la recarga aguardaba hasta 2 s por ella)
+   if (navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {});
   } catch (e) {}
   return Promise.all(tareas.map(t => t.catch(() => {})));
  };
  const irAlInicio = () => { location.replace('/?r=' + Date.now()); };   // el parámetro evita usar una copia vieja del navegador
- // Si la limpieza tarda (justo cuando el sistema está trabado), no se espera más de 2 segundos
- Promise.race([limpiar(), new Promise(res => setTimeout(res, 2000))]).then(irAlInicio, irAlInicio);
+ // Si la limpieza tarda (justo cuando el sistema está trabado), no se espera más de 0.8 segundos
+ Promise.race([limpiar(), new Promise(res => setTimeout(res, 800))]).then(irAlInicio, irAlInicio);
  // Último recurso: si por algo no se movió, se fuerza la recarga normal
  setTimeout(() => location.reload(), 5000);
 }
@@ -2457,7 +2472,7 @@ function subirLista() {
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
  else { db.alumnos.push({id:generarId(), curp:curp, nombre:nombre, grado:filtro.grado, grupo:filtro.grupo, turno:turnoActivo, reg:{}}); nuevos++; }
  });
- save(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);
+ save(); guardarYa(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);   // la lista ya va al servidor mientras se lee el aviso
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
  const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
  alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.') + (curpsInvalidas.length ? '\n\nSe omitieron ' + curpsInvalidas.length + ' fila(s) con CURP no válida (debe tener 18 caracteres): ' + curpsInvalidas.slice(0, 8).join(', ') + (curpsInvalidas.length > 8 ? '…' : '') + '. Corrígelas en el archivo y súbelo otra vez.' : ''));
@@ -2472,17 +2487,25 @@ function borrarListaGrupo() {
  const lista = db.alumnos.filter(a => a.grado === g && a.grupo === n && a.turno === t);
  if (!lista.length) { alert('El ' + g + '° grado, grupo ' + n + ' (' + t + ') no tiene alumnos cargados.'); return; }
  if (!confirm('¿Borrar la lista completa del ' + g + '° grado, grupo ' + n + ' (' + t + ')?\n' + lista.length + ' alumno(s) y todos sus registros de asistencia se eliminarán de forma permanente. Esta acción no se puede deshacer.')) return;
+ // La lista desaparece de la pantalla al instante; si el servidor no pudo borrarla, vuelve a aparecer con un aviso
+ const ids = new Set(lista.map(a => a.id));
+ db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
+ localStorage.setItem(LS, JSON.stringify(db));
+ $('#archivo-lista').val('');
+ renderTabla(); renderListaHorarios();
+ if (credSel) selCred(credSel.grado, credSel.grupo);
  _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
   if (!r.ok) return Promise.reject();
-  const ids = new Set(lista.map(a => a.id));
-  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
   ids.forEach(id => _firmasGuardadas.delete(id));
+  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
+ }).catch(() => {
+  const hay = new Set(db.alumnos.map(a => a.id));
+  lista.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
   localStorage.setItem(LS, JSON.stringify(db));
-  $('#archivo-lista').val('');
   renderTabla(); renderListaHorarios();
   if (credSel) selCred(credSel.grado, credSel.grupo);
-  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
- }).catch(() => alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+  alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
+ });
 }
 function subirHorarios() {
  if (!permisoPermite()) return;
@@ -3058,14 +3081,19 @@ function eliminarAlumno(id) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede eliminar alumnos.'); return; }
  const a = db.alumnos.find(x => x.id === id); if (!a) return;
  if (!confirm('¿Eliminar a ' + a.nombre + (a.curp ? ' (' + a.curp + ')' : '') + '? Se borrarán también sus registros de asistencia. Esta acción no se puede deshacer.')) return;
- const quitarLocal = () => {
+ // Se quita de la pantalla al instante; si el servidor no pudo borrarlo, vuelve a aparecer con un aviso
  db.alumnos = db.alumnos.filter(x => x.id !== id);
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
- };
  _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
- .then(r => r.ok ? quitarLocal() : Promise.reject())
- .catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+ .then(r => r.ok ? null : Promise.reject())
+ .catch(() => {
+ if (!db.alumnos.some(x => x.id === a.id)) db.alumnos.push(a);
+ localStorage.setItem(LS, JSON.stringify(db));
+ if (credSel) selCred(credSel.grado, credSel.grupo);
+ renderTabla();
+ alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
+ });
 }
 function guardarCambiosCredencial() {
  if (!permisoPermite()) return;
