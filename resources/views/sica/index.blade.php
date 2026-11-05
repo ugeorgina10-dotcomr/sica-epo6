@@ -1619,7 +1619,7 @@ function cargarClaves(forzar) {
   _etagClaves = r.headers.get('ETag');
   return r.json();
  }).then(d => {
-  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
+  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
   if (!d || !d.ok) return;
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
@@ -1719,30 +1719,37 @@ function avisarOtrasPestanas(msg) {
 /* ---- Sonido del aviso ----
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
-let _audioCtx = null;
+let _audioCtx = null, _sonidoPendiente = null;
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   if (!_audioCtx) _audioCtx = new AC();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume().then(() => {
+   // Si el aviso llegó antes de que alguien tocara la página, suena en cuanto se toca
+   if (_sonidoPendiente) { const v = _sonidoPendiente; _sonidoPendiente = null; sonarAviso(v); }
+  }).catch(() => {});
  } catch (e) {}
 }
 ['pointerdown', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, desbloquearAudio, {passive: true}));
-function sonarAviso() {
+/* veces = cuántas repeticiones del par de tonos (las solicitudes de contraseña suenan 3 veces para que se note) */
+function sonarAviso(veces) {
  try {
   desbloquearAudio();
-  if (!_audioCtx || _audioCtx.state !== 'running') return;   // la pestaña aún no recibió ningún clic: el navegador no permite sonar
+  if (!_audioCtx || _audioCtx.state !== 'running') { _sonidoPendiente = veces || 1; return; }   // aún sin ningún clic en esta pestaña
   const t0 = _audioCtx.currentTime;
-  [[880, 0], [1175, 0.16]].forEach(([hz, retraso]) => {
-   const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
-   osc.type = 'sine'; osc.frequency.value = hz;
-   vol.gain.setValueAtTime(0.0001, t0 + retraso);
-   vol.gain.exponentialRampToValueAtTime(0.35, t0 + retraso + 0.02);
-   vol.gain.exponentialRampToValueAtTime(0.0001, t0 + retraso + 0.35);
-   osc.connect(vol); vol.connect(_audioCtx.destination);
-   osc.start(t0 + retraso); osc.stop(t0 + retraso + 0.4);
-  });
+  for (let v = 0; v < (veces || 1); v++) {
+   [[880, 0], [1175, 0.16]].forEach(([hz, retraso]) => {
+    const ini = t0 + v * 0.8 + retraso;
+    const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = hz;
+    vol.gain.setValueAtTime(0.0001, ini);
+    vol.gain.exponentialRampToValueAtTime(0.5, ini + 0.02);
+    vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
+    osc.connect(vol); vol.connect(_audioCtx.destination);
+    osc.start(ini); osc.stop(ini + 0.4);
+   });
+  }
  } catch (e) {}
 }
 let _entrandoPorAviso = false;
@@ -1781,8 +1788,8 @@ function entrarSiHaySesion() {
   .then(() => { _entrandoPorAviso = false; });
 }
 /* Pestaña PRINCIPAL: otra pestaña (la secundaria) pidió atender una solicitud -> aquí se pide iniciar sesión como Control Escolar */
-function irAControl(cuenta) {
- sonarAviso();
+function irAControl(cuenta, silencio) {
+ if (!silencio) sonarAviso();
  if (rolActivo === 'control') { abrirSolicitudCuenta(cuenta); return; }
  if (rolActivo) return;
  _solicitudPendiente = cuenta;
@@ -1811,30 +1818,53 @@ window.addEventListener('storage', e => {
 // Una pestaña que se quedó en el login (o se "durmió") revisa al volver a verla si ya hay sesión abierta
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) entrarSiHaySesion(); });
 function sincronizarBurbujas() {
- if (rolActivo !== 'control') { $('#burbujas-claves').empty(); return; }
+ if (rolActivo !== 'control') { if (rolActivo) $('#burbujas-claves').empty(); return; }   // sin sesión las dibuja la consulta pública de abajo
+ $('#burbujas-claves .burbuja button:not(.burbuja-x)').text('Dar acceso');   // las que salieron en la pantalla de inicio
+ pintarBurbujas(clavesRoles, clavesOrientadores, true);
+}
+/* roles / orientadores con la misma forma que /api/sica/claves (bloqueada, olvido_at). avisar = avisar también a las otras pestañas */
+function pintarBurbujas(roles, orientadores, avisar) {
  const pend = [];
- clavesRoles.forEach(r => { if (r.bloqueada) pend.push({cuenta: 'rol:' + r.rol, nombre: NOMBRES_CUENTA[r.rol] || r.rol, k: 'rol:' + r.rol + '|' + r.olvido_at}); });
- clavesOrientadores.forEach(o => { if (o.bloqueada) pend.push({cuenta: 'ori:' + o.id, nombre: 'Orientador ' + o.nombre, k: 'ori:' + o.id + '|' + o.olvido_at}); });
+ roles.forEach(r => { if (r.bloqueada) pend.push({cuenta: 'rol:' + r.rol, nombre: NOMBRES_CUENTA[r.rol] || r.rol, k: 'rol:' + r.rol + '|' + r.olvido_at}); });
+ orientadores.forEach(o => { if (o.bloqueada) pend.push({cuenta: 'ori:' + o.id, nombre: 'Orientador ' + o.nombre, k: 'ori:' + o.id + '|' + o.olvido_at}); });
  const claves = pend.map(p => p.k);
  $('#burbujas-claves .burbuja').each(function () { if (claves.indexOf($(this).attr('data-k')) === -1) $(this).remove(); });
+ let hayNueva = false;
  pend.forEach(p => {
   if (burbujasVistas[p.k]) return;
   burbujasVistas[p.k] = true;
-  sonarAviso();
-  avisarOtrasPestanas({tipo: 'aviso', k: p.k, nombre: p.nombre});   // las otras pestañas en el login entran y lo ven también
+  hayNueva = true;
+  if (avisar) avisarOtrasPestanas({tipo: 'aviso', k: p.k, nombre: p.nombre});   // las otras pestañas en el login entran y lo ven también
   $('#burbujas-claves').append(
    '<div class="burbuja" role="alert" style="cursor:pointer" onclick="clicBurbuja(this, event)" data-k="' + esc(p.k) + '" data-cuenta="' + esc(p.cuenta) + '">' +
    '<button type="button" class="burbuja-x" aria-label="Cerrar" onclick="event.stopPropagation(); $(this).closest(\'.burbuja\').remove()">&times;</button>' +
    '<div class="fw-bold">' + esc(p.nombre) + ' solicita su nueva contraseña</div>' +
    '<div class="small mt-1">Marcó "¿Olvidaste tu contraseña?". Su cuenta quedó bloqueada y no podrá entrar hasta que le des acceso.</div>' +
-   '<button type="button" class="btn btn-sm btn-light fw-semibold mt-2" onclick="clicBurbuja(this, event)">Dar acceso</button></div>');
+   '<button type="button" class="btn btn-sm btn-light fw-semibold mt-2" onclick="clicBurbuja(this, event)">' + (rolActivo ? 'Dar acceso' : 'Entrar como Control Escolar') + '</button></div>');
  });
+ if (hayNueva) sonarAviso(3);
+}
+/* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
+let _consultandoOlvidos = false;
+function consultarOlvidosInicio() {
+ if (rolActivo || _consultandoOlvidos) return;
+ _consultandoOlvidos = true;
+ fetchT('/api/sica/olvidos', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 6000)
+  .then(r => r.ok ? r.json() : null)
+  .then(d => { if (d && d.ok && !rolActivo) pintarBurbujas(d.roles || [], d.orientadores || [], false); })
+  .catch(() => {})
+  .then(() => { _consultandoOlvidos = false; });
 }
 /* Pulsar la burbuja (o "Dar acceso"). En la pestaña principal abre la solicitud aquí mismo; en una pestaña secundaria
    (la que entró sola por el aviso) manda a la pestaña principal a iniciar sesión como Control Escolar, rápido. */
 function clicBurbuja(el, ev) {
  if (ev && $(ev.target).closest('.burbuja-x').length) return;
  if (ev) ev.stopPropagation();
+ if (!rolActivo) {   // pantalla de inicio: se pide iniciar sesión como Control Escolar; al entrar se abre esa solicitud
+  $(el).closest('.burbuja').find('.small').text('Inicia sesión como Control Escolar para darle acceso.');
+  irAControl($(el).closest('.burbuja').attr('data-cuenta'), true);
+  return;
+ }
  if (!_esSecundaria) { abrirSolicitud(el); return; }
  const b = $(el).closest('.burbuja');
  const cuenta = b.attr('data-cuenta');
@@ -3319,6 +3349,8 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 2000);   // burbuja y sonido en la pantalla de inicio
+ document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
  document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo) cargarDesdeServidor(); });

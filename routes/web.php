@@ -35,6 +35,11 @@ Route::post('/auth/olvide', [AuthController::class, 'olvide'])
     ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class])
     ->middleware('throttle:5,1,olvide')
     ->name('auth.olvide');
+// Aviso para Control Escolar en la pantalla de inicio: quién pidió contraseña nueva (burbuja + sonido). Sin sesión, igual que /auth/olvide.
+Route::get('/api/sica/olvidos', [AuthController::class, 'olvidos'])
+    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class])
+    ->middleware('throttle:600,1,olvidos')
+    ->name('sica.olvidos');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 
