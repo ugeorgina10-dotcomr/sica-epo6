@@ -135,7 +135,7 @@ class AuthController extends Controller
      */
     public function olvidos(): JsonResponse
     {
-        $datos = Cache::remember('sica.olvidos', 3, fn () => [
+        $datos = Cache::remember('sica.olvidos', 2, fn () => [
             'ok'           => true,
             'roles'        => User::select('rol', 'olvido_at')->whereIn('rol', ['director', 'subdirector', 'orientador'])->whereNotNull('olvido_at')->get()
                 ->map(fn ($u) => ['rol' => $u->rol, 'bloqueada' => true, 'olvido_at' => (string) $u->olvido_at])->values()->all(),

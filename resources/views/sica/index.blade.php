@@ -1602,7 +1602,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2500);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -2119,6 +2119,7 @@ function olvideContrasena() {
  if (rol === 'orientador' && !$('#select-orientador-login').val()) { alert('Primero selecciona tu nombre de la lista.'); return; }
  abrirModalCuenta('confirmar');
 }
+const MENSAJE_OLVIDO_LOCAL = '¿Olvidaste tu contraseña? Avisa a Control Escolar. Ellos borrarán tu contraseña anterior y generarán una nueva. Mientras tanto tu cuenta está bloqueada y no podrás entrar.';
 function confirmarOlvido(reintento) {
  const rol = $('#rol-select').val();
  const o = rol === 'orientador' ? db.orientadores.find(x => x.id === $('#select-orientador-login').val()) : null;
@@ -2127,7 +2128,12 @@ function confirmarOlvido(reintento) {
  const email = correosRoles[rol] || $('#input-correo').val();
  $('#input-correo').val(email);
  // Respuesta inmediata al tocar el botón: se ve "Enviando..." al instante y no se puede pulsar dos veces
- const btn = $('#modal-cuenta-botones button').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Enviando...');
+ // Respuesta al instante: para Director, Subdirector y Orientador el resultado ya se conoce (la cuenta queda bloqueada), así que se muestra
+ // el aviso de "Cuenta bloqueada" en el acto y la petición va detrás. Si el servidor responde otra cosa o falla, ese mensaje lo reemplaza.
+ // (Control Escolar no se bloquea desde aquí: ahí sí se espera la respuesta del servidor.)
+ const optimista = rol !== 'control';
+ if (optimista && !reintento) abrirModalCuenta('bloqueada', MENSAJE_OLVIDO_LOCAL);
+ const btn = optimista ? $() : $('#modal-cuenta-botones button').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Enviando...');
  fetchT('/auth/olvide', {
   method: 'POST',
   credentials: 'same-origin',
@@ -2155,7 +2161,7 @@ function confirmarOlvido(reintento) {
   }
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
  })
- .catch(() => { btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'); });
+ .catch(() => { btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo avisar a Control Escolar: no hay conexión con el servidor. Tu cuenta NO se bloqueó. Revisa tu conexión e inténtalo de nuevo.'); });
 }
 /* ============ COLA DE ESCANEOS (funciona sin internet) ============
  Cada escaneo se guarda primero en este equipo y se envía al servidor en cuanto hay conexión.
@@ -3456,7 +3462,7 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 2000);   // burbuja y sonido en la pantalla de inicio
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1500);   // burbuja y sonido en la pantalla de inicio
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
