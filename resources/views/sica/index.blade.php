@@ -352,19 +352,20 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 </div>
 <!-- ===== 2. LECTOR FIJO (no visible para Director/Subdirector) ===== -->
 <div id="panel-lector" class="panel-perfil d-none">
- <div class="text-center p-4 bg-light rounded-4 border mb-3">
- <h5 class="fw-bold text-uppercase mb-1" style="color:#800020">Lector Fijo - Control de Entradas y Salidas</h5>
- <p class="small text-muted mb-2">Modo <b>Automático</b>: el alumno solo muestra su credencial al lector y el sistema registra su entrada o su salida en su grupo. No hay que pulsar nada. (Si pulsas Entrada o Salida se fuerza ese modo; vuelve a pulsarlo para regresar al automático.)</p>
- <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
- <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Entrada</button>
- <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Salida</button>
+ <div class="p-3 bg-light rounded-4 border mb-3 text-center">
+ <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Lector Fijo - Control de Entradas y Salidas</h6>
+ {{-- El modo (Entrada o Salida) se elige aquí en el sistema y lo usan la cámara y el lector físico. Por defecto: Entrada. --}}
+ <div class="d-flex justify-content-center gap-2 mb-3 flex-wrap">
+ <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-success px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
+ <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
- <div class="camera-box-ref mb-2 border border-danger shadow">
- <div class="cam-ph text-center text-warning"><span class="small d-block fw-semibold">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
+ <div class="camera-box-ref mb-2 border shadow-sm">
+ <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Entrada</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
- <button onclick="toggleCamaraFija()" class="btn btn-vinotinto px-4">Encender / Apagar Cámara</button>
+ <button onclick="activarCamaraFija()" class="btn btn-vinotinto px-4 py-2 rounded-pill shadow-sm small">Activar Cámara</button>
+ <button onclick="apagarCamaraFija()" class="btn btn-dark py-2 px-3 rounded-pill small">Apagar</button>
  </div>
  <!-- SOLO CONTROL ESCOLAR: registros de entradas y salidas (el buscador y la tabla se pasan aquí desde el Panel de Orientadores) -->
  <div id="lector-registros-control" class="d-none">
@@ -427,17 +428,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  </div>
-  <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
- <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
- <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
- <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
- <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
- </div>
- <div id="resumen-orientadores" class="small text-muted"></div>
- <div id="estado-sync-orientadores" class="small mt-1"></div>
- <div id="lista-orientadores-actual" class="small mt-2"></div>
- </div>
  <!-- SOLO CONTROL ESCOLAR: subir lista del grupo elegido arriba -->
  <div id="bloque-listas-orientador" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
@@ -454,12 +444,23 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  </div>
+  <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
+ <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
+ <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
+ <div class="row g-3 align-items-end mb-2">
+ <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
+ </div>
+ <div id="resumen-orientadores" class="small text-muted"></div>
+ <div id="estado-sync-orientadores" class="small mt-1"></div>
+ <div id="lista-orientadores-actual" class="small mt-2"></div>
+ </div>
  <!-- SOLO CONTROL ESCOLAR: horario de entrada/salida y orientador del grupo -->
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
  <div class="row g-3 align-items-end">
  <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
- <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-dark btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
+ <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
  <div id="lista-horarios-actual" class="small mt-3"></div>
@@ -958,7 +959,7 @@ function descargarEstadoServidor() {
   })
   .catch(() => { _descargandoEstado = false; });
 }
-let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Auto';
+let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Entrada';
 let filtro = null, credSel = null, idEditando = null, chartAsistencias = null, gradoSeleccionado = null;
 let turnoCred = 'Matutino'; // turno elegido en el Portal del Alumno (credenciales)
 let orientadorActivo = null; // {id, nombre} cuando el rol activo es 'orientador'
@@ -972,6 +973,8 @@ const p2 = n => String(n).padStart(2,'0');
 const fechaLocal = d => { d = d || new Date(); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); };
 const hoy = () => fechaLocal();
 const horaAhora = () => { const d = new Date(); return p2(d.getHours())+':'+p2(d.getMinutes()); };
+/* Hora para mostrar con a. m. / p. m. (ej. "07:05" -> "7:05 a. m.", "20:10" -> "8:10 p. m."). Lo guardado sigue en 24 h. */
+const h12 = hm => { const m = /^(\d{1,2}):(\d{2})/.exec(hm || ''); if (!m) return hm; const h = Number(m[1]); return ((h % 12) || 12) + ':' + m[2] + (h < 12 ? ' a. m.' : ' p. m.'); };
 const toMin = hm => { const [h,m] = hm.split(':').map(Number); return h*60+m; };
 /* Clave de grupo: "Turno-grado-grupo" (ej. "Vespertino-1-2"). Matutino y Vespertino son grupos distintos. */
 const claveGrupo = (grado, grupo, turno) => (turno || 'Matutino') + '-' + grado + '-' + grupo;
@@ -1242,7 +1245,7 @@ function renderListaHorarios() {
   _horSel[o.id] = sel;
   const hs = db.horarios[sel] || {};
   const opciones = o.gr.map(x => '<option value="' + esc(x.k) + '"' + (x.k === sel ? ' selected' : '') + '>' + x.c.grado + '° grado, grupo ' + x.c.grupo +
-   ((x.h.entrada && x.h.salida) ? ' — ' + esc(x.h.entrada) + ' a ' + esc(x.h.salida) : ' — sin horario propio') + '</option>').join('');
+   ((x.h.entrada && x.h.salida) ? ' — ' + esc(h12(x.h.entrada)) + ' a ' + esc(h12(x.h.salida)) : ' — sin horario propio') + '</option>').join('');
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
@@ -1251,7 +1254,7 @@ function renderListaHorarios() {
    '<div class="col-6 col-md-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
    '<div class="col-md-3 d-flex flex-wrap gap-1">' +
    '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
-   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
+   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
    '</div></div></div></div>';
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios del turno ' + esc(turnoActivo) + ' por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
@@ -1274,7 +1277,7 @@ function guardarHorarioInline(btn) {
  db.horarios[k].entrada = e; db.horarios[k].salida = s;
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
- $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(e) + ' a ' + esc(s) + '.');
+ $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + '.');
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -2103,12 +2106,12 @@ function vaciarCola() {
 }
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
-const orientadorDe = x => {
- const h = x && x.grado ? (db.horarios || {})[claveGrupo(x.grado, x.grupo, x.turno)] : null;
- const o = h && h.orientadorId ? (db.orientadores || []).find(y => String(y.id) === String(h.orientadorId)) : null;
- return o ? o.nombre : '';
-};
-const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' + (orientadorDe(x) ? ' — Orientador(a): ' + orientadorDe(x) : '') : 'grupo sin asignar');
+const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
+/* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (en la salida, también la permanencia) */
+function detalleRegistro(tipo, a, hora, extra) {
+ return tipo + ' registrada: ' + a.nombre + ' · ' + (nomGrado[a.grado] || a.grado) + ' grado · Grupo ' + (ROMANOS[a.grupo] || a.grupo) +
+  ' · ' + a.turno + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · Permanencia: ' + extra : '');
+}
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
  if (scanners[el]) return;
@@ -2119,14 +2122,16 @@ function iniciarScanner(el, modoFn) {
  const s = new Html5Qrcode(el, {formatsToSupport: [0], experimentalFeatures: {useBarCodeDetectorIfSupported: true}, verbose: false}); scanners[el] = s;   // 0 = solo códigos QR
  $('#' + el).siblings('.cam-ph').hide();
  // Teléfono: cámara trasera ('environment'). Computadora: la que haya ('user').
- const cfg = {fps:15, qrbox: w => { const m = Math.min(w.width, w.height); return {width:Math.floor(m*0.7), height:Math.floor(m*0.7)}; }};
+ // Sin recuadro: se analiza TODA la imagen, así el QR se lee de cerca o de lejos y en cualquier parte de la pantalla
+ const cfg = {fps:20, disableFlip:true};
  const alLeer = txt => procesarQR(claveDeLectura(txt), modoFn(), el);
  const fallo = e => {
  delete scanners[el]; $('#' + el).siblings('.cam-ph').show();
  if (el === 'cam-fija') { camFijaError = Date.now(); $('#res-cam-fija').removeClass('text-success').addClass('text-danger').text('No se pudo abrir la cámara. Permite el acceso a la cámara en el navegador (requiere https o localhost).'); return; }
  alert('No se pudo abrir la cámara (requiere permiso y https o localhost): ' + e);
  };
- const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
+ const mejorarImagen = () => { try { s.applyVideoConstraints({width:{ideal:1920}, height:{ideal:1080}, advanced:[{focusMode:'continuous'}]}).catch(() => {}); } catch (e) {} };   // más resolución y enfoque automático continuo (si la cámara lo permite)
+ const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).then(mejorarImagen).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
  if (!ES_MOVIL) { probar([{facingMode:'user'}], 0); return; } // Computadora: cámara frontal
  // Teléfono/tablet: SIEMPRE trasera. Se busca en la lista real de cámaras la que se llame back/rear/trasera...
  const reTrasera = /back|rear|trasera|posterior|traseira|environment|arri[eè]re/i, reExtra = /ultra|wide|tele|macro|depth|front|frontal|delantera/i;
@@ -2154,12 +2159,12 @@ function detener(el) {
 }
 /* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
    porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
-const reQr = /SICA([0-9A-F]{20})$/;
+const reQr = /SICA([0-9A-F]{16,20})$/;   // 16 = código actual; hasta 20 = versión anterior del QR
 function claveDeLectura(txt) {
  const s = String(txt).toUpperCase().replace(/[^A-Z0-9]/g, ''), m = s.match(reQr);
- return m ? 'SICA' + m[1] : String(txt).trim().toUpperCase();
+ return m ? 'SICA' + m[1].slice(0, 16) : String(txt).trim().toUpperCase();
 }
-const esClaveQr = c => /^SICA[0-9A-F]{20}$/.test(c);
+const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
 function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
@@ -2177,18 +2182,18 @@ function aplicarRegistro(a, modo) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
  const f = hoy(), r = a.reg[f] = a.reg[f] || {};
  if (modo === 'Entrada') {
- if (r.entrada) return {ok:false, msg:a.nombre + ': la entrada ya estaba registrada (' + r.entrada + ')'};
+ if (r.entrada) return {ok:false, msg:a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
  r.entrada = horaAhora();
  } else {
  if (!r.entrada) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};
- if (r.salida) return {ok:false, msg:a.nombre + ': la salida ya estaba registrada (' + r.salida + ')'};
+ if (r.salida) return {ok:false, msg:a.nombre + ': la salida ya estaba registrada (' + h12(r.salida) + ')'};
  r.salida = horaAhora();
  }
  // Cada escaneo entra a la cola: se envía al servidor ya (o en cuanto vuelva el internet) y aparece en todos los equipos
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
  save(); renderTabla();
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
- return {ok:true, msg:modo + ' registrada: ' + a.nombre + ' — ' + etiquetaGrupo(a) + ' (' + horaAhora() + ')' +
+ return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), modo === 'Salida' ? permDe(r) : '') +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 function registrarPorCurp(curp, modo) {
@@ -2196,7 +2201,7 @@ function registrarPorCurp(curp, modo) {
   ? db.alumnos.find(x => x.curp && qrCodigo(x.curp).toUpperCase() === curp.slice(4))
   : db.alumnos.find(x => x.curp && x.curp === curp);
  if (!a) return registrarDesconocido(curp, modo);
- return aplicarRegistro(a, modo === 'Auto' ? modoAutomatico(a) : modo);
+ return aplicarRegistro(a, modo);
 }
 /* El QR no está en la lista de este equipo (p. ej. Control Escolar lo dio de alta hace un momento):
    se le pregunta al servidor, que busca al alumno por CURP en TODOS los grupos y lo registra en el suyo. */
@@ -2210,7 +2215,7 @@ function registrarDesconocido(curp, modo) {
   if (r.ok && d && d.ok) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
-   return {ok:true, msg:(d.modo || modo) + ' registrada: ' + (al.nombre || curp) + ' — ' + etiquetaGrupo(al) + ' (' + (d.hora || horaAhora()) + ')'};
+   return {ok:true, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '')};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
@@ -2222,22 +2227,12 @@ function registrarDesconocido(curp, modo) {
 }
 function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
 /* ============ LECTOR FIJO ============ */
+// El modo (Entrada o Salida) se elige en el sistema con estos botones; lo usan la cámara y el lector físico.
 function setModoEscaneo(m) {
- if (m === modoEscaneo) m = 'Auto';   // pulsar de nuevo el modo activo regresa al automático
  modoEscaneo = m;
  $('#btn-modo-entrada').toggleClass('btn-success', m === 'Entrada').toggleClass('btn-outline-dark bg-white', m !== 'Entrada');
  $('#btn-modo-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
- $('#lbl-modo').text(m === 'Auto' ? 'Automático' : m);
-}
-/* Modo Automático (por defecto en el Lector Fijo): el alumno solo muestra la credencial.
-   Sin entrada hoy -> Entrada; con entrada y sin salida -> Salida. Si vuelve a pasar la credencial en los
-   primeros MIN_ENTRE_ENTRADA_Y_SALIDA minutos se toma como lectura repetida y NO se registra la salida. */
-const MIN_ENTRE_ENTRADA_Y_SALIDA = 5;
-function modoAutomatico(a) {
- const r = (a.reg || {})[hoy()];
- if (!r || !r.entrada) return 'Entrada';
- if (r.salida) return 'Salida';   // ya tiene ambas: aplicarRegistro avisa que ya estaba registrada
- return (toMin(horaAhora()) - toMin(r.entrada) < MIN_ENTRE_ENTRADA_Y_SALIDA) ? 'Entrada' : 'Salida';   // 'Entrada' repetida -> aviso "ya estaba registrada"
+ $('#lbl-modo').text(m);
 }
 let camFijaManual = true, camFijaError = 0;   // la cámara solo se enciende cuando alguien pulsa el botón
 function toggleCamaraFija() {
@@ -2248,6 +2243,8 @@ function toggleCamaraFija() {
   iniciarScanner('cam-fija', () => modoEscaneo);
  }
 }
+function activarCamaraFija() { if (!scanners['cam-fija']) toggleCamaraFija(); }
+function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
 /* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
    Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
    Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
@@ -2419,7 +2416,7 @@ function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
  const r = a.reg[f] || {}, e = estatusDe(a, r, f), dis = (!r.entrada || r.salida || f !== hoy()) ? 'disabled' : '';
- return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada || '—'}</td><td>${r.salida || 'Pendiente'}</td><td>${permDe(r)}</td><td><span class="badge ${claseEst[e]}">${e}</span></td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
+ return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${permDe(r)}</td><td><span class="badge ${claseEst[e]}">${e}</span></td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
  }).join('') || '<tr><td colspan="10" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
@@ -2552,7 +2549,7 @@ function descargarReporte(formato) {
  const tp = tituloPeriodo(periodo, ref);
  const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
  const filas = [];
- filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && r.entrada) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada, Salida:r.salida || 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
+ filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && r.entrada) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:h12(r.entrada), Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
  descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
@@ -2992,15 +2989,15 @@ function _hmacSha256Hex(clave, texto) {
  const i1 = _sha256(a), b = new Uint8Array(96); b.set(ok); b.set(i1, 64);
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
-/* Texto del QR: solo datos de la escuela (lo que ve cualquier otra app de escaneo, sin ningún enlace) y al final el código propio del alumno */
-const QR_TEXTO_ESCUELA = 'PREPARATORIA OFICIAL NUM 6 CCT 15EBH0008G MAT 15EBH0199N VESP ';
+/* Texto del QR: nombre corto de la escuela (lo que ve cualquier otra app de escaneo, sin enlace) y al final el código propio del alumno. Total: 25 caracteres, igual de simple que el QR con la CURP */
+const QR_TEXTO_ESCUELA = 'EPO6 ';   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
  if (!curp || !db.qrClave) return '';
  const k = db.qrClave + '|' + curp, v = _memoQr.get(k);
  if (v) return v;
- const c = _hmacSha256Hex(db.qrClave, String(curp).toUpperCase()).slice(0, 20);
+ const c = _hmacSha256Hex(db.qrClave, String(curp).toUpperCase()).slice(0, 16);
  if (_memoQr.size > 6000) _memoQr.clear();
  _memoQr.set(k, c); return c;
 }

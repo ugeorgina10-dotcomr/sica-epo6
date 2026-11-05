@@ -219,10 +219,10 @@ class ControlEscolarController extends Controller
         }
 
         if (!empty($d['curp'])) {
-            $alumno = Alumno::select('id', 'nombre', 'grupo_id')->where('matricula', $d['curp'])->first();
+            $alumno = Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->where('matricula', $d['curp'])->first();
         } else {
-            $id = $this->mapaQr()[strtolower($d['qr'])] ?? null;
-            $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id')->find($id) : null;
+            $id = $this->mapaQr()[substr(strtolower($d['qr']), 0, 16)] ?? null;   // acepta también los códigos largos (20) de la versión anterior
+            $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->find($id) : null;
         }
         if (!$alumno) {
             return response()->json(['ok' => false, 'mensaje' => 'Alumno no encontrado'], 404);
@@ -273,6 +273,11 @@ class ControlEscolarController extends Controller
                 ? 'Retardo' : 'Asistencia';
         }
 
+        // Una salida en el mismo minuto que la entrada no debe pisarla: se anota un minuto después
+        if ($estatus === 'Salida' && Asistencia::where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->where('estatus', '!=', 'Salida')->exists()) {
+            $fechaHora = $ahora->copy()->addMinute()->format('Y-m-d H:i:00');
+        }
+
         // updateOrCreate: si el teléfono reintenta el mismo escaneo no se duplica el registro
         Asistencia::updateOrCreate(
             ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],
@@ -290,6 +295,7 @@ class ControlEscolarController extends Controller
             // A qué grupo se mandó el registro (para mostrarlo en el teléfono)
             'alumno'  => [
                 'nombre' => $alumno->nombre,
+                'curp'   => (string) $alumno->matricula,
                 'grado'  => $grupo ? (int) $grupo->grado : null,
                 'grupo'  => $grupo ? (int) end($partes) : null,
                 'turno'  => $grupo ? ($grupo->turno ?: 'Matutino') : null,
@@ -303,7 +309,7 @@ class ControlEscolarController extends Controller
      */
     public static function codigoQr(string $curp): string
     {
-        return substr(hash_hmac('sha256', strtoupper($curp), self::claveQr()), 0, 20);
+        return substr(hash_hmac('sha256', strtoupper($curp), self::claveQr()), 0, 16);
     }
 
     /** Llave derivada de la APP_KEY (nunca se manda la APP_KEY). El sistema la recibe ya con sesión y calcula el código del QR de cualquier CURP */
