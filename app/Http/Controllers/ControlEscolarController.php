@@ -273,6 +273,11 @@ class ControlEscolarController extends Controller
                 ? 'Retardo' : 'Asistencia';
         }
 
+        // Una salida en el mismo minuto que la entrada no debe pisarla: se anota un minuto después
+        if ($estatus === 'Salida' && Asistencia::where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->where('estatus', '!=', 'Salida')->exists()) {
+            $fechaHora = $ahora->copy()->addMinute()->format('Y-m-d H:i:00');
+        }
+
         // updateOrCreate: si el teléfono reintenta el mismo escaneo no se duplica el registro
         Asistencia::updateOrCreate(
             ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],

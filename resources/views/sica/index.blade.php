@@ -354,14 +354,13 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <div id="panel-lector" class="panel-perfil d-none">
  <div class="p-3 bg-light rounded-4 border mb-3 text-center">
  <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Lector Fijo - Control de Entradas y Salidas</h6>
- {{-- Modo automático (por defecto): el alumno solo muestra la credencial y el sistema registra su entrada o su salida.
-      Los botones Entrada y Salida solo se usan al escanear con la cámara (computadora o celular); el lector físico siempre es automático. --}}
+ {{-- El modo (Entrada o Salida) se elige aquí en el sistema y lo usan la cámara y el lector físico. Por defecto: Entrada. --}}
  <div class="d-flex justify-content-center gap-2 mb-3 flex-wrap">
- <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
+ <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-success px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
  <div class="camera-box-ref mb-2 border shadow-sm">
- <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
+ <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Entrada</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
@@ -461,7 +460,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
  <div class="row g-3 align-items-end">
  <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
- <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-dark btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
+ <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
  <div id="lista-horarios-actual" class="small mt-3"></div>
@@ -960,7 +959,7 @@ function descargarEstadoServidor() {
   })
   .catch(() => { _descargandoEstado = false; });
 }
-let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Auto';
+let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Entrada';
 let filtro = null, credSel = null, idEditando = null, chartAsistencias = null, gradoSeleccionado = null;
 let turnoCred = 'Matutino'; // turno elegido en el Portal del Alumno (credenciales)
 let orientadorActivo = null; // {id, nombre} cuando el rol activo es 'orientador'
@@ -2202,7 +2201,7 @@ function registrarPorCurp(curp, modo) {
   ? db.alumnos.find(x => x.curp && qrCodigo(x.curp).toUpperCase() === curp.slice(4))
   : db.alumnos.find(x => x.curp && x.curp === curp);
  if (!a) return registrarDesconocido(curp, modo);
- return aplicarRegistro(a, modo === 'Auto' ? modoAutomatico(a) : modo);
+ return aplicarRegistro(a, modo);
 }
 /* El QR no está en la lista de este equipo (p. ej. Control Escolar lo dio de alta hace un momento):
    se le pregunta al servidor, que busca al alumno por CURP en TODOS los grupos y lo registra en el suyo. */
@@ -2228,24 +2227,12 @@ function registrarDesconocido(curp, modo) {
 }
 function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
 /* ============ LECTOR FIJO ============ */
-// Los botones Entrada/Salida solo se usan al escanear con la cámara (computadora o celular): fuerzan ese modo; vuelve a pulsarlo para regresar al automático.
-// El lector físico no los necesita: siempre decide solo (ver destino() en el lector físico).
+// El modo (Entrada o Salida) se elige en el sistema con estos botones; lo usan la cámara y el lector físico.
 function setModoEscaneo(m) {
- if (m === modoEscaneo) m = 'Auto';   // pulsar de nuevo el modo activo regresa al automático
  modoEscaneo = m;
  $('#btn-modo-entrada').toggleClass('btn-success', m === 'Entrada').toggleClass('btn-outline-dark bg-white', m !== 'Entrada');
  $('#btn-modo-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
- $('#lbl-modo').text(m === 'Auto' ? 'Automático' : m);
-}
-/* Modo Automático (por defecto en el Lector Fijo): el alumno solo muestra la credencial.
-   Sin entrada hoy -> Entrada; con entrada y sin salida -> Salida. Si vuelve a pasar la credencial en los
-   primeros MIN_ENTRE_ENTRADA_Y_SALIDA minutos se toma como lectura repetida y NO se registra la salida. */
-const MIN_ENTRE_ENTRADA_Y_SALIDA = 5;
-function modoAutomatico(a) {
- const r = (a.reg || {})[hoy()];
- if (!r || !r.entrada) return 'Entrada';
- if (r.salida) return 'Salida';   // ya tiene ambas: aplicarRegistro avisa que ya estaba registrada
- return (toMin(horaAhora()) - toMin(r.entrada) < MIN_ENTRE_ENTRADA_Y_SALIDA) ? 'Entrada' : 'Salida';   // 'Entrada' repetida -> aviso "ya estaba registrada"
+ $('#lbl-modo').text(m);
 }
 let camFijaManual = true, camFijaError = 0;   // la cámara solo se enciende cuando alguien pulsa el botón
 function toggleCamaraFija() {
@@ -2269,9 +2256,9 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
  // A dónde va la lectura según el panel que se está viendo (null = ninguno)
  function destino() {
   if (!rolActivo || $('#vista-sistema').hasClass('d-none')) return null;
-  if (!$('#panel-lector').hasClass('d-none')) return {modo: 'Auto', el: 'cam-fija', permitido: true};   // el lector físico SIEMPRE es automático: los botones Entrada/Salida solo afectan a la cámara
+  if (!$('#panel-lector').hasClass('d-none')) return {modo: modoEscaneo, el: 'cam-fija', permitido: true};
   if (!$('#panel-orientador').hasClass('d-none') && $('#bloque-camara-orientador').is(':visible'))
-   return {modo: 'Auto', el: 'cam-orient', permitido: rolActivo === 'control' || (db.permisos[rolActivo] || 'ver') === 'editar'};
+   return {modo: modoOrient, el: 'cam-orient', permitido: rolActivo === 'control' || (db.permisos[rolActivo] || 'ver') === 'editar'};
   return null;
  }
  // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
