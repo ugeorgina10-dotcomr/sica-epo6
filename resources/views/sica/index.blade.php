@@ -1602,7 +1602,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2500);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -1631,6 +1631,8 @@ function etiquetaCuenta(borrada, bloqueada) {
 /* Control Escolar revisa cada 2 s si alguien pulsó "¿Olvidaste tu contraseña?". Se manda el ETag a mano para que,
    si nada cambió, el servidor responda 304 sin cuerpo y no se vuelva a dibujar nada (así se puede revisar seguido sin costo). */
 let _etagClaves = null, _cargandoClaves = false;
+let _versionClaves = 0;     // sube con cada cambio hecho aquí: una consulta que salió antes ya trae datos viejos y se descarta
+let _accionesClaves = 0;    // acciones (desbloquear, borrar, guardar...) que siguen en camino al servidor
 function cargarClaves(forzar) {
  if (forzar && _clavesPrecargadas) {   // ya llegaron con el inicio de sesión: solo se dibujan (cero esperas)
   _clavesPrecargadas = false;
@@ -1638,24 +1640,48 @@ function cargarClaves(forzar) {
   renderClaves();
   return Promise.resolve();
  }
- if (_cargandoClaves && !forzar) return Promise.resolve();
+ // Con "forzar" (al abrir el panel) se dibuja YA lo que hay en memoria y se actualiza detrás, sin dejar el panel vacío esperando
+ if (forzar && (clavesRoles.length || clavesOrientadores.length)) renderClaves();
+ if (!forzar && (_cargandoClaves || _accionesClaves > 0)) return Promise.resolve();   // la revisión periódica no estorba una acción en curso
  _cargandoClaves = true;
- if (forzar) _etagClaves = null;
+ const version = _versionClaves;
  const cab = {'Accept': 'application/json'};
  if (_etagClaves) cab['If-None-Match'] = _etagClaves;
  return fetchT('/api/sica/claves', {headers: cab, cache: 'no-store'}, 10000).then(r => {
   if (r.status === 304) return null;
   if (r.status === 401) { sesionExpirada(); return null; }
   if (!r.ok) return null;
-  _etagClaves = r.headers.get('ETag');
-  return r.json();
+  const et = r.headers.get('ETag');
+  return r.json().then(d => { d._etag = et; return d; });
  }).then(d => {
   vigilarClaves();
   if (!d || !d.ok) return;
+  if (version !== _versionClaves) return;   // salió antes de un cambio que acabas de hacer: sus datos ya están viejos
+  _etagClaves = d._etag;
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
   renderClaves();
  }).catch(() => {}).then(() => { _cargandoClaves = false; });
+}
+/* Acciones sobre las contraseñas: la pantalla cambia AL INSTANTE (sin esperar al servidor) y la petición va detrás.
+   Si el servidor la rechaza, se regresa todo a como estaba y se avisa. */
+function copiaClaves() { return JSON.parse(JSON.stringify({r: clavesRoles, o: clavesOrientadores})); }
+function restaurarClaves(c) { clavesRoles = c.r; clavesOrientadores = c.o; }
+function cambiarLocalClaves(c, cambios) {   // c = datosCuenta(); cambios = campos de la cuenta que cambian de inmediato
+ const cta = c.tipo === 'ori' ? clavesOrientadores.find(x => x.id === cuentaSel.slice(4)) : clavesRoles.find(x => x.rol === c.rol);
+ if (cta) Object.assign(cta, cambios);
+}
+function enviarClaves(url, metodo, cuerpo, copia, mensajeError) {
+ _accionesClaves++; _versionClaves++;
+ return llamarClaves(url, metodo, cuerpo).then(d => {
+  _accionesClaves--; _versionClaves++;
+  if (!d.ok) {
+   if (copia) { restaurarClaves(copia); renderClaves(); }
+   $('#resumen-claves').text('');
+   alert(d.mensaje || mensajeError);
+  }
+  return d;
+ });
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo === 'control' && temporizadorClaves) cargarClaves(); });
 function datosCuenta() {
@@ -1982,19 +2008,24 @@ function guardarClave() {
   url = '/api/sica/claves/rol';
   cuerpo = {rol: c.rol, password: nueva, password_confirmation: conf, password_actual: $('#clave-actual').val()};
  }
- llamarClaves(url, 'POST', cuerpo).then(d => {
-  if (!d.ok) { $('#resumen-claves').text(''); alert(d.mensaje || 'No se pudo guardar la contraseña.'); return; }
+ // Esta sí espera al servidor (él revisa que la contraseña sirva y no esté repetida), pero ya no hace una segunda consulta después
+ const btns = $('#panel-cuenta-clave button').prop('disabled', true);
+ $('#resumen-claves').text('Guardando...');
+ enviarClaves(url, 'POST', cuerpo, null, 'No se pudo guardar la contraseña.').then(d => {
+  btns.prop('disabled', false);
+  if (!d.ok) return;
   if (c.control) {
    $('#resumen-claves').text('Tu contraseña de Control Escolar se actualizó.');
   } else {
+   cambiarLocalClaves(c, c.tipo === 'ori' ? {estado: 'propia', bloqueada: false, olvido_at: null} : {borrada: false, bloqueada: false, olvido_at: null});
    claveEntrega = {para: c.nombre, correo: c.correo, clave: nueva};
    $('#entrega-para').text(c.nombre); $('#entrega-correo').text(c.correo); $('#entrega-clave-texto').text(nueva);
    $('#entrega-clave').removeClass('d-none');
    $('#resumen-claves').text('Contraseña nueva guardada para ' + c.nombre + '. Ya puede entrar con ella.');
   }
   limpiarCamposClave();
-  cargarClaves(true);
- }).catch(() => alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+  renderClaves();
+ }).catch(() => { btns.prop('disabled', false); alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'); });
 }
 function ocultarEntrega() {
  claveEntrega = null;
@@ -2030,33 +2061,33 @@ function borrarClaveCuenta() {
  if (!c || c.control) return;
  if (!confirm('Se borrará la contraseña guardada de: ' + c.nombre + '.\nNo podrá entrar hasta que generes una nueva aquí mismo. No se borra ningún otro dato. ¿Continuar?')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/borrar' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol);
- llamarClaves(url, c.tipo === 'ori' ? 'POST' : 'DELETE').then(d => {
-  if (!d.ok) { alert(d.mensaje || 'No se pudo borrar la contraseña.'); return; }
-  ocultarEntrega();
-  $('#resumen-claves').text('Se borró la contraseña anterior de ' + c.nombre + '. Pulsa Generar, luego Guardar, y entrégasela.');
-  cargarClaves(true);
- }).catch(() => alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+ const copia = copiaClaves();
+ cambiarLocalClaves(c, c.tipo === 'ori' ? {estado: 'borrada'} : {borrada: true});   // se ve al instante
+ ocultarEntrega();
+ $('#resumen-claves').text('Se borró la contraseña anterior de ' + c.nombre + '. Pulsa Generar, luego Guardar, y entrégasela.');
+ renderClaves();
+ enviarClaves(url, c.tipo === 'ori' ? 'POST' : 'DELETE', null, copia, 'No se pudo borrar la contraseña.');
 }
 /* Quita el bloqueo sin cambiar la contraseña (por ejemplo, si alguien lo marcó por error) */
 function desbloquearCuenta() {
  const c = datosCuenta();
  if (!c || !c.bloqueada) return;
- if (!confirm('Se quitará el bloqueo de ' + c.nombre + ' sin cambiar su contraseña. ¿Continuar?')) return;
+ // Sin ventana de confirmación: desbloquear no cambia ni borra nada (solo deja que la persona vuelva a intentar entrar), así es un solo clic.
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
- llamarClaves(url, 'POST').then(d => {
-  if (!d.ok) { alert(d.mensaje || 'No se pudo desbloquear.'); return; }
-  $('#resumen-claves').text('Se quitó el bloqueo de ' + c.nombre + '.');
-  cargarClaves(true);
- });
+ const copia = copiaClaves();
+ cambiarLocalClaves(c, {bloqueada: false, olvido_at: null});   // el bloqueo desaparece al instante (y su burbuja)
+ $('#resumen-claves').text('Se quitó el bloqueo de ' + c.nombre + '.');
+ renderClaves();
+ enviarClaves(url, 'POST', null, copia, 'No se pudo desbloquear.');
 }
 function quitarClaveOrientador() {
  if (!cuentaSel.startsWith('ori:')) return;
  if (!confirm('Este orientador volverá a entrar con la contraseña general del rol Orientador. ¿Continuar?')) return;
- llamarClaves('/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)), 'DELETE').then(d => {
-  if (!d.ok) { alert(d.mensaje || 'No se pudo quitar la contraseña propia.'); return; }
-  $('#resumen-claves').text('Se quitó la contraseña propia. Ahora usa la general del rol Orientador.');
-  cargarClaves(true);
- });
+ const c = datosCuenta(), copia = copiaClaves();
+ cambiarLocalClaves(c, {estado: 'general', bloqueada: false, olvido_at: null});
+ $('#resumen-claves').text('Se quitó la contraseña propia. Ahora usa la general del rol Orientador.');
+ renderClaves();
+ enviarClaves('/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)), 'DELETE', null, copia, 'No se pudo quitar la contraseña propia.');
 }
 /* ---- Pantalla de inicio de sesión: ventana central de "¿Olvidaste tu contraseña?" ---- */
 function abrirModalCuenta(modo, mensaje) {
@@ -3348,7 +3379,9 @@ function entrarAlSistema(restaurando) {
   if (!rolActivo) mostrarSeccion('vista-sistema');
   if (_solicitudPendiente && rolActivo === 'control') {   // venía de pulsar la burbuja en la otra pestaña: abre esa cuenta ya
    const cuenta = _solicitudPendiente; _solicitudPendiente = null;
-   cargarClaves(true).then(() => abrirSolicitudCuenta(cuenta));
+   // Si ya hay contraseñas en memoria se abre al instante (se actualizan detrás); solo la primera vez sin datos se espera
+   if (clavesRoles.length || clavesOrientadores.length) { cargarClaves(true); abrirSolicitudCuenta(cuenta); }
+   else cargarClaves(true).then(() => abrirSolicitudCuenta(cuenta));
   }
   if (restaurando) vaciarCola();   // si quedaron escaneos pendientes de otra vez, se envían ahora
   setTimeout(prepararPanelesOcultos, 0);   // lo que se ve al cambiar de pestaña también se deja listo
@@ -3362,7 +3395,9 @@ function entrarAlSistema(restaurando) {
  //    Tope de 2.5 s para no dejar a nadie esperando.
  const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas]).catch(() => {});
  if (window.SICA_LIBS_LISTAS) window.SICA_LIBS_LISTAS.then(() => { if (rolActivo) { renderStats(); prepararPanelesOcultos(); } });
- return Promise.race([todo, new Promise(r => setTimeout(r, 2500))]).then(() => {
+ // El panel NO espera las plantillas de Word ni las librerías: se abre en cuanto hay datos (tope de 1 s) y lo demás sigue cargando detrás.
+ const datosParaAbrir = Promise.resolve(datosListos).catch(() => {});
+ return Promise.race([datosParaAbrir, new Promise(r => setTimeout(r, 1000))]).then(() => {
   abrir();
   // Sincroniza con el servidor en segundo plano (primera consulta: 304 si el estado ya venía en el login)
   cargarDesdeServidor();

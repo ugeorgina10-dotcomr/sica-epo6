@@ -190,14 +190,9 @@ class ClavesController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'Esa cuenta no se puede borrar desde aquí.'], 422);
         }
 
-        $usuario = User::where('rol', $rol)->first();
-
-        if (!$usuario) {
-            return response()->json(['ok' => false, 'mensaje' => 'No existe la cuenta de ese rol.'], 404);
-        }
-
-        DB::table('users')->where('id', $usuario->id)->update(['password' => '', 'remember_token' => null]);
-        DB::table('sessions')->where('user_id', $usuario->id)->delete();
+        // Un UPDATE y un DELETE directos (antes: buscar la cuenta primero = una consulta más por la red)
+        DB::table('users')->where('rol', $rol)->update(['password' => '', 'remember_token' => null]);
+        DB::table('sessions')->whereIn('user_id', DB::table('users')->where('rol', $rol)->select('id'))->delete();
 
         return response()->json(['ok' => true]);
     }

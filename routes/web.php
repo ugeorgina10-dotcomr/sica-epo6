@@ -92,15 +92,20 @@ Route::middleware('auth')->group(function () {
         ->middleware('sica:control')
         ->name('sica.plantilla.anterior');
 
-    // Contraseñas: solo Control Escolar (cambiar la de cada rol y poner una propia a cada orientador)
-    Route::middleware(['sica:control', 'throttle:20,1,claves'])->prefix('/api/sica/claves')->group(function () {
-        Route::get('/', [ClavesController::class, 'index'])->name('sica.claves');
-        Route::post('/rol', [ClavesController::class, 'rol'])->name('sica.claves.rol');
-        Route::post('/orientador', [ClavesController::class, 'orientador'])->name('sica.claves.orientador');
-        Route::delete('/rol/{rol}', [ClavesController::class, 'borrarRol'])->name('sica.claves.borrar.rol');
-        Route::post('/orientador/{orientador}/borrar', [ClavesController::class, 'borrarOrientador'])->name('sica.claves.borrar.orientador');
-        Route::post('/rol/{rol}/desbloquear', [ClavesController::class, 'desbloquearRol'])->name('sica.claves.desbloquear.rol');
-        Route::post('/orientador/{orientador}/desbloquear', [ClavesController::class, 'desbloquearOrientador'])->name('sica.claves.desbloquear.orientador');
-        Route::delete('/orientador/{orientador}', [ClavesController::class, 'quitarOrientador'])->name('sica.claves.quitar');
+    // Contraseñas: solo Control Escolar (cambiar la de cada rol y poner una propia a cada orientador).
+    // La pantalla revisa el estado cada ~2.5 s (GET): antes compartía el límite de 20 por minuto con las acciones,
+    // se lo acababa en medio minuto y entonces desbloquear / guardar fallaban o tardaban. Ahora cada cosa tiene su propio límite.
+    Route::middleware('sica:control')->prefix('/api/sica/claves')->group(function () {
+        Route::get('/', [ClavesController::class, 'index'])->middleware('throttle:300,1,claves-leer')->name('sica.claves');
+
+        Route::middleware('throttle:90,1,claves')->group(function () {
+            Route::post('/rol', [ClavesController::class, 'rol'])->name('sica.claves.rol');
+            Route::post('/orientador', [ClavesController::class, 'orientador'])->name('sica.claves.orientador');
+            Route::delete('/rol/{rol}', [ClavesController::class, 'borrarRol'])->name('sica.claves.borrar.rol');
+            Route::post('/orientador/{orientador}/borrar', [ClavesController::class, 'borrarOrientador'])->name('sica.claves.borrar.orientador');
+            Route::post('/rol/{rol}/desbloquear', [ClavesController::class, 'desbloquearRol'])->name('sica.claves.desbloquear.rol');
+            Route::post('/orientador/{orientador}/desbloquear', [ClavesController::class, 'desbloquearOrientador'])->name('sica.claves.desbloquear.orientador');
+            Route::delete('/orientador/{orientador}', [ClavesController::class, 'quitarOrientador'])->name('sica.claves.quitar');
+        });
     });
 });
