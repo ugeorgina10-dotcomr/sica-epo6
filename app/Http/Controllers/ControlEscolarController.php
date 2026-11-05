@@ -219,10 +219,10 @@ class ControlEscolarController extends Controller
         }
 
         if (!empty($d['curp'])) {
-            $alumno = Alumno::select('id', 'nombre', 'grupo_id')->where('matricula', $d['curp'])->first();
+            $alumno = Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->where('matricula', $d['curp'])->first();
         } else {
             $id = $this->mapaQr()[strtolower($d['qr'])] ?? null;
-            $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id')->find($id) : null;
+            $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->find($id) : null;
         }
         if (!$alumno) {
             return response()->json(['ok' => false, 'mensaje' => 'Alumno no encontrado'], 404);
@@ -290,6 +290,7 @@ class ControlEscolarController extends Controller
             // A qué grupo se mandó el registro (para mostrarlo en el teléfono)
             'alumno'  => [
                 'nombre' => $alumno->nombre,
+                'curp'   => (string) $alumno->matricula,
                 'grado'  => $grupo ? (int) $grupo->grado : null,
                 'grupo'  => $grupo ? (int) end($partes) : null,
                 'turno'  => $grupo ? ($grupo->turno ?: 'Matutino') : null,

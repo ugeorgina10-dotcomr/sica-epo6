@@ -427,17 +427,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  </div>
-  <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
- <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
- <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
- <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
- <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
- </div>
- <div id="resumen-orientadores" class="small text-muted"></div>
- <div id="estado-sync-orientadores" class="small mt-1"></div>
- <div id="lista-orientadores-actual" class="small mt-2"></div>
- </div>
  <!-- SOLO CONTROL ESCOLAR: subir lista del grupo elegido arriba -->
  <div id="bloque-listas-orientador" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
@@ -453,6 +442,17 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </select>
  </div>
  </div>
+ </div>
+  <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
+ <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
+ <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
+ <div class="row g-3 align-items-end mb-2">
+ <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
+ </div>
+ <div id="resumen-orientadores" class="small text-muted"></div>
+ <div id="estado-sync-orientadores" class="small mt-1"></div>
+ <div id="lista-orientadores-actual" class="small mt-2"></div>
  </div>
  <!-- SOLO CONTROL ESCOLAR: horario de entrada/salida y orientador del grupo -->
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
@@ -2103,12 +2103,12 @@ function vaciarCola() {
 }
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
-const orientadorDe = x => {
- const h = x && x.grado ? (db.horarios || {})[claveGrupo(x.grado, x.grupo, x.turno)] : null;
- const o = h && h.orientadorId ? (db.orientadores || []).find(y => String(y.id) === String(h.orientadorId)) : null;
- return o ? o.nombre : '';
-};
-const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' + (orientadorDe(x) ? ' — Orientador(a): ' + orientadorDe(x) : '') : 'grupo sin asignar');
+const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
+/* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (en la salida, también la permanencia) */
+function detalleRegistro(tipo, a, hora, extra) {
+ return tipo + ' registrada: ' + a.nombre + ' · ' + (nomGrado[a.grado] || a.grado) + ' grado · Grupo ' + (ROMANOS[a.grupo] || a.grupo) +
+  ' · ' + a.turno + ' · CURP: ' + (a.curp || '') + ' · ' + hora + (extra ? ' · Permanencia: ' + extra : '');
+}
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
  if (scanners[el]) return;
@@ -2119,14 +2119,16 @@ function iniciarScanner(el, modoFn) {
  const s = new Html5Qrcode(el, {formatsToSupport: [0], experimentalFeatures: {useBarCodeDetectorIfSupported: true}, verbose: false}); scanners[el] = s;   // 0 = solo códigos QR
  $('#' + el).siblings('.cam-ph').hide();
  // Teléfono: cámara trasera ('environment'). Computadora: la que haya ('user').
- const cfg = {fps:15, qrbox: w => { const m = Math.min(w.width, w.height); return {width:Math.floor(m*0.7), height:Math.floor(m*0.7)}; }};
+ // Sin recuadro: se analiza TODA la imagen, así el QR se lee de cerca o de lejos y en cualquier parte de la pantalla
+ const cfg = {fps:20, disableFlip:true};
  const alLeer = txt => procesarQR(claveDeLectura(txt), modoFn(), el);
  const fallo = e => {
  delete scanners[el]; $('#' + el).siblings('.cam-ph').show();
  if (el === 'cam-fija') { camFijaError = Date.now(); $('#res-cam-fija').removeClass('text-success').addClass('text-danger').text('No se pudo abrir la cámara. Permite el acceso a la cámara en el navegador (requiere https o localhost).'); return; }
  alert('No se pudo abrir la cámara (requiere permiso y https o localhost): ' + e);
  };
- const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
+ const mejorarImagen = () => { try { s.applyVideoConstraints({width:{ideal:1920}, height:{ideal:1080}, advanced:[{focusMode:'continuous'}]}).catch(() => {}); } catch (e) {} };   // más resolución y enfoque automático continuo (si la cámara lo permite)
+ const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).then(mejorarImagen).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
  if (!ES_MOVIL) { probar([{facingMode:'user'}], 0); return; } // Computadora: cámara frontal
  // Teléfono/tablet: SIEMPRE trasera. Se busca en la lista real de cámaras la que se llame back/rear/trasera...
  const reTrasera = /back|rear|trasera|posterior|traseira|environment|arri[eè]re/i, reExtra = /ultra|wide|tele|macro|depth|front|frontal|delantera/i;
@@ -2188,7 +2190,7 @@ function aplicarRegistro(a, modo) {
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
  save(); renderTabla();
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
- return {ok:true, msg:modo + ' registrada: ' + a.nombre + ' — ' + etiquetaGrupo(a) + ' (' + horaAhora() + ')' +
+ return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), modo === 'Salida' ? permDe(r) : '') +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 function registrarPorCurp(curp, modo) {
@@ -2210,7 +2212,7 @@ function registrarDesconocido(curp, modo) {
   if (r.ok && d && d.ok) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
-   return {ok:true, msg:(d.modo || modo) + ' registrada: ' + (al.nombre || curp) + ' — ' + etiquetaGrupo(al) + ' (' + (d.hora || horaAhora()) + ')'};
+   return {ok:true, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '')};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
