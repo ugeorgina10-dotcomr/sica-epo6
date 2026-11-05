@@ -352,19 +352,21 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 </div>
 <!-- ===== 2. LECTOR FIJO (no visible para Director/Subdirector) ===== -->
 <div id="panel-lector" class="panel-perfil d-none">
- <div class="text-center p-4 bg-light rounded-4 border mb-3">
- <h5 class="fw-bold text-uppercase mb-1" style="color:#800020">Lector Fijo - Control de Entradas y Salidas</h5>
- <p class="small text-muted mb-2">Modo <b>Automático</b>: el alumno solo muestra su credencial al lector y el sistema registra su entrada o su salida en su grupo. No hay que pulsar nada. (Si pulsas Entrada o Salida se fuerza ese modo; vuelve a pulsarlo para regresar al automático.)</p>
- <div class="d-flex justify-content-center gap-3 mb-3 flex-wrap">
- <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Entrada</button>
- <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm">Registrar Salida</button>
+ <div class="p-3 bg-light rounded-4 border mb-3 text-center">
+ <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Lector Fijo - Control de Entradas y Salidas</h6>
+ {{-- Modo automático (por defecto): el alumno solo muestra la credencial y el sistema registra su entrada o su salida.
+      Si pulsas el botón Entrada o Salida se fuerza a utilizarlo; vuelve a pulsarlo para regresar al automático. --}}
+ <div class="d-flex justify-content-center gap-2 mb-3 flex-wrap">
+ <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
+ <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
- <div class="camera-box-ref mb-2 border border-danger shadow">
- <div class="cam-ph text-center text-warning"><span class="small d-block fw-semibold">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
+ <div class="camera-box-ref mb-2 border shadow-sm">
+ <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
- <button onclick="toggleCamaraFija()" class="btn btn-vinotinto px-4">Encender / Apagar Cámara</button>
+ <button onclick="activarCamaraFija()" class="btn btn-vinotinto px-4 py-2 rounded-pill shadow-sm small">Activar Cámara</button>
+ <button onclick="apagarCamaraFija()" class="btn btn-dark py-2 px-3 rounded-pill small">Apagar</button>
  </div>
  <!-- SOLO CONTROL ESCOLAR: registros de entradas y salidas (el buscador y la tabla se pasan aquí desde el Panel de Orientadores) -->
  <div id="lector-registros-control" class="d-none">
@@ -2224,6 +2226,7 @@ function registrarDesconocido(curp, modo) {
 }
 function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
 /* ============ LECTOR FIJO ============ */
+// Si pulsas el botón Entrada o Salida se fuerza a utilizarlo; vuelve a pulsarlo para regresar al automático.
 function setModoEscaneo(m) {
  if (m === modoEscaneo) m = 'Auto';   // pulsar de nuevo el modo activo regresa al automático
  modoEscaneo = m;
@@ -2250,6 +2253,8 @@ function toggleCamaraFija() {
   iniciarScanner('cam-fija', () => modoEscaneo);
  }
 }
+function activarCamaraFija() { if (!scanners['cam-fija']) toggleCamaraFija(); }
+function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
 /* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
    Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
    Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
