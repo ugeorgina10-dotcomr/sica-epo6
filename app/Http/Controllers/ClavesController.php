@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -122,6 +123,7 @@ class ClavesController extends Controller
         $usuario->password = $d['password'];   // el modelo la guarda con hash
         $usuario->olvido_at = null;            // con contraseña nueva, la cuenta vuelve a tener acceso
         $usuario->save();
+        Cache::forget('sica.olvidos');
 
         // Cierra las sesiones abiertas de esa cuenta (en Control Escolar, menos la actual)
         DB::table('sessions')
@@ -148,6 +150,7 @@ class ClavesController extends Controller
         $o->password = $d['password'];
         $o->olvido_at = null;   // con contraseña nueva, vuelve a tener acceso
         $o->save();
+        Cache::forget('sica.olvidos');
 
         return response()->json(['ok' => true]);
     }
@@ -158,6 +161,7 @@ class ClavesController extends Controller
         $orientador->password = null;
         $orientador->olvido_at = null;
         $orientador->save();
+        Cache::forget('sica.olvidos');
 
         return response()->json(['ok' => true]);
     }
@@ -206,6 +210,7 @@ class ClavesController extends Controller
         }
 
         DB::table('users')->where('rol', $rol)->update(['olvido_at' => null]);
+        Cache::forget('sica.olvidos');
 
         return response()->json(['ok' => true]);
     }
@@ -213,6 +218,7 @@ class ClavesController extends Controller
     public function desbloquearOrientador(Orientador $orientador): JsonResponse
     {
         DB::table('orientadores')->where('id', $orientador->id)->update(['olvido_at' => null]);
+        Cache::forget('sica.olvidos');
 
         return response()->json(['ok' => true]);
     }

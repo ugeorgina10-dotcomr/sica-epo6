@@ -321,7 +321,10 @@ class ControlEscolarController extends Controller
     /** código QR => id de alumno (se guarda unos minutos; solo cuenta la CURP de cada alumno) */
     private function mapaQr(): array
     {
-        return Cache::remember('sica.mapaqr.v2.' . $this->huellaEstado(), 300, function () {
+        // La llave depende SOLO de los alumnos (antes también de las asistencias: cada escaneo la invalidaba y se recalculaba el código de todos los alumnos)
+        $h = DB::table('alumnos')->selectRaw('COUNT(*) c, MAX(id) i, MAX(updated_at) u')->first();
+
+        return Cache::remember('sica.mapaqr.v3.' . md5(json_encode($h)), 1800, function () {
             $mapa = [];
             foreach (DB::table('alumnos')->whereNotNull('matricula')->where('matricula', '!=', '')->select('id', 'matricula')->cursor() as $a) {
                 $mapa[self::codigoQr($a->matricula)] = $a->id;
@@ -381,6 +384,17 @@ class ControlEscolarController extends Controller
         $respuesta->setEtag($huella);
 
         return $respuesta;
+    }
+
+    /** Lo mismo que /api/sica/estado, pero para incrustarlo en la página al abrirla con sesión (misma caché y mismo ETag) */
+    public function paraPagina(): array
+    {
+        $huella = $this->huellaEstado() . '-q2';
+
+        return [
+            'etag'  => '"' . $huella . '"',
+            'datos' => Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado()),
+        ];
     }
 
     private function construirEstado(): array
@@ -501,16 +515,14 @@ class ControlEscolarController extends Controller
         }
 
         $borrados = 0;
-        $grupo = Grupo::where('grado', $grado)->where('nombre', $grado . '° ' . $n)->where('turno', $turno)->first();
+        $grupo = Grupo::where('grado', $grado)->where('nombre', $grado . '° ' . $n)->where('turno', $turno)
+            ->first(['id', 'hora_entrada', 'hora_salida', 'orientador_id']);   // sin las plantillas (imágenes pesadas)
 
         if ($grupo) {
             DB::transaction(function () use ($grupo, &$borrados) {
-                $ids = Alumno::where('grupo_id', $grupo->id)->pluck('id');
-                $borrados = $ids->count();
-                foreach ($ids->chunk(500) as $lote) {
-                    Asistencia::whereIn('alumno_id', $lote)->delete();
-                }
-                Alumno::where('grupo_id', $grupo->id)->delete();
+                // Dos consultas sin importar cuántos alumnos haya (antes: una por cada 500 alumnos, más traer todos los ids)
+                Asistencia::whereIn('alumno_id', Alumno::where('grupo_id', $grupo->id)->select('id'))->delete();
+                $borrados = Alumno::where('grupo_id', $grupo->id)->delete();
                 $this->borrarGrupoSiEstaVacio($grupo);
             });
         }
@@ -593,8 +605,9 @@ class ControlEscolarController extends Controller
 
     private function guardarTodo(array $db, bool $soloAsistencias = false): JsonResponse
     {
-        if (!$soloAsistencias) {
-            // Orientadores y grupos van en su propia transacción: un problema con un alumno no los deja sin guardar
+        // Orientadores y grupos van en su propia transacción: un problema con un alumno no los deja sin guardar.
+        // Los lotes siguientes de una lista grande los mandan vacíos: así no se gasta ni una consulta ni una transacción de más.
+        if (!$soloAsistencias && (!empty($db['orientadores']) || !empty($db['horarios']))) {
             $this->guardarSoloOrientadores($db);
         }
 
@@ -738,7 +751,12 @@ class ControlEscolarController extends Controller
         }
         $porClave = $porClave->keyBy('client_key');
 
-        $pares = [];   // [alumno, grupo, reg] para guardar registros en lote
+        $pares      = [];   // [alumno, grupo, reg] para guardar registros en lote
+        $nuevas     = [];   // alumnos que no existen: se insertan TODOS juntos al final (antes: un INSERT por alumno)
+        $indice     = [];   // 'c:CURP' | 'k:id-del-navegador' => posición en $nuevas (para no duplicar dentro del mismo lote)
+        $paresNuevos = [];  // [posición en $nuevas, grupo, reg]
+        $ahora      = now();
+
         foreach ($alumnos as $a) {
             $curp  = (isset($a['curp']) && is_string($a['curp'])) ? $a['curp'] : '';
             $clave = (isset($a['id']) && is_string($a['id']) && $a['id'] !== '') ? mb_substr($a['id'], 0, 255) : null;
@@ -758,6 +776,7 @@ class ControlEscolarController extends Controller
                 ->firstOrCreate(['grado' => $grado, 'nombre' => $nombreGrupo, 'turno' => $turno]);
             $grupo  = $gruposCache[$k];
             $nombre = mb_substr((string) ($a['nombre'] ?? ''), 0, 150);
+            $claveNav = ($clave !== null && !str_starts_with($clave, 'srv-')) ? $clave : null;   // id que puso el navegador
 
             // Primero por CURP; si no, por el id del navegador (alumno de lista sin CURP, o al que se le acaba de asignar)
             $alumno = $curp !== '' ? $existentes->get($curp) : null;
@@ -765,17 +784,42 @@ class ControlEscolarController extends Controller
             $alumno ??= ($clave !== null && str_starts_with($clave, 'srv-')) ? Alumno::find((int) substr($clave, 4)) : null;
 
             if (!$alumno) {
-                $alumno = Alumno::create([
-                    'matricula'  => $curp !== '' ? $curp : null,
-                    'nombre'     => $nombre,
-                    'grupo_id'   => $grupo->id,
-                    'client_key' => $clave !== null && !str_starts_with($clave, 'srv-') ? $clave : null,
-                ]);
-                if ($curp !== '') {
-                    $existentes->put($curp, $alumno);
+                // ¿Ya viene en este mismo lote? Entonces solo se actualizan sus datos (gana el último, igual que antes)
+                $i = ($curp !== '' ? ($indice['c:' . $curp] ?? null) : null)
+                    ?? ($claveNav !== null ? ($indice['k:' . $claveNav] ?? null) : null);
+
+                if ($i !== null) {
+                    $nuevas[$i]['nombre']   = $nombre;
+                    $nuevas[$i]['grupo_id'] = $grupo->id;
+                    if ($curp !== '') {
+                        $nuevas[$i]['matricula'] = $curp;
+                        $indice['c:' . $curp] = $i;
+                    }
+                    $paresNuevos[] = [$i, $grupo, $a['reg'] ?? []];
+                    continue;
                 }
-                if ($alumno->client_key) {
-                    $porClave->put($alumno->client_key, $alumno);
+
+                if ($curp === '' && $claveNav === null) {
+                    // Caso raro (id "srv-N" que ya no existe y sin CURP): no habría cómo encontrarlo después de insertarlo en lote
+                    $alumno = Alumno::create(['matricula' => null, 'nombre' => $nombre, 'grupo_id' => $grupo->id, 'client_key' => null]);
+                } else {
+                    $i = count($nuevas);
+                    $nuevas[$i] = [
+                        'matricula'  => $curp !== '' ? $curp : null,
+                        'nombre'     => $nombre,
+                        'grupo_id'   => $grupo->id,
+                        'client_key' => $claveNav,
+                        'created_at' => $ahora,
+                        'updated_at' => $ahora,
+                    ];
+                    if ($curp !== '') {
+                        $indice['c:' . $curp] = $i;
+                    }
+                    if ($claveNav !== null) {
+                        $indice['k:' . $claveNav] = $i;
+                    }
+                    $paresNuevos[] = [$i, $grupo, $a['reg'] ?? []];
+                    continue;
                 }
             } else {
                 $cambios = [];
@@ -797,6 +841,39 @@ class ControlEscolarController extends Controller
             }
 
             $pares[] = [$alumno, $grupo, $a['reg'] ?? []];
+        }
+
+        // Alumnos nuevos: un solo INSERT por cada 200 (con la base en la nube cada consulta cuesta decenas de milisegundos)
+        // y una consulta para recuperar sus ids, que hacen falta para guardar sus entradas y salidas.
+        if ($nuevas) {
+            foreach (array_chunk($nuevas, 200) as $bloque) {
+                DB::table('alumnos')->insert($bloque);
+            }
+
+            $porCurpNueva  = collect();
+            $porClaveNueva = collect();
+            $curpsNuevas   = array_values(array_filter(array_column($nuevas, 'matricula')));
+            $clavesNuevas  = array_values(array_filter(array_column($nuevas, 'client_key')));
+
+            foreach (array_chunk($curpsNuevas, 500) as $bloque) {
+                $porCurpNueva = $porCurpNueva->concat(Alumno::whereIn('matricula', $bloque)->get(['id', 'matricula', 'nombre', 'grupo_id', 'client_key']));
+            }
+            foreach (array_chunk($clavesNuevas, 500) as $bloque) {
+                $porClaveNueva = $porClaveNueva->concat(Alumno::whereIn('client_key', $bloque)->get(['id', 'matricula', 'nombre', 'grupo_id', 'client_key']));
+            }
+            $porCurpNueva  = $porCurpNueva->keyBy('matricula');
+            $porClaveNueva = $porClaveNueva->keyBy('client_key');
+
+            foreach ($paresNuevos as [$i, $grupo, $reg]) {
+                $fila   = $nuevas[$i];
+                $alumno = $fila['matricula'] !== null
+                    ? $porCurpNueva->get($fila['matricula'])
+                    : $porClaveNueva->get($fila['client_key']);
+
+                if ($alumno) {
+                    $pares[] = [$alumno, $grupo, $reg];
+                }
+            }
         }
 
         $this->guardarRegistrosEnLote($pares);

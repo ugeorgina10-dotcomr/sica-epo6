@@ -5,7 +5,7 @@
  *   - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
-const VERSION = 'sica-v24';
+const VERSION = 'sica-v25';
 const C_ESTATICOS = VERSION + '-estaticos';
 const C_PAGINAS = VERSION + '-paginas';
 
@@ -13,8 +13,6 @@ const PRECARGA = [
   '/vendor/bootstrap.min.css',
   '/vendor/fontawesome/css/all.min.css',
   '/vendor/fontawesome/webfonts/fa-solid-900.woff2',
-  '/vendor/fontawesome/webfonts/fa-regular-400.woff2',
-  '/vendor/fontawesome/webfonts/fa-brands-400.woff2',
   '/vendor/jquery.min.js',
   '/vendor/html5-qrcode.min.js?v=21',
   '/vendor/qrious.min.js?v=21',
@@ -26,7 +24,7 @@ const PRECARGA = [
   '/vendor/pdf.min.js?v=21',
   '/vendor/pdf.worker.min.js',
   '/img/logo6.png',
-  '/img/epo6.png',
+  '/img/epo6.jpg',
   '/vendor/jszip.min.js?v=21',
   '/vendor/sica-docx.js?v=21',
   '/plantillas/FrenteMatutino.docx',

@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -110,6 +111,7 @@ class AuthController extends Controller
                 ->where('nombre', $d['orientador'])
                 ->whereNull('olvido_at')
                 ->update(['olvido_at' => now()]);
+            Cache::forget('sica.olvidos');   // la burbuja de Control Escolar sale en el siguiente consulta, no hasta que caduque la caché
 
             return response()->json($bloqueada);
         }
@@ -120,8 +122,28 @@ class AuthController extends Controller
             ->update(['olvido_at' => now()]);
 
         DB::table('sessions')->where('user_id', $usuario->id)->delete();
+        Cache::forget('sica.olvidos');
 
         return response()->json($bloqueada);
+    }
+
+    /**
+     * Quién pulsó "¿Olvidaste tu contraseña?" y espera que Control Escolar le dé una nueva.
+     * Es pública a propósito: la pantalla de inicio la consulta cada 2 s (sin sesión) para sacar la burbuja y el sonido de alerta,
+     * así Control Escolar se entera aunque aún no haya iniciado sesión. Solo trae el nombre de la cuenta y la hora de la solicitud
+     * (los nombres de los orientadores ya son públicos en la lista del login). Misma forma que /api/sica/claves.
+     */
+    public function olvidos(): JsonResponse
+    {
+        $datos = Cache::remember('sica.olvidos', 3, fn () => [
+            'ok'           => true,
+            'roles'        => User::select('rol', 'olvido_at')->whereIn('rol', ['director', 'subdirector', 'orientador'])->whereNotNull('olvido_at')->get()
+                ->map(fn ($u) => ['rol' => $u->rol, 'bloqueada' => true, 'olvido_at' => (string) $u->olvido_at])->values()->all(),
+            'orientadores' => Orientador::select('id', 'nombre', 'olvido_at')->whereNotNull('olvido_at')->orderBy('nombre')->get()
+                ->map(fn ($o) => ['id' => (string) $o->id, 'nombre' => $o->nombre, 'bloqueada' => true, 'olvido_at' => (string) $o->olvido_at])->values()->all(),
+        ]);
+
+        return response()->json($datos);
     }
 
     /** Cierra la sesión y descarta la sesión actual. */

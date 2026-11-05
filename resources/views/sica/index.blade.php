@@ -12,14 +12,24 @@
 <meta name="apple-mobile-web-app-title" content="SICA-EPO6">
 <link rel="apple-touch-icon" href="{{ asset('img/logo6.png') }}">
 <link rel="preload" as="image" href="{{ asset('img/logo6.png') }}">
-<link rel="prefetch" as="image" href="{{ asset('img/epo6.png') }}">   {{-- el fondo del login ya está listo cuando se pulsa Ingresar --}}
+<link rel="prefetch" as="image" href="{{ asset('img/epo6.jpg') }}">   {{-- el fondo del login ya está listo cuando se pulsa Ingresar --}}
 {{-- Librerías servidas desde public/vendor (sin CDN): así el sistema abre aunque no haya internet --}}
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
+{{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
+     Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
+@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js'] as $lib)
+<link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
+@endforeach
+@foreach (['html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
+<link rel="preload" as="script" fetchpriority="low" href="{{ asset('vendor/' . $lib) }}?v=21">
+@endforeach
+<link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
+<link rel="prefetch" href="{{ asset('vendor/pdf.worker.min.js') }}">
 <style>
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
-/* Fondo epo6.png: public/img/epo6.png. Se ve a partir del login, con brillo y color originales. */
-.bg-escuela{background:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.png') }}") center/cover no-repeat fixed !important;min-height:100vh}
+/* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
+.bg-escuela{background:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.jpg') }}") center/cover no-repeat fixed !important;min-height:100vh}
 #input-clave::-ms-reveal,#input-clave::-ms-clear{display:none}
 .bg-login{background:#fff !important;min-height:100vh}
 .main-card{background:rgba(255,255,255,.95);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.3);border:1px solid rgba(128,0,32,.25)}
@@ -206,7 +216,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  <div class="text-end mb-3" style="margin-top:-1rem"><a href="#" class="small text-muted text-decoration-underline" onclick="olvideContrasena(); return false;">¿Olvidaste tu contraseña?</a></div>
- <button type="button" onclick="intentarEntrar()" class="btn btn-vinotinto w-100 py-3 rounded-3 shadow fs-5">Ingresar al Sistema</button>
+ <button type="button" id="btn-ingresar" onclick="intentarEntrar()" class="btn btn-vinotinto w-100 py-3 rounded-3 shadow fs-5">Ingresar al Sistema</button>
  <div class="text-center mt-3"><a href="#" class="small text-muted text-decoration-underline btn-recargar-sistema" onclick="recargarSistema(this); return false;" title="Si el sistema se trabó o tarda en responder">Recargar sistema</a></div>
 </form>
 </div>
@@ -642,19 +652,21 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
   ['html5-qrcode.min.js', 'chart.umd.min.js'],                        // escáner y gráficas
   ['xlsx.full.min.js', 'exceljs.min.js', 'jspdf.umd.min.js', 'pdf.min.js']   // Excel, Excel con gráficas, PDF y lector de PDF
  ];
- const cargar = src => new Promise(ok => {
+ const cargar = (src, baja) => new Promise(ok => {
   const s = document.createElement('script');
+  if (baja) s.fetchPriority = 'low';   // Excel, PDF y gráficas bajan en paralelo pero sin quitarle ancho de banda a lo que se ve primero
   s.src = base + src + '?v=21'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
  // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
- const pantallaLista = new Promise(ok => setTimeout(ok, 0));   // justo después de pintar la pantalla: todo se va cargando mientras escribes tu contraseña
- window.SICA_DOCX_LISTO = pantallaLista.then(() => Promise.all(grupos[0].map(cargar)));
- const resto = window.SICA_DOCX_LISTO.then(() => Promise.all([
-  Promise.all(grupos[1].map(cargar)),
-  Promise.all(grupos[2].map(cargar)).then(() => cargar('jspdf.plugin.autotable.min.js'))   // autotable depende de jsPDF
- ]));
+ // Todo arranca de inmediato y en paralelo (ya están precargados desde la cabecera); solo autotable espera a jsPDF
+ window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(x => cargar(x)));
+ const resto = Promise.all([
+  window.SICA_DOCX_LISTO,
+  Promise.all(grupos[1].map(x => cargar(x, true))),
+  Promise.all(grupos[2].map(x => cargar(x, true))).then(() => cargar('jspdf.plugin.autotable.min.js', true))   // autotable depende de jsPDF
+ ]);
  window.SICA_LIBS_LISTAS = resto.then(() => {
   if (window.Chart) Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = base + 'pdf.worker.min.js';
@@ -672,6 +684,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    OJO: esto solo sirve para mostrar la pantalla; los permisos reales los decide siempre el servidor. */
 window.SICA_SESION = @json($sesion ?? null);
 window.SICA_ORIENTADORES = @json($orientadoresLogin ?? []);
+window.SICA_ESTADO = @json($estado ?? null);   // solo con sesión iniciada: listas, horarios y asistencias ya vienen en la página
 </script>
 <script>
 /* ============ DATOS (localStorage del navegador) ============ */
@@ -747,6 +760,8 @@ const save = () => {
  clearTimeout(_temporizadorSave);
  _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 600);
 };
+/* Envía YA lo guardado (sin esperar el medio segundo de agrupación de save()). Para acciones grandes y únicas, como subir una lista. */
+const guardarYa = () => { if (ES_MOVIL) return; clearTimeout(_temporizadorSave); _temporizadorSave = null; enviarTodo(); };
 /* ============ SINCRONIZACIÓN CON EL SERVIDOR (MySQL vía Laravel) ============
  Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
  Si el backend no responde, falla en silencio y el sistema sigue con localStorage. */
@@ -779,7 +794,7 @@ const PEND_TODO = 'sica_epo6_pend_todo';   // marca: hay cambios guardados solo 
    pesaba megas, tardaba y el servidor podía rechazarla por tamaño sin avisar. Ahora:
    - solo se envían los alumnos que cambiaron desde la última vez que el servidor los guardó (se compara su "firma"),
    - y se mandan por lotes chicos, uno tras otro. */
-const LOTE_ALUMNOS = 150;
+const LOTE_ALUMNOS = 250;
 const _firmasGuardadas = new Map();   // id del alumno -> firma de lo que ya tiene el servidor
 const firmaAlumno = a => JSON.stringify([a.curp, a.nombre, a.grado, a.grupo, a.turno, a.reg]);
 let _enviando = false, _hayOtroEnvio = false;
@@ -811,7 +826,8 @@ function enviarTodo(sinVacios) {
  let fallo = false;
  return lotes.reduce((prev, lote, n) => prev.then(() => {
   if (fallo) return;
-  const datos = {orientadores: db.orientadores, horarios: db.horarios, plantillas: n === 0 && hayPlantillas ? db.plantillas : {}, alumnos: lote};
+  // Orientadores y horarios solo en el primer lote: los demás van más ligeros y el servidor no repite ese trabajo
+  const datos = {orientadores: n === 0 ? db.orientadores : [], horarios: n === 0 ? db.horarios : {}, plantillas: n === 0 && hayPlantillas ? db.plantillas : {}, alumnos: lote};
   return _postSync('guardar_todo', datos).then(r => {
    if (r.status === 401) { fallo = true; sesionExpirada(); return; }
    if (r.status === 403) { fallo = true; localStorage.removeItem(PEND_TODO); return r.json().then(d => avisoPermiso(d && d.mensaje)).catch(() => avisoPermiso()); }
@@ -1388,7 +1404,9 @@ function verOcultarClave() {
  boton.setAttribute('aria-pressed', mostrar ? 'true' : 'false');
  campo.focus();
 }
-function intentarEntrar() {
+let _entrando = false;
+function intentarEntrar(reintento) {
+ if (_entrando) return;   // un solo intento a la vez (Enter + clic mandaban dos y el segundo gastaba otro intento)
  const rol = $('#rol-select').val();
  const clave = $('#input-clave').val();
  if (!clave) { alert('Escribe tu contraseña.'); return; }
@@ -1400,13 +1418,21 @@ function intentarEntrar() {
  } else {
  orientadorActivo = null;
  }
- fetch('/auth/login', {
+ // Respuesta inmediata al pulsar: se ve "Entrando..." al instante (revisar la contraseña tarda una fracción de segundo)
+ _entrando = true;
+ const btnIngresar = $('#btn-ingresar').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Entrando...');
+ const listo = () => { _entrando = false; btnIngresar.prop('disabled', false).text('Ingresar al Sistema'); };
+ fetchT('/auth/login', {
  method: 'POST',
  headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
  body: JSON.stringify({email: $('#input-correo').val(), password: clave, orientador: orientadorActivo ? orientadorActivo.nombre : null})
- })
- .then(r => r.json().then(d => ({status: r.status, ...d})))
+ }, 20000)
+ .then(r => r.json().catch(() => ({})).then(d => ({status: r.status, ...d})))
  .then(d => {
+ listo();
+ // 419: la página llevaba mucho abierta y su token venció -> se pide uno nuevo y se reintenta UNA vez, sin que la persona haga nada
+ if (d.status === 419 && !reintento) { orientadorActivo = null; return refrescarCsrf().then(() => intentarEntrar(true)); }
+ if (d.status === 429 && !d.mensaje) d.mensaje = 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
  if (!d.ok) {
  orientadorActivo = null;
  if (d.bloqueada) { $('#input-clave').val(''); abrirModalCuenta('bloqueada', d.mensaje); return; }
@@ -1428,6 +1454,7 @@ function intentarEntrar() {
  entrarAlSistema(false);
  })
  .catch(() => {
+ listo();
  orientadorActivo = null;
  alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
@@ -1484,13 +1511,14 @@ function recargarSistema(btn) {
   const tareas = [];
   try {
    if (window.caches) tareas.push(caches.keys().then(ks => Promise.all(ks.filter(k => k.indexOf('sica-') === 0 && k.indexOf('-paginas') > -1).map(k => caches.delete(k)))));
-   if (navigator.serviceWorker) tareas.push(navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}));
+   // La búsqueda de actualización del service worker va por red: se lanza SIN esperarla (antes la recarga aguardaba hasta 2 s por ella)
+   if (navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {});
   } catch (e) {}
   return Promise.all(tareas.map(t => t.catch(() => {})));
  };
  const irAlInicio = () => { location.replace('/?r=' + Date.now()); };   // el parámetro evita usar una copia vieja del navegador
- // Si la limpieza tarda (justo cuando el sistema está trabado), no se espera más de 2 segundos
- Promise.race([limpiar(), new Promise(res => setTimeout(res, 2000))]).then(irAlInicio, irAlInicio);
+ // Si la limpieza tarda (justo cuando el sistema está trabado), no se espera más de 0.8 segundos
+ Promise.race([limpiar(), new Promise(res => setTimeout(res, 800))]).then(irAlInicio, irAlInicio);
  // Último recurso: si por algo no se movió, se fuerza la recarga normal
  setTimeout(() => location.reload(), 5000);
 }
@@ -1595,7 +1623,7 @@ function cargarClaves(forzar) {
   _etagClaves = r.headers.get('ETag');
   return r.json();
  }).then(d => {
-  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
+  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
   if (!d || !d.ok) return;
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
@@ -1695,30 +1723,37 @@ function avisarOtrasPestanas(msg) {
 /* ---- Sonido del aviso ----
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
-let _audioCtx = null;
+let _audioCtx = null, _sonidoPendiente = null;
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
   if (!_audioCtx) _audioCtx = new AC();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  if (_audioCtx.state === 'suspended') _audioCtx.resume().then(() => {
+   // Si el aviso llegó antes de que alguien tocara la página, suena en cuanto se toca
+   if (_sonidoPendiente) { const v = _sonidoPendiente; _sonidoPendiente = null; sonarAviso(v); }
+  }).catch(() => {});
  } catch (e) {}
 }
 ['pointerdown', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, desbloquearAudio, {passive: true}));
-function sonarAviso() {
+/* veces = cuántas repeticiones del par de tonos (las solicitudes de contraseña suenan 3 veces para que se note) */
+function sonarAviso(veces) {
  try {
   desbloquearAudio();
-  if (!_audioCtx || _audioCtx.state !== 'running') return;   // la pestaña aún no recibió ningún clic: el navegador no permite sonar
+  if (!_audioCtx || _audioCtx.state !== 'running') { _sonidoPendiente = veces || 1; return; }   // aún sin ningún clic en esta pestaña
   const t0 = _audioCtx.currentTime;
-  [[880, 0], [1175, 0.16]].forEach(([hz, retraso]) => {
-   const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
-   osc.type = 'sine'; osc.frequency.value = hz;
-   vol.gain.setValueAtTime(0.0001, t0 + retraso);
-   vol.gain.exponentialRampToValueAtTime(0.35, t0 + retraso + 0.02);
-   vol.gain.exponentialRampToValueAtTime(0.0001, t0 + retraso + 0.35);
-   osc.connect(vol); vol.connect(_audioCtx.destination);
-   osc.start(t0 + retraso); osc.stop(t0 + retraso + 0.4);
-  });
+  for (let v = 0; v < (veces || 1); v++) {
+   [[880, 0], [1175, 0.16]].forEach(([hz, retraso]) => {
+    const ini = t0 + v * 0.8 + retraso;
+    const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
+    osc.type = 'sine'; osc.frequency.value = hz;
+    vol.gain.setValueAtTime(0.0001, ini);
+    vol.gain.exponentialRampToValueAtTime(0.5, ini + 0.02);
+    vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
+    osc.connect(vol); vol.connect(_audioCtx.destination);
+    osc.start(ini); osc.stop(ini + 0.4);
+   });
+  }
  } catch (e) {}
 }
 let _entrandoPorAviso = false;
@@ -1757,8 +1792,8 @@ function entrarSiHaySesion() {
   .then(() => { _entrandoPorAviso = false; });
 }
 /* Pestaña PRINCIPAL: otra pestaña (la secundaria) pidió atender una solicitud -> aquí se pide iniciar sesión como Control Escolar */
-function irAControl(cuenta) {
- sonarAviso();
+function irAControl(cuenta, silencio) {
+ if (!silencio) sonarAviso();
  if (rolActivo === 'control') { abrirSolicitudCuenta(cuenta); return; }
  if (rolActivo) return;
  _solicitudPendiente = cuenta;
@@ -1787,30 +1822,53 @@ window.addEventListener('storage', e => {
 // Una pestaña que se quedó en el login (o se "durmió") revisa al volver a verla si ya hay sesión abierta
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) entrarSiHaySesion(); });
 function sincronizarBurbujas() {
- if (rolActivo !== 'control') { $('#burbujas-claves').empty(); return; }
+ if (rolActivo !== 'control') { if (rolActivo) $('#burbujas-claves').empty(); return; }   // sin sesión las dibuja la consulta pública de abajo
+ $('#burbujas-claves .burbuja button:not(.burbuja-x)').text('Dar acceso');   // las que salieron en la pantalla de inicio
+ pintarBurbujas(clavesRoles, clavesOrientadores, true);
+}
+/* roles / orientadores con la misma forma que /api/sica/claves (bloqueada, olvido_at). avisar = avisar también a las otras pestañas */
+function pintarBurbujas(roles, orientadores, avisar) {
  const pend = [];
- clavesRoles.forEach(r => { if (r.bloqueada) pend.push({cuenta: 'rol:' + r.rol, nombre: NOMBRES_CUENTA[r.rol] || r.rol, k: 'rol:' + r.rol + '|' + r.olvido_at}); });
- clavesOrientadores.forEach(o => { if (o.bloqueada) pend.push({cuenta: 'ori:' + o.id, nombre: 'Orientador ' + o.nombre, k: 'ori:' + o.id + '|' + o.olvido_at}); });
+ roles.forEach(r => { if (r.bloqueada) pend.push({cuenta: 'rol:' + r.rol, nombre: NOMBRES_CUENTA[r.rol] || r.rol, k: 'rol:' + r.rol + '|' + r.olvido_at}); });
+ orientadores.forEach(o => { if (o.bloqueada) pend.push({cuenta: 'ori:' + o.id, nombre: 'Orientador ' + o.nombre, k: 'ori:' + o.id + '|' + o.olvido_at}); });
  const claves = pend.map(p => p.k);
  $('#burbujas-claves .burbuja').each(function () { if (claves.indexOf($(this).attr('data-k')) === -1) $(this).remove(); });
+ let hayNueva = false;
  pend.forEach(p => {
   if (burbujasVistas[p.k]) return;
   burbujasVistas[p.k] = true;
-  sonarAviso();
-  avisarOtrasPestanas({tipo: 'aviso', k: p.k, nombre: p.nombre});   // las otras pestañas en el login entran y lo ven también
+  hayNueva = true;
+  if (avisar) avisarOtrasPestanas({tipo: 'aviso', k: p.k, nombre: p.nombre});   // las otras pestañas en el login entran y lo ven también
   $('#burbujas-claves').append(
    '<div class="burbuja" role="alert" style="cursor:pointer" onclick="clicBurbuja(this, event)" data-k="' + esc(p.k) + '" data-cuenta="' + esc(p.cuenta) + '">' +
    '<button type="button" class="burbuja-x" aria-label="Cerrar" onclick="event.stopPropagation(); $(this).closest(\'.burbuja\').remove()">&times;</button>' +
    '<div class="fw-bold">' + esc(p.nombre) + ' solicita su nueva contraseña</div>' +
    '<div class="small mt-1">Marcó "¿Olvidaste tu contraseña?". Su cuenta quedó bloqueada y no podrá entrar hasta que le des acceso.</div>' +
-   '<button type="button" class="btn btn-sm btn-light fw-semibold mt-2" onclick="clicBurbuja(this, event)">Dar acceso</button></div>');
+   '<button type="button" class="btn btn-sm btn-light fw-semibold mt-2" onclick="clicBurbuja(this, event)">' + (rolActivo ? 'Dar acceso' : 'Entrar como Control Escolar') + '</button></div>');
  });
+ if (hayNueva) sonarAviso(3);
+}
+/* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
+let _consultandoOlvidos = false;
+function consultarOlvidosInicio() {
+ if (rolActivo || _consultandoOlvidos) return;
+ _consultandoOlvidos = true;
+ fetchT('/api/sica/olvidos', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 6000)
+  .then(r => r.ok ? r.json() : null)
+  .then(d => { if (d && d.ok && !rolActivo) pintarBurbujas(d.roles || [], d.orientadores || [], false); })
+  .catch(() => {})
+  .then(() => { _consultandoOlvidos = false; });
 }
 /* Pulsar la burbuja (o "Dar acceso"). En la pestaña principal abre la solicitud aquí mismo; en una pestaña secundaria
    (la que entró sola por el aviso) manda a la pestaña principal a iniciar sesión como Control Escolar, rápido. */
 function clicBurbuja(el, ev) {
  if (ev && $(ev.target).closest('.burbuja-x').length) return;
  if (ev) ev.stopPropagation();
+ if (!rolActivo) {   // pantalla de inicio: se pide iniciar sesión como Control Escolar; al entrar se abre esa solicitud
+  $(el).closest('.burbuja').find('.small').text('Inicia sesión como Control Escolar para darle acceso.');
+  irAControl($(el).closest('.burbuja').attr('data-cuenta'), true);
+  return;
+ }
  if (!_esSecundaria) { abrirSolicitud(el); return; }
  const b = $(el).closest('.burbuja');
  const cuenta = b.attr('data-cuenta');
@@ -2457,7 +2515,7 @@ function subirLista() {
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
  else { db.alumnos.push({id:generarId(), curp:curp, nombre:nombre, grado:filtro.grado, grupo:filtro.grupo, turno:turnoActivo, reg:{}}); nuevos++; }
  });
- save(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);
+ save(); guardarYa(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);   // la lista ya va al servidor mientras se lee el aviso
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
  const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
  alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.') + (curpsInvalidas.length ? '\n\nSe omitieron ' + curpsInvalidas.length + ' fila(s) con CURP no válida (debe tener 18 caracteres): ' + curpsInvalidas.slice(0, 8).join(', ') + (curpsInvalidas.length > 8 ? '…' : '') + '. Corrígelas en el archivo y súbelo otra vez.' : ''));
@@ -2472,17 +2530,25 @@ function borrarListaGrupo() {
  const lista = db.alumnos.filter(a => a.grado === g && a.grupo === n && a.turno === t);
  if (!lista.length) { alert('El ' + g + '° grado, grupo ' + n + ' (' + t + ') no tiene alumnos cargados.'); return; }
  if (!confirm('¿Borrar la lista completa del ' + g + '° grado, grupo ' + n + ' (' + t + ')?\n' + lista.length + ' alumno(s) y todos sus registros de asistencia se eliminarán de forma permanente. Esta acción no se puede deshacer.')) return;
+ // La lista desaparece de la pantalla al instante; si el servidor no pudo borrarla, vuelve a aparecer con un aviso
+ const ids = new Set(lista.map(a => a.id));
+ db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
+ localStorage.setItem(LS, JSON.stringify(db));
+ $('#archivo-lista').val('');
+ renderTabla(); renderListaHorarios();
+ if (credSel) selCred(credSel.grado, credSel.grupo);
  _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
   if (!r.ok) return Promise.reject();
-  const ids = new Set(lista.map(a => a.id));
-  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
   ids.forEach(id => _firmasGuardadas.delete(id));
+  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
+ }).catch(() => {
+  const hay = new Set(db.alumnos.map(a => a.id));
+  lista.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
   localStorage.setItem(LS, JSON.stringify(db));
-  $('#archivo-lista').val('');
   renderTabla(); renderListaHorarios();
   if (credSel) selCred(credSel.grado, credSel.grupo);
-  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
- }).catch(() => alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+  alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
+ });
 }
 function subirHorarios() {
  if (!permisoPermite()) return;
@@ -3058,14 +3124,19 @@ function eliminarAlumno(id) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede eliminar alumnos.'); return; }
  const a = db.alumnos.find(x => x.id === id); if (!a) return;
  if (!confirm('¿Eliminar a ' + a.nombre + (a.curp ? ' (' + a.curp + ')' : '') + '? Se borrarán también sus registros de asistencia. Esta acción no se puede deshacer.')) return;
- const quitarLocal = () => {
+ // Se quita de la pantalla al instante; si el servidor no pudo borrarlo, vuelve a aparecer con un aviso
  db.alumnos = db.alumnos.filter(x => x.id !== id);
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
- };
  _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
- .then(r => r.ok ? quitarLocal() : Promise.reject())
- .catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+ .then(r => r.ok ? null : Promise.reject())
+ .catch(() => {
+ if (!db.alumnos.some(x => x.id === a.id)) db.alumnos.push(a);
+ localStorage.setItem(LS, JSON.stringify(db));
+ if (credSel) selCred(credSel.grado, credSel.grupo);
+ renderTabla();
+ alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
+ });
 }
 function guardarCambiosCredencial() {
  if (!permisoPermite()) return;
@@ -3269,6 +3340,10 @@ $(function () {
  precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
  try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
  if (Array.isArray(window.SICA_ORIENTADORES)) db.orientadores = window.SICA_ORIENTADORES;   // ya vienen en la página
+ // Con sesión abierta el estado completo ya viene dentro de la página: se usa al instante y la primera consulta al servidor responde 304
+ if (window.SICA_SESION && window.SICA_ESTADO && window.SICA_ESTADO.datos) {
+  try { fusionarServidor(window.SICA_ESTADO.datos, 0); _etagEstado = window.SICA_ESTADO.etag; } catch (e) {}
+ }
  actualizarCredenciales();
  $('#calendario-orientador').val(hoy());
  if (window.SICA_SESION) restaurarSesion(window.SICA_SESION);   // solo pide datos al servidor si hay sesión (cero errores 401 al abrir)
@@ -3278,6 +3353,8 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 2000);   // burbuja y sonido en la pantalla de inicio
+ document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
  document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo) cargarDesdeServidor(); });
