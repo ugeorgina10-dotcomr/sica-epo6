@@ -355,7 +355,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="p-3 bg-light rounded-4 border mb-3 text-center">
  <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Lector Fijo - Control de Entradas y Salidas</h6>
  {{-- Modo automático (por defecto): el alumno solo muestra la credencial y el sistema registra su entrada o su salida.
-      Si pulsas el botón Entrada o Salida se fuerza a utilizarlo; vuelve a pulsarlo para regresar al automático. --}}
+      Los botones Entrada y Salida solo se usan al escanear con la cámara (computadora o celular); el lector físico siempre es automático. --}}
  <div class="d-flex justify-content-center gap-2 mb-3 flex-wrap">
  <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
@@ -974,6 +974,8 @@ const p2 = n => String(n).padStart(2,'0');
 const fechaLocal = d => { d = d || new Date(); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); };
 const hoy = () => fechaLocal();
 const horaAhora = () => { const d = new Date(); return p2(d.getHours())+':'+p2(d.getMinutes()); };
+/* Hora para mostrar con a. m. / p. m. (ej. "07:05" -> "7:05 a. m.", "20:10" -> "8:10 p. m."). Lo guardado sigue en 24 h. */
+const h12 = hm => { const m = /^(\d{1,2}):(\d{2})/.exec(hm || ''); if (!m) return hm; const h = Number(m[1]); return ((h % 12) || 12) + ':' + m[2] + (h < 12 ? ' a. m.' : ' p. m.'); };
 const toMin = hm => { const [h,m] = hm.split(':').map(Number); return h*60+m; };
 /* Clave de grupo: "Turno-grado-grupo" (ej. "Vespertino-1-2"). Matutino y Vespertino son grupos distintos. */
 const claveGrupo = (grado, grupo, turno) => (turno || 'Matutino') + '-' + grado + '-' + grupo;
@@ -1244,7 +1246,7 @@ function renderListaHorarios() {
   _horSel[o.id] = sel;
   const hs = db.horarios[sel] || {};
   const opciones = o.gr.map(x => '<option value="' + esc(x.k) + '"' + (x.k === sel ? ' selected' : '') + '>' + x.c.grado + '° grado, grupo ' + x.c.grupo +
-   ((x.h.entrada && x.h.salida) ? ' — ' + esc(x.h.entrada) + ' a ' + esc(x.h.salida) : ' — sin horario propio') + '</option>').join('');
+   ((x.h.entrada && x.h.salida) ? ' — ' + esc(h12(x.h.entrada)) + ' a ' + esc(h12(x.h.salida)) : ' — sin horario propio') + '</option>').join('');
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
@@ -1276,7 +1278,7 @@ function guardarHorarioInline(btn) {
  db.horarios[k].entrada = e; db.horarios[k].salida = s;
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
- $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(e) + ' a ' + esc(s) + '.');
+ $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + '.');
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -2109,7 +2111,7 @@ const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grup
 /* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (en la salida, también la permanencia) */
 function detalleRegistro(tipo, a, hora, extra) {
  return tipo + ' registrada: ' + a.nombre + ' · ' + (nomGrado[a.grado] || a.grado) + ' grado · Grupo ' + (ROMANOS[a.grupo] || a.grupo) +
-  ' · ' + a.turno + ' · CURP: ' + (a.curp || '') + ' · ' + hora + (extra ? ' · Permanencia: ' + extra : '');
+  ' · ' + a.turno + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · Permanencia: ' + extra : '');
 }
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
@@ -2181,11 +2183,11 @@ function aplicarRegistro(a, modo) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
  const f = hoy(), r = a.reg[f] = a.reg[f] || {};
  if (modo === 'Entrada') {
- if (r.entrada) return {ok:false, msg:a.nombre + ': la entrada ya estaba registrada (' + r.entrada + ')'};
+ if (r.entrada) return {ok:false, msg:a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
  r.entrada = horaAhora();
  } else {
  if (!r.entrada) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};
- if (r.salida) return {ok:false, msg:a.nombre + ': la salida ya estaba registrada (' + r.salida + ')'};
+ if (r.salida) return {ok:false, msg:a.nombre + ': la salida ya estaba registrada (' + h12(r.salida) + ')'};
  r.salida = horaAhora();
  }
  // Cada escaneo entra a la cola: se envía al servidor ya (o en cuanto vuelva el internet) y aparece en todos los equipos
@@ -2226,7 +2228,8 @@ function registrarDesconocido(curp, modo) {
 }
 function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
 /* ============ LECTOR FIJO ============ */
-// Si pulsas el botón Entrada o Salida se fuerza a utilizarlo; vuelve a pulsarlo para regresar al automático.
+// Los botones Entrada/Salida solo se usan al escanear con la cámara (computadora o celular): fuerzan ese modo; vuelve a pulsarlo para regresar al automático.
+// El lector físico no los necesita: siempre decide solo (ver destino() en el lector físico).
 function setModoEscaneo(m) {
  if (m === modoEscaneo) m = 'Auto';   // pulsar de nuevo el modo activo regresa al automático
  modoEscaneo = m;
@@ -2266,9 +2269,9 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
  // A dónde va la lectura según el panel que se está viendo (null = ninguno)
  function destino() {
   if (!rolActivo || $('#vista-sistema').hasClass('d-none')) return null;
-  if (!$('#panel-lector').hasClass('d-none')) return {modo: modoEscaneo, el: 'cam-fija', permitido: true};
+  if (!$('#panel-lector').hasClass('d-none')) return {modo: 'Auto', el: 'cam-fija', permitido: true};   // el lector físico SIEMPRE es automático: los botones Entrada/Salida solo afectan a la cámara
   if (!$('#panel-orientador').hasClass('d-none') && $('#bloque-camara-orientador').is(':visible'))
-   return {modo: modoOrient, el: 'cam-orient', permitido: rolActivo === 'control' || (db.permisos[rolActivo] || 'ver') === 'editar'};
+   return {modo: 'Auto', el: 'cam-orient', permitido: rolActivo === 'control' || (db.permisos[rolActivo] || 'ver') === 'editar'};
   return null;
  }
  // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
@@ -2426,7 +2429,7 @@ function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
  const r = a.reg[f] || {}, e = estatusDe(a, r, f), dis = (!r.entrada || r.salida || f !== hoy()) ? 'disabled' : '';
- return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada || '—'}</td><td>${r.salida || 'Pendiente'}</td><td>${permDe(r)}</td><td><span class="badge ${claseEst[e]}">${e}</span></td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
+ return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${permDe(r)}</td><td><span class="badge ${claseEst[e]}">${e}</span></td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
  }).join('') || '<tr><td colspan="10" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
@@ -2559,7 +2562,7 @@ function descargarReporte(formato) {
  const tp = tituloPeriodo(periodo, ref);
  const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
  const filas = [];
- filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && r.entrada) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada, Salida:r.salida || 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
+ filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && r.entrada) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:h12(r.entrada), Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
  descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
