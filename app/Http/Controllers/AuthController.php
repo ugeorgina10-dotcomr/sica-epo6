@@ -68,7 +68,7 @@ class AuthController extends Controller
         Auth::login($usuario, false);   // false = sin "recordarme": la sesión no queda abierta para siempre
         $request->session()->regenerate();
 
-        return response()->json($this->datosUsuario($request));
+        return response()->json($this->datosUsuario($request, true));
     }
 
     /**
@@ -163,7 +163,8 @@ class AuthController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'Sin sesión.', 'csrf' => csrf_token()], 401);
         }
 
-        return response()->json($this->datosUsuario($request));
+        // ?estado=1: una pestaña que entra sola por un aviso recibe también todo el estado (sin otra petición)
+        return response()->json($this->datosUsuario($request, $request->boolean('estado')));
     }
 
     /**
@@ -229,16 +230,29 @@ class AuthController extends Controller
         return [$usuario, null];
     }
 
-    private function datosUsuario(Request $request): array
+    private function datosUsuario(Request $request, bool $incluirEstado = false): array
     {
         $u = $request->user();
 
-        return [
+        $datos = [
             'ok'     => true,
             'nombre' => $u->name,
             'email'  => $u->email,
             'rol'    => $u->rol,
             'csrf'   => csrf_token(),
         ];
+
+        // Todo lo que el panel necesita para mostrarse YA cargado al entrar (sin esperar otras peticiones):
+        // listas, horarios, asistencias y permisos; y, para Control Escolar, también el estado de las contraseñas.
+        if ($incluirEstado) {
+            $datos['estado'] = app(ControlEscolarController::class)->paraPagina();
+
+            if ($u->rol === 'control') {
+                $claves = ClavesController::datos();
+                $datos['claves'] = ['etag' => ClavesController::etag($claves), 'datos' => $claves];
+            }
+        }
+
+        return $datos;
     }
 }

@@ -63,7 +63,29 @@ class ClavesController extends Controller
      */
     public function index(Request $request): JsonResponse|Response
     {
-        $datos = [
+        $datos = self::datos();
+
+        // ETag: Control Escolar consulta esto cada pocos segundos para ver quién pulsó "¿Olvidaste tu contraseña?".
+        // Si nada cambió se responde 304 (sin cuerpo) y la pantalla no se vuelve a dibujar.
+        $etag = self::etag($datos);
+
+        if (in_array($request->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
+            return response('', 304)->header('ETag', $etag);
+        }
+
+        return response()->json($datos)->header('ETag', $etag);
+    }
+
+    /** ETag de los datos de contraseñas (la pantalla lo guarda para que la primera consulta responda 304). */
+    public static function etag(array $datos): string
+    {
+        return '"' . md5(json_encode($datos)) . '"';
+    }
+
+    /** Estado de las contraseñas: lo usan /api/sica/claves y el inicio de sesión de Control Escolar (así ya viene cargado). */
+    public static function datos(): array
+    {
+        return [
             'ok' => true,
             'roles' => User::select('rol', 'password', 'olvido_at')
                 ->whereIn('rol', ['director', 'subdirector', 'orientador'])->get()
@@ -84,16 +106,6 @@ class ClavesController extends Controller
                 ])
                 ->values(),
         ];
-
-        // ETag: Control Escolar consulta esto cada pocos segundos para ver quién pulsó "¿Olvidaste tu contraseña?".
-        // Si nada cambió se responde 304 (sin cuerpo) y la pantalla no se vuelve a dibujar.
-        $etag = '"' . md5(json_encode($datos)) . '"';
-
-        if (in_array($request->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
-            return response('', 304)->header('ETag', $etag);
-        }
-
-        return response()->json($datos)->header('ETag', $etag);
     }
 
     /** Cambia la contraseña de la cuenta de un rol. */

@@ -20,6 +20,10 @@ Route::get('/', function () {
         'orientadoresLogin' => ControlEscolarController::orientadoresLogin(),
         // Con sesión, el estado completo va dentro de la página: al recargar entra sin esperar otra petición
         'estado' => $u ? app(ControlEscolarController::class)->paraPagina() : null,
+        // Control Escolar: el estado de las contraseñas también viene dentro de la página (el panel abre ya con todo dibujado)
+        'claves' => ($u && $u->rol === 'control')
+            ? ['etag' => ClavesController::etag($c = ClavesController::datos()), 'datos' => $c]
+            : null,
     ]);
 });
 
