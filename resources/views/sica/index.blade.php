@@ -684,6 +684,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    OJO: esto solo sirve para mostrar la pantalla; los permisos reales los decide siempre el servidor. */
 window.SICA_SESION = @json($sesion ?? null);
 window.SICA_ORIENTADORES = @json($orientadoresLogin ?? []);
+window.SICA_CLAVES = @json($claves ?? null);   // solo Control Escolar con sesión: estado de las contraseñas ya dibujable
 window.SICA_ESTADO = @json($estado ?? null);   // solo con sesión iniciada: listas, horarios y asistencias ya vienen en la página
 </script>
 <script>
@@ -1440,6 +1441,7 @@ function intentarEntrar(reintento) {
  return;
  }
  if (d.csrf) $('meta[name="csrf-token"]').attr('content', d.csrf);
+ aplicarPrecarga(d);   // estado completo + contraseñas (Control Escolar) llegan con el inicio de sesión
  // El rol real lo dice el SERVIDOR. Si no coincide con el elegido (alguien tocó la página con F12), se cierra la sesión.
  if (d.rol !== rol) {
  orientadorActivo = null;
@@ -1451,7 +1453,10 @@ function intentarEntrar(reintento) {
  if (orientadorActivo) localStorage.setItem('sica_orientador', orientadorActivo.id);   // para recordar quién eres si recargas la página
  $('#input-clave').val('').attr('type','password');
  $('#ojo-abierto').removeClass('d-none'); $('#ojo-cerrado').addClass('d-none');
- entrarAlSistema(false);
+ // Se mantiene "Entrando..." hasta que el panel esté 100% listo (datos, plantillas y librerías ya cargadas)
+ _entrando = true;
+ btnIngresar.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Entrando...');
+ entrarAlSistema(false).then(listo, listo);
  })
  .catch(() => {
  listo();
@@ -1583,6 +1588,22 @@ function guardarPermisoRol() {
 }
 /* ============ CONTRASEÑAS (solo Control Escolar) ============ */
 let clavesOrientadores = [];   // [{id, nombre, propia}] que devuelve el servidor
+let _clavesPrecargadas = false;   // las contraseñas ya llegaron con el inicio de sesión / la página: la primera carga no pide nada
+/* Aplica lo que el servidor manda junto con el inicio de sesión (o dentro de la página): estado completo y contraseñas.
+   Así el panel se abre con todo ya cargado, sin esperar otras peticiones. */
+function aplicarPrecarga(d) {
+ if (!d) return;
+ if (d.estado && d.estado.datos) { try { fusionarServidor(d.estado.datos, 0); _etagEstado = d.estado.etag; } catch (e) {} }
+ if (d.claves && d.claves.datos && d.claves.datos.ok) {
+  clavesOrientadores = d.claves.datos.orientadores || [];
+  clavesRoles = d.claves.datos.roles || [];
+  _etagClaves = d.claves.etag;
+  _clavesPrecargadas = true;
+ }
+}
+function vigilarClaves() {
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
+}
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
   method: metodo,
@@ -1610,25 +1631,57 @@ function etiquetaCuenta(borrada, bloqueada) {
 /* Control Escolar revisa cada 2 s si alguien pulsó "¿Olvidaste tu contraseña?". Se manda el ETag a mano para que,
    si nada cambió, el servidor responda 304 sin cuerpo y no se vuelva a dibujar nada (así se puede revisar seguido sin costo). */
 let _etagClaves = null, _cargandoClaves = false;
+let _versionClaves = 0;     // sube con cada cambio hecho aquí: una consulta que salió antes ya trae datos viejos y se descarta
+let _accionesClaves = 0;    // acciones (desbloquear, borrar, guardar...) que siguen en camino al servidor
 function cargarClaves(forzar) {
- if (_cargandoClaves && !forzar) return Promise.resolve();
+ if (forzar && _clavesPrecargadas) {   // ya llegaron con el inicio de sesión: solo se dibujan (cero esperas)
+  _clavesPrecargadas = false;
+  vigilarClaves();
+  renderClaves();
+  return Promise.resolve();
+ }
+ // Con "forzar" (al abrir el panel) se dibuja YA lo que hay en memoria y se actualiza detrás, sin dejar el panel vacío esperando
+ if (forzar && (clavesRoles.length || clavesOrientadores.length)) renderClaves();
+ if (!forzar && (_cargandoClaves || _accionesClaves > 0)) return Promise.resolve();   // la revisión periódica no estorba una acción en curso
  _cargandoClaves = true;
- if (forzar) _etagClaves = null;
+ const version = _versionClaves;
  const cab = {'Accept': 'application/json'};
  if (_etagClaves) cab['If-None-Match'] = _etagClaves;
  return fetchT('/api/sica/claves', {headers: cab, cache: 'no-store'}, 10000).then(r => {
   if (r.status === 304) return null;
   if (r.status === 401) { sesionExpirada(); return null; }
   if (!r.ok) return null;
-  _etagClaves = r.headers.get('ETag');
-  return r.json();
+  const et = r.headers.get('ETag');
+  return r.json().then(d => { d._etag = et; return d; });
  }).then(d => {
-  if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
+  vigilarClaves();
   if (!d || !d.ok) return;
+  if (version !== _versionClaves) return;   // salió antes de un cambio que acabas de hacer: sus datos ya están viejos
+  _etagClaves = d._etag;
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
   renderClaves();
  }).catch(() => {}).then(() => { _cargandoClaves = false; });
+}
+/* Acciones sobre las contraseñas: la pantalla cambia AL INSTANTE (sin esperar al servidor) y la petición va detrás.
+   Si el servidor la rechaza, se regresa todo a como estaba y se avisa. */
+function copiaClaves() { return JSON.parse(JSON.stringify({r: clavesRoles, o: clavesOrientadores})); }
+function restaurarClaves(c) { clavesRoles = c.r; clavesOrientadores = c.o; }
+function cambiarLocalClaves(c, cambios) {   // c = datosCuenta(); cambios = campos de la cuenta que cambian de inmediato
+ const cta = c.tipo === 'ori' ? clavesOrientadores.find(x => x.id === cuentaSel.slice(4)) : clavesRoles.find(x => x.rol === c.rol);
+ if (cta) Object.assign(cta, cambios);
+}
+function enviarClaves(url, metodo, cuerpo, copia, mensajeError) {
+ _accionesClaves++; _versionClaves++;
+ return llamarClaves(url, metodo, cuerpo).then(d => {
+  _accionesClaves--; _versionClaves++;
+  if (!d.ok) {
+   if (copia) { restaurarClaves(copia); renderClaves(); }
+   $('#resumen-claves').text('');
+   alert(d.mensaje || mensajeError);
+  }
+  return d;
+ });
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo === 'control' && temporizadorClaves) cargarClaves(); });
 function datosCuenta() {
@@ -1779,9 +1832,10 @@ function entrarSiHaySesion() {
  const reloj = setTimeout(() => { if (!rolActivo) mostrarAvisoLento(true); }, 2500);   // pasados 2.5 s sin entrar: botón Recargar
  const vigila = setInterval(() => { if (rolActivo) { limpiar(); mostrarAvisoLento(false); } }, 300);
  const limpiar = () => { clearTimeout(reloj); clearInterval(vigila); };
- fetchT('/auth/me', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 8000)
+ fetchT('/auth/me?estado=1', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 8000)
   .then(r => r.ok ? r.json() : null)
   .then(d => {
+   if (d && d.ok) aplicarPrecarga(d);
    if (!d || !d.ok || rolActivo) { if (!rolActivo) { limpiar(); mostrarAvisoLento(false); } return; }   // sin sesión en el servidor: se queda en el login
    if (d.csrf) $('meta[name="csrf-token"]').attr('content', d.csrf);
    _esSecundaria = true;
@@ -1954,19 +2008,24 @@ function guardarClave() {
   url = '/api/sica/claves/rol';
   cuerpo = {rol: c.rol, password: nueva, password_confirmation: conf, password_actual: $('#clave-actual').val()};
  }
- llamarClaves(url, 'POST', cuerpo).then(d => {
-  if (!d.ok) { $('#resumen-claves').text(''); alert(d.mensaje || 'No se pudo guardar la contraseña.'); return; }
+ // Esta sí espera al servidor (él revisa que la contraseña sirva y no esté repetida), pero ya no hace una segunda consulta después
+ const btns = $('#panel-cuenta-clave button').prop('disabled', true);
+ $('#resumen-claves').text('Guardando...');
+ enviarClaves(url, 'POST', cuerpo, null, 'No se pudo guardar la contraseña.').then(d => {
+  btns.prop('disabled', false);
+  if (!d.ok) return;
   if (c.control) {
    $('#resumen-claves').text('Tu contraseña de Control Escolar se actualizó.');
   } else {
+   cambiarLocalClaves(c, c.tipo === 'ori' ? {estado: 'propia', bloqueada: false, olvido_at: null} : {borrada: false, bloqueada: false, olvido_at: null});
    claveEntrega = {para: c.nombre, correo: c.correo, clave: nueva};
    $('#entrega-para').text(c.nombre); $('#entrega-correo').text(c.correo); $('#entrega-clave-texto').text(nueva);
    $('#entrega-clave').removeClass('d-none');
    $('#resumen-claves').text('Contraseña nueva guardada para ' + c.nombre + '. Ya puede entrar con ella.');
   }
   limpiarCamposClave();
-  cargarClaves(true);
- }).catch(() => alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+  renderClaves();
+ }).catch(() => { btns.prop('disabled', false); alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'); });
 }
 function ocultarEntrega() {
  claveEntrega = null;
@@ -2002,33 +2061,33 @@ function borrarClaveCuenta() {
  if (!c || c.control) return;
  if (!confirm('Se borrará la contraseña guardada de: ' + c.nombre + '.\nNo podrá entrar hasta que generes una nueva aquí mismo. No se borra ningún otro dato. ¿Continuar?')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/borrar' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol);
- llamarClaves(url, c.tipo === 'ori' ? 'POST' : 'DELETE').then(d => {
-  if (!d.ok) { alert(d.mensaje || 'No se pudo borrar la contraseña.'); return; }
-  ocultarEntrega();
-  $('#resumen-claves').text('Se borró la contraseña anterior de ' + c.nombre + '. Pulsa Generar, luego Guardar, y entrégasela.');
-  cargarClaves(true);
- }).catch(() => alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+ const copia = copiaClaves();
+ cambiarLocalClaves(c, c.tipo === 'ori' ? {estado: 'borrada'} : {borrada: true});   // se ve al instante
+ ocultarEntrega();
+ $('#resumen-claves').text('Se borró la contraseña anterior de ' + c.nombre + '. Pulsa Generar, luego Guardar, y entrégasela.');
+ renderClaves();
+ enviarClaves(url, c.tipo === 'ori' ? 'POST' : 'DELETE', null, copia, 'No se pudo borrar la contraseña.');
 }
 /* Quita el bloqueo sin cambiar la contraseña (por ejemplo, si alguien lo marcó por error) */
 function desbloquearCuenta() {
  const c = datosCuenta();
  if (!c || !c.bloqueada) return;
- if (!confirm('Se quitará el bloqueo de ' + c.nombre + ' sin cambiar su contraseña. ¿Continuar?')) return;
+ // Sin ventana de confirmación: desbloquear no cambia ni borra nada (solo deja que la persona vuelva a intentar entrar), así es un solo clic.
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
- llamarClaves(url, 'POST').then(d => {
-  if (!d.ok) { alert(d.mensaje || 'No se pudo desbloquear.'); return; }
-  $('#resumen-claves').text('Se quitó el bloqueo de ' + c.nombre + '.');
-  cargarClaves(true);
- });
+ const copia = copiaClaves();
+ cambiarLocalClaves(c, {bloqueada: false, olvido_at: null});   // el bloqueo desaparece al instante (y su burbuja)
+ $('#resumen-claves').text('Se quitó el bloqueo de ' + c.nombre + '.');
+ renderClaves();
+ enviarClaves(url, 'POST', null, copia, 'No se pudo desbloquear.');
 }
 function quitarClaveOrientador() {
  if (!cuentaSel.startsWith('ori:')) return;
  if (!confirm('Este orientador volverá a entrar con la contraseña general del rol Orientador. ¿Continuar?')) return;
- llamarClaves('/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)), 'DELETE').then(d => {
-  if (!d.ok) { alert(d.mensaje || 'No se pudo quitar la contraseña propia.'); return; }
-  $('#resumen-claves').text('Se quitó la contraseña propia. Ahora usa la general del rol Orientador.');
-  cargarClaves(true);
- });
+ const c = datosCuenta(), copia = copiaClaves();
+ cambiarLocalClaves(c, {estado: 'general', bloqueada: false, olvido_at: null});
+ $('#resumen-claves').text('Se quitó la contraseña propia. Ahora usa la general del rol Orientador.');
+ renderClaves();
+ enviarClaves('/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)), 'DELETE', null, copia, 'No se pudo quitar la contraseña propia.');
 }
 /* ---- Pantalla de inicio de sesión: ventana central de "¿Olvidaste tu contraseña?" ---- */
 function abrirModalCuenta(modo, mensaje) {
@@ -2060,6 +2119,7 @@ function olvideContrasena() {
  if (rol === 'orientador' && !$('#select-orientador-login').val()) { alert('Primero selecciona tu nombre de la lista.'); return; }
  abrirModalCuenta('confirmar');
 }
+const MENSAJE_OLVIDO_LOCAL = '¿Olvidaste tu contraseña? Avisa a Control Escolar. Ellos borrarán tu contraseña anterior y generarán una nueva. Mientras tanto tu cuenta está bloqueada y no podrás entrar.';
 function confirmarOlvido(reintento) {
  const rol = $('#rol-select').val();
  const o = rol === 'orientador' ? db.orientadores.find(x => x.id === $('#select-orientador-login').val()) : null;
@@ -2068,7 +2128,12 @@ function confirmarOlvido(reintento) {
  const email = correosRoles[rol] || $('#input-correo').val();
  $('#input-correo').val(email);
  // Respuesta inmediata al tocar el botón: se ve "Enviando..." al instante y no se puede pulsar dos veces
- const btn = $('#modal-cuenta-botones button').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Enviando...');
+ // Respuesta al instante: para Director, Subdirector y Orientador el resultado ya se conoce (la cuenta queda bloqueada), así que se muestra
+ // el aviso de "Cuenta bloqueada" en el acto y la petición va detrás. Si el servidor responde otra cosa o falla, ese mensaje lo reemplaza.
+ // (Control Escolar no se bloquea desde aquí: ahí sí se espera la respuesta del servidor.)
+ const optimista = rol !== 'control';
+ if (optimista && !reintento) abrirModalCuenta('bloqueada', MENSAJE_OLVIDO_LOCAL);
+ const btn = optimista ? $() : $('#modal-cuenta-botones button').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Enviando...');
  fetchT('/auth/olvide', {
   method: 'POST',
   credentials: 'same-origin',
@@ -2096,7 +2161,7 @@ function confirmarOlvido(reintento) {
   }
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
  })
- .catch(() => { btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'); });
+ .catch(() => { btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo avisar a Control Escolar: no hay conexión con el servidor. Tu cuenta NO se bloqueó. Revisa tu conexión e inténtalo de nuevo.'); });
 }
 /* ============ COLA DE ESCANEOS (funciona sin internet) ============
  Cada escaneo se guarda primero en este equipo y se envía al servidor en cuanto hay conexión.
@@ -2839,16 +2904,22 @@ function leerPlantilla(url, forzar) {
   }).catch(e => { delete _plantillasLeidas[url]; throw e; }));
 }
 /* Deja listos (ya leídos) los Word originales mientras la persona escribe su contraseña: al entrar, las plantillas aparecen al instante. */
+let _tsPrecalentado = 0;   // cuándo se leyeron por adelantado (si pasó mucho rato se vuelven a revisar al entrar)
 function precalentarPlantillas() {
  if (!window.SICA_DOCX_LISTO) return;
  window.SICA_DOCX_LISTO.then(() => {
   if (!window.SicaDocx) return;
+  _tsPrecalentado = Date.now();
   const urls = {};
-  Object.keys(ARCHIVOS_PLANTILLA).forEach(t => ['frente', 'reverso'].forEach(l => { urls[BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[t][l]] = 1; }));
-  Object.keys(urls).forEach(u => leerPlantilla(u).catch(() => {}));
+  // Las que subió Control Escolar (servidor, ruta pública) y los Word originales: al iniciar sesión ya están leídas
+  Object.keys(ARCHIVOS_PLANTILLA).forEach(t => ['frente', 'reverso'].forEach(l => {
+   urls['/plantilla-oficial/' + t + '/' + l] = 1;
+   urls[BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[t][l]] = 1;
+  }));
+  Object.keys(urls).forEach(u => leerPlantilla(u, true).catch(() => {}));
  });
 }
-function cargarPlantillasDefault() {
+function cargarPlantillasDefault(revalidar) {
  revisarOriginales();
  const hecho = (turno, lado, modelo, error, origen) => {
   plantillasDefault[turno][lado] = modelo;
@@ -2859,21 +2930,22 @@ function cargarPlantillasDefault() {
  };
  // Se esperan solo las librerías de Word (no Excel/PDF/gráficas). El mismo archivo (p. ej. Reverso.docx, igual en los dos turnos) se lee UNA sola vez.
  const leer = leerPlantilla;
- (window.SICA_DOCX_LISTO || window.SICA_LIBS_LISTAS || Promise.resolve()).then(() => {
+ return (window.SICA_DOCX_LISTO || window.SICA_LIBS_LISTAS || Promise.resolve()).then(() => {
   if (!window.SicaDocx) { Object.keys(plantillasDefault).forEach(t => ['frente','reverso'].forEach(l => hecho(t, l, null, 'No se pudo cargar el lector de plantillas. Revisa tu internet y recarga la página.'))); return; }
   // el turno que se está viendo primero
   const turnos = Object.keys(ARCHIVOS_PLANTILLA).sort((a, b) => (b === turnoCred) - (a === turnoCred));
-  turnos.forEach(turno => ['frente','reverso'].forEach(lado => {
+  return Promise.all(turnos.reduce((acc, turno) => acc.concat(['frente','reverso'].map(lado => {
    const urlServidor = '/plantilla-oficial/' + turno + '/' + lado, urlOriginal = BASE_PLANTILLAS + ARCHIVOS_PLANTILLA[turno][lado];
    // Se piden las dos a la vez (antes la del servidor fallaba con 404 y apenas entonces se pedía la original)
-   const pServ = leer(urlServidor, true).then(m => ({m}), e => ({e}));
+   // Si ya se leyó por adelantado hace menos de 1 minuto se usa esa lectura (instantáneo); si no, se vuelve a revisar con el servidor
+   const pServ = leer(urlServidor, revalidar || !_tsPrecalentado || Date.now() - _tsPrecalentado > 60000).then(m => ({m}), e => ({e}));
    const pOrig = leer(urlOriginal).then(m => ({m}), e => ({e}));
    pServ.then(rs => rs.m ? hecho(turno, lado, rs.m, null, 'servidor') : pOrig.then(ro => {
     if (ro.m) return hecho(turno, lado, ro.m, null, 'original');
     const malo = [rs.e, ro.e].find(e => e && e !== 'no-esta');
     hecho(turno, lado, null, malo ? 'No se pudo leer el archivo de la plantilla: ' + (malo.message || malo) : 'Todavía no hay plantilla para este turno. Elige tu archivo (Word o PDF) y pulsa "Actualizar".');
    }));
-  }));
+  })), []));
  });
 }
 /* Devuelve la plantilla (ya leída) del turno y lado indicados, o null si aún no carga. */
@@ -2888,7 +2960,7 @@ function problemasFrente(m) {
  ['nombre','curp','grado','grupo','turno'].forEach(k => { if (!m.campos[k]) faltan.push('la etiqueta ' + (k === 'nombre' ? 'NOMBRE DEL ESTUDIANTE:' : k.toUpperCase() + ':')); });
  return faltan;
 }
-function refrescarPreviewPlantillaOficial() {
+function refrescarPreviewPlantillaOficial(dibujarOculto) {
  const t = turnoCred || 'Matutino';
  $('#turno-plantilla-actual').text(t);
  ['frente','reverso'].forEach(l => {
@@ -2897,8 +2969,8 @@ function refrescarPreviewPlantillaOficial() {
   const m = plantillasDefault[t] && plantillasDefault[t][l];
   const msg = $('#msg-prev-plantilla-' + l);
   if (m && window.SicaDocx) {
-   if ($('#panel-alumno').hasClass('d-none')) return;   // oculto: no se gasta tiempo dibujando; al abrir el Portal del Alumno se dibuja
-   SicaDocx.dibujar(cv, m, null, {ancho: 900});
+   if ($('#panel-alumno').hasClass('d-none') && !dibujarOculto) return;   // oculto: se dibuja por adelantado en segundo plano (prepararPanelesOcultos)
+   if (cv._sicaModelo !== m) { SicaDocx.dibujar(cv, m, null, {ancho: 900}); cv._sicaModelo = m; }   // ya dibujada: no se repite
    $(cv).show();
    const falta = l === 'frente' ? problemasFrente(m) : [];
    msg.toggleClass('text-danger', falta.length > 0).toggleClass('text-muted', !falta.length)
@@ -2994,7 +3066,7 @@ function restaurarPlantillaOficial() {
  if (!confirm('¿Volver a la plantilla original del turno ' + t + '?')) return;
  const cab = {'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''};
  Promise.all(lados.map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers: cab}).catch(() => {})))
-  .then(() => { plantillasDefault[t] = {frente: null, reverso: null}; cargarPlantillasDefault(); });
+  .then(() => { plantillasDefault[t] = {frente: null, reverso: null}; cargarPlantillasDefault(true); });
  $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success').text('Se restauró la plantilla original del turno ' + t + ' en el servidor.');
 }
 /* Elimina PARA SIEMPRE la plantilla anterior (el Word original del servidor) del turno elegido.
@@ -3313,16 +3385,55 @@ function entrarAlSistema(restaurando) {
   if (!rolActivo) mostrarSeccion('vista-sistema');
   if (_solicitudPendiente && rolActivo === 'control') {   // venía de pulsar la burbuja en la otra pestaña: abre esa cuenta ya
    const cuenta = _solicitudPendiente; _solicitudPendiente = null;
-   cargarClaves(true).then(() => abrirSolicitudCuenta(cuenta));
+   // Si ya hay contraseñas en memoria se abre al instante (se actualizan detrás); solo la primera vez sin datos se espera
+   if (clavesRoles.length || clavesOrientadores.length) { cargarClaves(true); abrirSolicitudCuenta(cuenta); }
+   else cargarClaves(true).then(() => abrirSolicitudCuenta(cuenta));
   }
   if (restaurando) vaciarCola();   // si quedaron escaneos pendientes de otra vez, se envían ahora
+  setTimeout(prepararPanelesOcultos, 0);   // lo que se ve al cambiar de pestaña también se deja listo
  };
- if (db.alumnos.length || Object.keys(db.horarios).length) abrir();
- return cargarDesdeServidor().then(() => {
+ // 1) Se empiezan a leer las plantillas YA (antes esperaban a que se abriera el panel)
+ const plantillas = precargarPlantillasEntrada();
+ // 2) Datos: si ya llegaron con el inicio de sesión / la página (o hay copia local) no se espera nada; si no, se descargan
+ const datosListos = (db.alumnos.length || Object.keys(db.horarios).length) ? Promise.resolve() : cargarDesdeServidor();
+ // 3) El panel se abre cuando lo que se ve está listo: datos, lector de plantillas + QR y plantillas ya leídas. Las librerías pesadas
+ //    (Excel, PDF, gráficas) siguen bajando en segundo plano y la gráfica se dibuja sola en cuanto llegan (así la primera vez no se espera por ellas).
+ //    Tope de 2.5 s para no dejar a nadie esperando.
+ const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas]).catch(() => {});
+ if (window.SICA_LIBS_LISTAS) window.SICA_LIBS_LISTAS.then(() => { if (rolActivo) { renderStats(); prepararPanelesOcultos(); } });
+ // El panel NO espera las plantillas de Word ni las librerías: se abre en cuanto hay datos (tope de 1 s) y lo demás sigue cargando detrás.
+ const datosParaAbrir = Promise.resolve(datosListos).catch(() => {});
+ return Promise.race([datosParaAbrir, new Promise(r => setTimeout(r, 1000))]).then(() => {
   abrir();
+  // Sincroniza con el servidor en segundo plano (primera consulta: 304 si el estado ya venía en el login)
+  cargarDesdeServidor();
   // Al recargar, el service worker ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
   if (!restaurando) setTimeout(guardarPaginaOffline, 4000);   // al iniciar sesión sí: así se puede abrir sin internet
+  return todo.then(() => { if (rolActivo) prepararPanelesOcultos(); });
  });
+}
+/* Empieza a leer las plantillas de Word al entrar (una sola vez) y devuelve la promesa de que ya están listas. */
+let _promesaPlantillas = null;
+function precargarPlantillasEntrada() {
+ if (_promesaPlantillas) return _promesaPlantillas;
+ if (ES_MOVIL && $('#rol-select').val() === 'orientador') return Promise.resolve();   // el teléfono del orientador solo escanea
+ plantillasPedidas = true;
+ return _promesaPlantillas = Promise.resolve(cargarPlantillasDefault()).catch(() => {});
+}
+/* Deja dibujado, sin que nadie lo pida, lo que está en las otras pestañas del panel (vista previa de las plantillas
+   en el Portal del Alumno, estadísticas y gráfica): al cambiar de pestaña ya está todo ahí. */
+let _preparando = false;
+function prepararPanelesOcultos() {
+ if (_preparando || !rolActivo) return;
+ _preparando = true;
+ const tarea = () => {
+  try {
+   if (rolActivo === 'control') refrescarPreviewPlantillaOficial(true);   // el bloque de plantillas es solo de Control Escolar
+   if (window.Chart) renderStats();
+  } catch (e) {}
+  _preparando = false;
+ };
+ if (window.requestIdleCallback) requestIdleCallback(tarea, {timeout: 800}); else setTimeout(tarea, 50);
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
 function restaurarSesion(S) {
@@ -3341,9 +3452,7 @@ $(function () {
  try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
  if (Array.isArray(window.SICA_ORIENTADORES)) db.orientadores = window.SICA_ORIENTADORES;   // ya vienen en la página
  // Con sesión abierta el estado completo ya viene dentro de la página: se usa al instante y la primera consulta al servidor responde 304
- if (window.SICA_SESION && window.SICA_ESTADO && window.SICA_ESTADO.datos) {
-  try { fusionarServidor(window.SICA_ESTADO.datos, 0); _etagEstado = window.SICA_ESTADO.etag; } catch (e) {}
- }
+ if (window.SICA_SESION) aplicarPrecarga({estado: window.SICA_ESTADO, claves: window.SICA_CLAVES});   // estado + contraseñas ya vienen en la página
  actualizarCredenciales();
  $('#calendario-orientador').val(hoy());
  if (window.SICA_SESION) restaurarSesion(window.SICA_SESION);   // solo pide datos al servidor si hay sesión (cero errores 401 al abrir)
@@ -3353,7 +3462,7 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 2000);   // burbuja y sonido en la pantalla de inicio
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1500);   // burbuja y sonido en la pantalla de inicio
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
