@@ -24,8 +24,8 @@ class CabecerasSeguridad
 
         // Nunca guardar en caché del navegador lo que cambia por sesión (páginas y API)
         if ($request->is('vendor/*', 'img/*', 'build/*')) {
-            // Archivos estáticos (librerías, imágenes): el navegador los reutiliza 7 días sin volver a pedirlos
-            $respuesta->headers->set('Cache-Control', 'public, max-age=604800');
+            // Archivos estáticos (librerías, imágenes): el navegador los reutiliza 30 días sin volver a pedirlos
+            $respuesta->headers->set('Cache-Control', 'public, max-age=2592000, immutable');
         } else {
             $respuesta->headers->set('Cache-Control', 'no-cache, private');
         }

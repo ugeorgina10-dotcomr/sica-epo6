@@ -12,11 +12,14 @@ RUN { \
       echo 'opcache.validate_timestamps=0'; \
     } > /usr/local/etc/php/conf.d/opcache-sica.ini
 
-# Apache: comprime las respuestas (página, JSON, JS) y deja que el navegador guarde librerías e imágenes un día
+# Apache: comprime las respuestas (página, JSON, JS) y deja que el navegador guarde librerías e imágenes 30 días (llevan ?v= y el service worker las renueva)
 RUN a2enmod rewrite deflate headers \
     && { \
       echo 'AddOutputFilterByType DEFLATE text/html text/css text/plain text/javascript application/javascript application/json application/manifest+json image/svg+xml'; \
-      echo '<LocationMatch "^/(vendor|img|plantillas)/">'; \
+      echo '<LocationMatch "^/(vendor|img)/">'; \
+      echo '    Header set Cache-Control "public, max-age=2592000, immutable"'; \
+      echo '</LocationMatch>'; \
+      echo '<LocationMatch "^/plantillas/">'; \
       echo '    Header set Cache-Control "public, max-age=86400"'; \
       echo '</LocationMatch>'; \
     } > /etc/apache2/conf-available/sica-velocidad.conf \

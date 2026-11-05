@@ -18,8 +18,11 @@
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
 {{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
      Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
-@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
+@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js'] as $lib)
 <link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
+@endforeach
+@foreach (['html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
+<link rel="preload" as="script" fetchpriority="low" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
 <link rel="prefetch" href="{{ asset('vendor/pdf.worker.min.js') }}">
@@ -649,19 +652,20 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
   ['html5-qrcode.min.js', 'chart.umd.min.js'],                        // escáner y gráficas
   ['xlsx.full.min.js', 'exceljs.min.js', 'jspdf.umd.min.js', 'pdf.min.js']   // Excel, Excel con gráficas, PDF y lector de PDF
  ];
- const cargar = src => new Promise(ok => {
+ const cargar = (src, baja) => new Promise(ok => {
   const s = document.createElement('script');
+  if (baja) s.fetchPriority = 'low';   // Excel, PDF y gráficas bajan en paralelo pero sin quitarle ancho de banda a lo que se ve primero
   s.src = base + src + '?v=21'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
  // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
  // Todo arranca de inmediato y en paralelo (ya están precargados desde la cabecera); solo autotable espera a jsPDF
- window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(cargar));
+ window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(x => cargar(x)));
  const resto = Promise.all([
   window.SICA_DOCX_LISTO,
-  Promise.all(grupos[1].map(cargar)),
-  Promise.all(grupos[2].map(cargar)).then(() => cargar('jspdf.plugin.autotable.min.js'))   // autotable depende de jsPDF
+  Promise.all(grupos[1].map(x => cargar(x, true))),
+  Promise.all(grupos[2].map(x => cargar(x, true))).then(() => cargar('jspdf.plugin.autotable.min.js', true))   // autotable depende de jsPDF
  ]);
  window.SICA_LIBS_LISTAS = resto.then(() => {
   if (window.Chart) Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);

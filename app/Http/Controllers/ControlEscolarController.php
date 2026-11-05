@@ -321,7 +321,10 @@ class ControlEscolarController extends Controller
     /** código QR => id de alumno (se guarda unos minutos; solo cuenta la CURP de cada alumno) */
     private function mapaQr(): array
     {
-        return Cache::remember('sica.mapaqr.v2.' . $this->huellaEstado(), 300, function () {
+        // La llave depende SOLO de los alumnos (antes también de las asistencias: cada escaneo la invalidaba y se recalculaba el código de todos los alumnos)
+        $h = DB::table('alumnos')->selectRaw('COUNT(*) c, MAX(id) i, MAX(updated_at) u')->first();
+
+        return Cache::remember('sica.mapaqr.v3.' . md5(json_encode($h)), 1800, function () {
             $mapa = [];
             foreach (DB::table('alumnos')->whereNotNull('matricula')->where('matricula', '!=', '')->select('id', 'matricula')->cursor() as $a) {
                 $mapa[self::codigoQr($a->matricula)] = $a->id;
