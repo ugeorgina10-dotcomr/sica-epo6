@@ -1881,7 +1881,7 @@ window.addEventListener('storage', e => {
 // Una pestaña que se quedó en el login (o se "durmió") revisa al volver a verla si ya hay sesión abierta
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) entrarSiHaySesion(); });
 function sincronizarBurbujas() {
- if (rolActivo !== 'control') { if (rolActivo) $('#burbujas-claves').empty(); return; }   // sin sesión las dibuja la consulta pública de abajo
+ if (rolActivo !== 'control') { if (rolActivo) { $('#burbujas-claves').empty(); _pendientesAviso = []; vigilarRepeticion(); } return; }   // sin sesión las dibuja la consulta pública de abajo
  $('#burbujas-claves .burbuja .btn-dar-acceso').text('Dar acceso');   // las que salieron en la pantalla de inicio
  pintarBurbujas(clavesRoles, clavesOrientadores, true);
 }
@@ -1891,6 +1891,7 @@ function pintarBurbujas(roles, orientadores, avisar) {
  roles.forEach(r => { if (r.bloqueada) pend.push({cuenta: 'rol:' + r.rol, nombre: NOMBRES_CUENTA[r.rol] || r.rol, k: 'rol:' + r.rol + '|' + r.olvido_at}); });
  orientadores.forEach(o => { if (o.bloqueada) pend.push({cuenta: 'ori:' + o.id, nombre: 'Orientador ' + o.nombre, k: 'ori:' + o.id + '|' + o.olvido_at}); });
  const claves = pend.map(p => p.k);
+ _pendientesAviso = claves;
  $('#burbujas-claves .burbuja').each(function () { if (claves.indexOf($(this).attr('data-k')) === -1) $(this).remove(); });
  let hayNueva = false;
  pend.forEach(p => {
@@ -1921,6 +1922,7 @@ function pintarBurbujas(roles, orientadores, avisar) {
 const REPETIR_AVISO_MS = 12000;
 const CLAVE_MUDOS = 'sica_avisos_mudos';
 let _repiteAviso = null;
+let _pendientesAviso = [];   // solicitudes que siguen sin atender (cuenta aún bloqueada), aunque su burbuja ya no esté a la vista
 function leerMudos() {
  try {
   const m = JSON.parse(localStorage.getItem(CLAVE_MUDOS) || '{}') || {};
@@ -1960,16 +1962,13 @@ function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silenc
 }
 /* Enciende el temporizador solo cuando hay alguna burbuja y lo apaga cuando ya no queda ninguna */
 function vigilarRepeticion() {
- const hay = $('#burbujas-claves .burbuja').length > 0;
+ const hay = _pendientesAviso.length > 0;
  if (hay && !_repiteAviso) _repiteAviso = setInterval(repetirAviso, REPETIR_AVISO_MS);
  else if (!hay && _repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; }
 }
 function repetirAviso() {
- let suena = false;
- $('#burbujas-claves .burbuja').each(function () {
-  pintarMudo($(this));   // por si en otra pestaña la silenciaron
-  if (!estaMudo($(this).attr('data-k'))) suena = true;
- });
+ $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });   // por si en otra pestaña la silenciaron
+ const suena = _pendientesAviso.some(k => !estaMudo(k));   // suena mientras haya una solicitud sin atender y sin silenciar
  if (suena) sonarAviso(1);
  else vigilarRepeticion();
 }
@@ -2011,7 +2010,8 @@ function clicBurbuja(el, ev) {
 function abrirSolicitud(btn) {
  const b = $(btn).closest('.burbuja');
  const v = b.attr('data-cuenta');
- b.remove();
+ // La burbuja NO se quita aquí: sigue a la vista (con su botón Silenciar) y el sonido se repite hasta que se dé acceso;
+ // se va sola cuando la cuenta se desbloquea.
  abrirSolicitudCuenta(v);
 }
 function abrirSolicitudCuenta(v) {
