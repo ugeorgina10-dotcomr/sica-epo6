@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
 {{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
      Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
-@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js'] as $lib)
+@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js'] as $lib)
 <link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
 @foreach (['html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
@@ -448,7 +448,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
  <div class="row g-3 align-items-end">
  <div class="col-md-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
- <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
  <div class="col-md-5 d-flex gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm w-100 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
@@ -463,7 +463,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
  <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
  <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
  </div>
  <div id="resumen-orientadores" class="small text-muted"></div>
@@ -474,7 +474,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
  <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
+ <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
  <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
@@ -652,8 +652,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    así que desde la segunda visita salen del equipo). Lo que tarda en estar listo se avisa con libsOk(). */
 (function(){
  const base = "{{ asset('vendor') }}/";
+ window.SICA_VENDOR_BASE = base;   // la compresión de PDF baja pdf-lib solo cuando hace falta, desde esta misma ruta
  const grupos = [
-  ['jszip.min.js', 'qrious.min.js', 'sica-docx.js'],                 // lo mínimo para dibujar credenciales (lector de Word + QR)
+  ['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js'],   // lo mínimo para dibujar credenciales (lector de Word + QR) y reducir el peso de lo que se sube
   ['html5-qrcode.min.js', 'chart.umd.min.js'],                        // escáner y gráficas
   ['xlsx.full.min.js', 'exceljs.min.js', 'jspdf.umd.min.js', 'pdf.min.js']   // Excel, Excel con gráficas, PDF y lector de PDF
  ];
@@ -1078,6 +1079,28 @@ function armarNombre(fila, desde, modo) {
  Punto único para leer listas de nombres: si es .xlsx/.xls/.csv usa SheetJS (como antes);
  si es .pdf usa pdf.js y trata cada línea de texto del PDF como una fila (una sola columna).
  callback(filas) recibe un arreglo de arreglos, igual que sheet_to_json({header:1}). */
+/* Varios archivos a la vez: se leen UNO POR UNO (así no se satura la memoria ni se traba la pantalla), a cada uno se le quita su
+   fila de encabezados y todas las filas se juntan en una sola lista. extensiones = regex de los tipos válidos. */
+function leerFilasVarios(input, extensiones, esEncabezado, callback, onError) {
+ const archivos = Array.from(input.files || []);
+ if (!archivos.length) { onError && onError('Selecciona al menos un archivo.'); return; }
+ const malos = archivos.filter(f => !extensiones.test(f.name));
+ if (malos.length) { onError && onError('Estos archivos no sirven: ' + malos.map(f => f.name).join(', ') + '. Usa un archivo del tipo indicado.'); return; }
+ const todas = [];
+ let i = 0;
+ const siguiente = () => {
+  if (i >= archivos.length) { callback(todas); return; }
+  const original = archivos[i++];
+  // Excel con imágenes, PDF con fotos o CSV con filas vacías se aligeran antes de leerse (el original no se modifica)
+  (window.SicaCompresion ? SicaCompresion.comprimirArchivo(original).catch(() => original) : Promise.resolve(original)).then(f => leerFilasDesdeArchivo(f, filas => {
+   const lim = (filas || []).filter(r => r && r.some && r.some(x => x != null && String(x).trim() !== ''));
+   if (lim.length && esEncabezado(lim[0])) lim.shift();
+   lim.forEach(r => todas.push(r));
+   setTimeout(siguiente, 0);   // cede el control entre archivos para que la pantalla siga respondiendo
+  }, msg => onError && onError(original.name + ': ' + msg)));
+ };
+ siguiente();
+}
 function leerFilasDesdeArchivo(file, callback, onError) {
  if (/\.pdf$/i.test(file.name)) {
  if (typeof pdfjsLib === 'undefined') { onError && onError('No se pudo cargar el lector de PDF. Revisa tu conexión a internet.'); return; }
@@ -1185,10 +1208,9 @@ function leerFilaOrientador(r) {
 }
 function subirOrientadores() {
  if (!permisoPermite()) return;
- const file = $('#archivo-orientadores')[0].files[0];
- if (!file) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
- if (!/\.(xlsx|xls|csv|pdf)$/i.test(file.name)) { alert('Usa un archivo Excel (.xlsx/.xls), .csv o .pdf.'); return; }
- leerFilasDesdeArchivo(file, rows => {
+ const inp = $('#archivo-orientadores')[0];
+ if (!inp.files.length) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
+ leerFilasVarios(inp, /\.(xlsx|xls|csv|pdf)$/i, r => /nombre|orientador/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r[0] && String(r[0]).trim());
   if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
   if (!rows.length) { alert('El archivo no trae orientadores. Revisa que el nombre esté en la primera columna.'); return; }
@@ -2636,12 +2658,11 @@ function marcarSalida(id) { if (!permisoPermite()) return; const r = registrarPo
 function subirLista() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
- const file = $('#archivo-lista')[0].files[0];
- if (!file) { alert('Selecciona un archivo para la lista.'); return; }
- if (!/\.(xlsx|xls|csv|pdf)$/i.test(file.name)) { alert('Para cargar los alumnos automáticamente usa un archivo Excel (.xlsx/.xls), .csv o .pdf.'); return; }
+ const inp = $('#archivo-lista')[0];
+ if (!inp.files.length) { alert('Selecciona un archivo para la lista.'); return; }
  const modo = $('#orden-nombre-lista').val();
  const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
- leerFilasDesdeArchivo(file, rows => {
+ leerFilasVarios(inp, /\.(xlsx|xls|csv|pdf)$/i, r => /curp|matr|nombre|apellido/i.test(String(r[0] == null ? '' : r[0])), rows => {
  rows = rows.filter(r => r && r[0] != null && String(r[0]).trim());
  if (rows.length && /curp|matr|nombre|apellido/i.test(String(rows[0][0]))) rows.shift();
  if (!rows.length) { alert('El archivo no trae alumnos. Pon la CURP en la columna A y el nombre en la B.'); return; }
@@ -2696,10 +2717,9 @@ function borrarListaGrupo() {
 }
 function subirHorarios() {
  if (!permisoPermite()) return;
- const file = $('#archivo-horarios')[0].files[0];
- if (!file) { alert('Selecciona un archivo de horarios.'); return; }
- if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { alert('Usa un archivo Excel (.xlsx/.xls) o .csv.'); return; }
- leerFilasDesdeArchivo(file, rows => {
+ const inp = $('#archivo-horarios')[0];
+ if (!inp.files.length) { alert('Selecciona un archivo de horarios.'); return; }
+ leerFilasVarios(inp, /\.(xlsx|xls|csv)$/i, r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
   if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
   if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador y Turno (opcional).'); return; }
@@ -3104,7 +3124,14 @@ function subirPlantillaOficial(lado) {
  if (esPDF && !libsOk('pdfjsLib')) return;
  const caja = $('#resumen-plantilla-oficial');
  caja.removeClass('text-success text-danger').addClass('text-muted').text('Leyendo tu ' + (esPDF ? 'PDF' : 'Word') + '…');
- f.arrayBuffer().then(buf => SicaDocx.cargar(buf)).then(m => {
+ let envio = f;   // lo que realmente se sube: el Word ya con sus imágenes reducidas (así lo que ves es lo que se guarda)
+ const preparar = window.SicaCompresion ? SicaCompresion.comprimirArchivo(f, t => caja.text(t)).catch(() => f) : Promise.resolve(f);
+ preparar.then(g => {
+  envio = g;
+  if (g.size > 20 * 1048576) throw new Error('El archivo pesa ' + (g.size / 1048576).toFixed(1) + ' MB incluso después de reducirlo y el máximo es 20 MB. Si es un Word, quítale imágenes; si es un PDF, expórtalo con menor calidad de imagen.');
+  if (g !== f) caja.text('Peso reducido de ' + SicaCompresion.pesoLegible(f.size) + ' a ' + SicaCompresion.pesoLegible(g.size) + '. Leyendo…');
+  return g.arrayBuffer();
+ }).then(buf => SicaDocx.cargar(buf)).then(m => {
   if (lado === 'frente') {
    const falta = problemasFrente(m);
    if (falta.length && !confirm('En este archivo no encontré ' + falta.join(', ') + '. Sin eso, los datos del alumno no quedarían bien en la credencial.\n\n¿Subirlo de todos modos?')) { caja.text(''); return; }
@@ -3114,23 +3141,32 @@ function subirPlantillaOficial(lado) {
   refrescarPreviewPlantillaOficial();
   if (idEditando) actualizarVistaPreviaCredencial();
   caja.removeClass('text-success text-danger').addClass('text-muted').text('Guardando en el servidor…');
-  return Promise.all(turnos.map(t => {
+  // Cada turno es una subida; van en cola (pocas a la vez) y se reintentan si falla la red o el servidor
+  const subir = t => () => {
    const fd = new FormData();
-   fd.append('archivo', f, f.name);
+   fd.append('archivo', envio, envio.name);
    fd.append('turno', t);
    return fetch('/api/sica/plantilla-oficial/' + lado, {
     method: 'POST',
     headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
     body: fd
-   }).then(r => r.ok ? r.json() : r.json().catch(() => ({})).then(d => Promise.reject((d && (d.message || d.mensaje)) || ('error ' + r.status))));
-  })).then(() => {
+   }).then(r => r.ok ? r.json() : r.json().catch(() => ({})).then(d => {
+    const err = new Error((d && (d.message || d.mensaje)) || ('error ' + r.status));
+    err.noReintentar = r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429 && r.status !== 419;   // el servidor rechazó el archivo: repetir no sirve
+    throw err;
+   }));
+  };
+  return SicaCompresion.cola(turnos.map(subir), {simultaneas: 2, reintentos: 2}).then(res => {
+   const fallo = res.find(x => !x.ok);
+   if (fallo) throw fallo.error;
+  }).then(() => {
    turnos.forEach(t => { origenPlantilla[t + '-' + lado] = 'servidor'; });
    actualizarBotonesPlantilla();
    caja.removeClass('text-muted text-danger').addClass('text-success')
     .text('¡Listo! La plantilla ' + turnos.join(' y ') + ' (' + lado + ') ya se actualizó. Las credenciales de ' + (turnos.length > 1 ? 'los dos turnos' : 'ese turno') + ' se hacen con este diseño.');
   }, e => {
    caja.removeClass('text-muted text-success').addClass('text-danger')
-    .text('La plantilla se cambió solo en este navegador; el servidor no la guardó (' + e + '). Intenta de nuevo.');
+    .text('La plantilla se cambió solo en este navegador; el servidor no la guardó (' + (e && e.message ? e.message : e) + '). Intenta de nuevo.');
   });
  }).catch(e => {
   caja.removeClass('text-muted text-success').addClass('text-danger').text('No se pudo leer ese archivo: ' + (e && e.message ? e.message : e));

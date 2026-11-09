@@ -12,6 +12,18 @@ RUN { \
       echo 'opcache.validate_timestamps=0'; \
     } > /usr/local/etc/php/conf.d/opcache-sica.ini
 
+# --- Subir archivos ---
+# Sin esto PHP solo acepta archivos de 2 MB (y 8 MB por petición): una plantilla o lista grande fallaba. El navegador ya reduce el peso antes de subir.
+RUN { \
+      echo 'upload_max_filesize=25M'; \
+      echo 'post_max_size=30M'; \
+      echo 'max_file_uploads=50'; \
+      echo 'memory_limit=256M'; \
+      echo 'max_execution_time=120'; \
+      echo 'realpath_cache_size=4096K'; \
+      echo 'realpath_cache_ttl=600'; \
+    } > /usr/local/etc/php/conf.d/sica-subidas.ini
+
 # Apache: comprime las respuestas (página, JSON, JS) y deja que el navegador guarde librerías e imágenes 30 días (llevan ?v= y el service worker las renueva)
 RUN a2enmod rewrite deflate headers \
     && { \

@@ -61,11 +61,11 @@ class ControlEscolarController extends Controller
         abort_unless(in_array($lado, ['frente', 'reverso'], true), 404);
 
         $request->validate([
-            'archivo' => 'required|file|max:10240|extensions:docx,pdf',
+            'archivo' => 'required|file|max:20480|extensions:docx,pdf',
             'turno'   => 'required|in:Matutino,Vespertino',
         ], [
             'archivo.extensions' => 'La plantilla debe ser un Word (.docx) o un PDF.',
-            'archivo.max'        => 'El archivo pesa demasiado (máximo 10 MB).',
+            'archivo.max'        => 'El archivo pesa demasiado (máximo 20 MB).',
         ]);
 
         $ruta = $request->file('archivo')->getRealPath();
@@ -100,7 +100,17 @@ class ControlEscolarController extends Controller
     {
         abort_unless(in_array($turno, ['Matutino', 'Vespertino'], true) && in_array($lado, ['frente', 'reverso'], true), 404);
 
-        $a = Ajuste::find(self::clavePlantilla($turno, $lado));
+        // Primero solo la fecha de la plantilla (sin traer el archivo de la BD): si el equipo ya tiene esta versión, responde 304 al instante
+        $clave = self::clavePlantilla($turno, $lado);
+        $meta  = Ajuste::select('clave', 'updated_at')->find($clave);
+        abort_unless($meta, 404);
+
+        $etag = '"' . md5($clave . '|' . ($meta->updated_at?->getTimestamp() ?? 0)) . '"';
+        if (in_array(request()->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
+            return response('', 304)->header('ETag', $etag)->header('Cache-Control', 'no-cache');
+        }
+
+        $a = Ajuste::find($clave);
         abort_unless($a && $a->valor, 404);
 
         $bytes = base64_decode($a->valor);
@@ -112,8 +122,7 @@ class ControlEscolarController extends Controller
             'Content-Type'  => $tipo,
             'Cache-Control' => 'no-cache',
         ]);
-        $respuesta->setEtag(md5($a->valor));
-        $respuesta->isNotModified(request());   // 304 si el equipo ya tiene esta plantilla
+        $respuesta->headers->set('ETag', $etag);
 
         return $respuesta;
     }
