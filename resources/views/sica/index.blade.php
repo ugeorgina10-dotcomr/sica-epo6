@@ -150,6 +150,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .burbujas-claves{position:fixed;top:14px;right:14px;z-index:1900;display:flex;flex-direction:column;gap:10px;max-width:340px;width:calc(100% - 28px)}
 .burbuja{position:relative;background:#800020;color:#fff;border-radius:1.1rem 1.1rem .3rem 1.1rem;padding:.8rem 2rem .8rem 1rem;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:.9rem;animation:burbujaEntra .35s ease-out}
 .burbuja-x{position:absolute;top:4px;right:10px;border:0;background:transparent;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;opacity:.8}
+.burbuja .burbuja-acciones{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.burbuja .burbuja-acciones .mt-2{margin-top:0!important}
+.burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.5rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
+.burbuja .burbuja-mudo:hover{background:rgba(255,255,255,.15)}
+.burbuja.silenciada{background:#5c1a2c}
 @keyframes burbujaEntra{from{opacity:0;transform:translateY(-12px) scale(.95)}to{opacity:1;transform:none}}
 </style>
 </head>
@@ -1877,7 +1882,7 @@ window.addEventListener('storage', e => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) entrarSiHaySesion(); });
 function sincronizarBurbujas() {
  if (rolActivo !== 'control') { if (rolActivo) $('#burbujas-claves').empty(); return; }   // sin sesión las dibuja la consulta pública de abajo
- $('#burbujas-claves .burbuja button:not(.burbuja-x)').text('Dar acceso');   // las que salieron en la pantalla de inicio
+ $('#burbujas-claves .burbuja .btn-dar-acceso').text('Dar acceso');   // las que salieron en la pantalla de inicio
  pintarBurbujas(clavesRoles, clavesOrientadores, true);
 }
 /* roles / orientadores con la misma forma que /api/sica/claves (bloqueada, olvido_at). avisar = avisar también a las otras pestañas */
@@ -1891,16 +1896,82 @@ function pintarBurbujas(roles, orientadores, avisar) {
  pend.forEach(p => {
   if (burbujasVistas[p.k]) return;
   burbujasVistas[p.k] = true;
-  hayNueva = true;
+  if (!estaMudo(p.k)) hayNueva = true;   // una alerta que ya se silenció (por ejemplo, antes de recargar la página) no vuelve a sonar
   if (avisar) avisarOtrasPestanas({tipo: 'aviso', k: p.k, nombre: p.nombre});   // las otras pestañas en el login entran y lo ven también
   $('#burbujas-claves').append(
-   '<div class="burbuja" role="alert" style="cursor:pointer" onclick="clicBurbuja(this, event)" data-k="' + esc(p.k) + '" data-cuenta="' + esc(p.cuenta) + '">' +
-   '<button type="button" class="burbuja-x" aria-label="Cerrar" onclick="event.stopPropagation(); $(this).closest(\'.burbuja\').remove()">&times;</button>' +
+   '<div class="burbuja' + (estaMudo(p.k) ? ' silenciada' : '') + '" role="alert" style="cursor:pointer" onclick="clicBurbuja(this, event)" data-k="' + esc(p.k) + '" data-cuenta="' + esc(p.cuenta) + '">' +
+   '<button type="button" class="burbuja-x" aria-label="Cerrar" onclick="cerrarBurbuja(this, event)">&times;</button>' +
    '<div class="fw-bold">' + esc(p.nombre) + ' solicita su nueva contraseña</div>' +
    '<div class="small mt-1">Marcó "¿Olvidaste tu contraseña?". Su cuenta quedó bloqueada y no podrá entrar hasta que le des acceso.</div>' +
-   '<button type="button" class="btn btn-sm btn-light fw-semibold mt-2" onclick="clicBurbuja(this, event)">' + (rolActivo ? 'Dar acceso' : 'Entrar como Control Escolar') + '</button></div>');
+   '<div class="burbuja-acciones">' +
+   '<button type="button" class="btn btn-sm btn-light fw-semibold btn-dar-acceso" onclick="clicBurbuja(this, event)">' + (rolActivo ? 'Dar acceso' : 'Entrar como Control Escolar') + '</button>' +
+   '<button type="button" class="burbuja-mudo" onclick="alternarMudoBurbuja(this, event)"></button>' +
+   '</div></div>');
  });
+ $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });
  if (hayNueva) sonarAviso(3);
+ vigilarRepeticion();
+}
+/* ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
+   Mientras haya una burbuja sin atender y sin silenciar, el sonido vuelve a sonar cada REPETIR_AVISO_MS (12 s).
+   La burbuja se va sola en cuanto Control Escolar le da acceso a esa cuenta (la consulta ya no la trae) y con ella se detiene el sonido.
+   El botón "Silenciar" apaga el sonido de ESA alerta (la burbuja se queda a la vista); se guarda en este navegador (localStorage),
+   así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
+   "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar. */
+const REPETIR_AVISO_MS = 12000;
+const CLAVE_MUDOS = 'sica_avisos_mudos';
+let _repiteAviso = null;
+function leerMudos() {
+ try {
+  const m = JSON.parse(localStorage.getItem(CLAVE_MUDOS) || '{}') || {};
+  const hoy = Date.now();
+  Object.keys(m).forEach(k => { if (hoy - m[k] > 86400000) delete m[k]; });   // se olvidan los de más de un día
+  return m;
+ } catch (e) { return {}; }
+}
+function estaMudo(k) { return !!leerMudos()[k]; }
+function fijarMudo(k, mudo) {
+ try {
+  const m = leerMudos();
+  if (mudo) m[k] = Date.now(); else delete m[k];
+  localStorage.setItem(CLAVE_MUDOS, JSON.stringify(m));
+ } catch (e) {}
+}
+function pintarMudo(b) {   // b = burbuja (jQuery): el texto del botón y su aspecto siguen al estado guardado
+ const mudo = estaMudo(b.attr('data-k'));
+ b.toggleClass('silenciada', mudo);
+ b.find('.burbuja-mudo')
+  .text(mudo ? 'Activar sonido' : 'Silenciar')
+  .attr('title', mudo ? 'Volver a activar el sonido de esta alerta' : 'Silenciar el sonido de esta alerta (la burbuja se queda)');
+}
+function alternarMudoBurbuja(btn, ev) {
+ if (ev) ev.stopPropagation();   // no cuenta como pulsar la burbuja (no abre la solicitud)
+ const b = $(btn).closest('.burbuja');
+ fijarMudo(b.attr('data-k'), !estaMudo(b.attr('data-k')));
+ pintarMudo(b);
+ vigilarRepeticion();
+}
+function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silencia esa alerta
+ if (ev) ev.stopPropagation();
+ const b = $(btn).closest('.burbuja');
+ fijarMudo(b.attr('data-k'), true);
+ b.remove();
+ vigilarRepeticion();
+}
+/* Enciende el temporizador solo cuando hay alguna burbuja y lo apaga cuando ya no queda ninguna */
+function vigilarRepeticion() {
+ const hay = $('#burbujas-claves .burbuja').length > 0;
+ if (hay && !_repiteAviso) _repiteAviso = setInterval(repetirAviso, REPETIR_AVISO_MS);
+ else if (!hay && _repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; }
+}
+function repetirAviso() {
+ let suena = false;
+ $('#burbujas-claves .burbuja').each(function () {
+  pintarMudo($(this));   // por si en otra pestaña la silenciaron
+  if (!estaMudo($(this).attr('data-k'))) suena = true;
+ });
+ if (suena) sonarAviso(1);
+ else vigilarRepeticion();
 }
 /* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
 let _consultandoOlvidos = false;
