@@ -1910,7 +1910,7 @@ function pintarBurbujas(roles, orientadores, avisar) {
    '</div></div>');
  });
  $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });
- if (hayNueva) sonarAviso(3);
+ if (hayNueva) sonarAviso(VECES_PRIMER_AVISO);
  vigilarRepeticion();
 }
 /* ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
@@ -1920,6 +1920,8 @@ function pintarBurbujas(roles, orientadores, avisar) {
    así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
    "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar. */
 const REPETIR_AVISO_MS = 12000;
+const VECES_PRIMER_AVISO = 6;   // el primer aviso suena ~5 s (cada vez = par de tonos de 0.8 s)
+const VECES_REPETICION = 4;     // cada repetición suena ~3 s, dentro de los 12 s entre una y otra
 const CLAVE_MUDOS = 'sica_avisos_mudos';
 let _repiteAviso = null;
 let _pendientesAviso = [];   // solicitudes que siguen sin atender (cuenta aún bloqueada), aunque su burbuja ya no esté a la vista
@@ -1969,7 +1971,7 @@ function vigilarRepeticion() {
 function repetirAviso() {
  $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });   // por si en otra pestaña la silenciaron
  const suena = _pendientesAviso.some(k => !estaMudo(k));   // suena mientras haya una solicitud sin atender y sin silenciar
- if (suena) sonarAviso(1);
+ if (suena) sonarAviso(VECES_REPETICION);
  else vigilarRepeticion();
 }
 /* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
@@ -2191,7 +2193,10 @@ function olvideContrasena() {
  abrirModalCuenta('confirmar');
 }
 const MENSAJE_OLVIDO_LOCAL = '¿Olvidaste tu contraseña? Avisa a Control Escolar. Ellos borrarán tu contraseña anterior y generarán una nueva. Mientras tanto tu cuenta está bloqueada y no podrás entrar.';
+let _olvidoEnCurso = false;   // evita que el aviso se mande (y el mensaje salga) dos veces
 function confirmarOlvido(reintento) {
+ if (_olvidoEnCurso && !reintento) return;
+ _olvidoEnCurso = true;
  const rol = $('#rol-select').val();
  const o = rol === 'orientador' ? db.orientadores.find(x => x.id === $('#select-orientador-login').val()) : null;
  // El correo se toma del ROL elegido (no del campo de texto): en computadora el navegador puede dejar ese campo vacío,
@@ -2214,6 +2219,7 @@ function confirmarOlvido(reintento) {
  .then(d => {
   // 419: la página llevaba mucho tiempo abierta y su token venció (pasa en computadoras) -> se pide uno nuevo y se reintenta UNA vez
   if (d.status === 419 && !reintento) return refrescarCsrf().then(() => confirmarOlvido(true));
+  _olvidoEnCurso = false;
   btn.prop('disabled', false);   // (el modal siguiente reemplaza los botones)
   $('#input-clave').val('');
   if (d.ok === false || !d.mensaje) {
@@ -2230,9 +2236,11 @@ function confirmarOlvido(reintento) {
    }
    abrirModalCuenta('info', msg); return;
   }
+  // Si el mensaje de "Cuenta bloqueada" ya salió al instante y el servidor lo confirma, NO se vuelve a abrir (salía dos veces)
+  if (optimista && d.bloqueada) return;
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
  })
- .catch(() => { btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo avisar a Control Escolar: no hay conexión con el servidor. Tu cuenta NO se bloqueó. Revisa tu conexión e inténtalo de nuevo.'); });
+ .catch(() => { _olvidoEnCurso = false; btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo avisar a Control Escolar: no hay conexión con el servidor. Tu cuenta NO se bloqueó. Revisa tu conexión e inténtalo de nuevo.'); });
 }
 /* ============ COLA DE ESCANEOS (funciona sin internet) ============
  Cada escaneo se guarda primero en este equipo y se envía al servidor en cuanto hay conexión.
