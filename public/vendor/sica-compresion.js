@@ -6,6 +6,7 @@
  *      Excel (.xlsx) : reduce las imágenes que lleva adentro
  *      CSV / TXT     : quita las filas vacías (solo comas o espacios)
  *      Otros         : se devuelven igual
+ *  SicaCompresion.validar(file, tipos) / validarVarios(archivos, tipos) -> Promise<null | texto del problema>   (tipo real y no dañado)
  *  SicaCompresion.cola(tareas, opciones) -> Promise<[{ok, valor|error}]>   (pocas a la vez, con reintentos)
  *
  * Nunca empeora un archivo: si el resultado no pesa claramente menos, se devuelve el original.
@@ -210,6 +211,62 @@
   }).catch(function () { return file; });
  }
 
+
+ /* ---------- Validar: ¿es de verdad el tipo de archivo que se permite, y no está dañado? ----------
+    No basta con la extensión (alguien puede renombrar una foto a .pdf): se revisa el CONTENIDO real.
+    tipos: lista de 'docx' | 'xlsx' | 'xls' | 'csv' | 'pdf'.  Devuelve una promesa con null (está bien) o el texto del problema. */
+ var NOMBRE_TIPO = {docx: 'Word (.docx)', xlsx: 'Excel (.xlsx)', xls: 'Excel (.xls)', csv: 'CSV (.csv)', pdf: 'PDF (.pdf)'};
+ function listaTipos(tipos) { return tipos.map(function (t) { return NOMBRE_TIPO[t]; }).join(', '); }
+ function empieza(b, arr) { for (var i = 0; i < arr.length; i++) if (b[i] !== arr[i]) return false; return true; }
+
+ function validar(file, tipos) {
+  var nombre = file && file.name ? file.name : 'el archivo';
+  var m = /\.([A-Za-z0-9]+)$/.exec(nombre), ext = m ? m[1].toLowerCase() : '';
+  if (tipos.indexOf(ext) === -1) return Promise.resolve('"' + nombre + '" no se puede subir: solo se permiten archivos ' + listaTipos(tipos) + '.');
+  if (!file.size) return Promise.resolve('"' + nombre + '" está vacío (pesa 0 KB). Vuelve a guardarlo desde el programa donde lo hiciste.');
+  var danado = '"' + nombre + '" está dañado o no es un archivo ' + NOMBRE_TIPO[ext] + ' de verdad. Ábrelo en su programa, guárdalo de nuevo y súbelo otra vez.';
+  var otroTipo = '"' + nombre + '" dice ser ' + NOMBRE_TIPO[ext] + ' pero por dentro es otro tipo de archivo. Guárdalo con "Guardar como" en el formato correcto.';
+
+  return file.slice(0, 8192).arrayBuffer().then(function (cab) {
+   var b = new Uint8Array(cab);
+   var esZip = empieza(b, [0x50, 0x4B, 0x03, 0x04]);
+   var esPdf = empieza(b, [0x25, 0x50, 0x44, 0x46, 0x2D]);                       // %PDF-
+   var esOle = empieza(b, [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);     // Excel antiguo (.xls)
+   var esImagen = empieza(b, [0xFF, 0xD8, 0xFF]) || empieza(b, [0x89, 0x50, 0x4E, 0x47]) || empieza(b, [0x47, 0x49, 0x46, 0x38]);
+   var esExe = empieza(b, [0x4D, 0x5A]) || empieza(b, [0x7F, 0x45, 0x4C, 0x46]) || empieza(b, [0x23, 0x21]);   // programa o script
+
+   if (ext === 'pdf') {
+    if (!esPdf) return (esZip || esOle || esImagen || esExe) ? otroTipo : danado;
+    // Un PDF completo termina con %%EOF: si falta, se cortó al guardarlo o al descargarlo
+    return file.slice(Math.max(0, file.size - 2048)).text().then(function (fin) { return fin.indexOf('%%EOF') === -1 ? danado : null; });
+   }
+   if (ext === 'docx' || ext === 'xlsx') {
+    if (!esZip) return (esPdf || esOle || esImagen || esExe) ? otroTipo : danado;
+    if (!window.JSZip) return null;
+    return file.arrayBuffer().then(function (buf) { return JSZip.loadAsync(buf); }).then(function (z) {
+     var clave = ext === 'docx' ? 'word/document.xml' : 'xl/workbook.xml';
+     if (z.file(clave)) return null;
+     return (z.file('word/document.xml') || z.file('xl/workbook.xml') || z.file('ppt/presentation.xml')) ? otroTipo : danado;
+    }, function () { return danado; });   // el zip está truncado o corrupto
+   }
+   if (ext === 'xls') return esOle ? null : ((esZip || esPdf || esImagen || esExe) ? otroTipo : danado);
+   // CSV: texto plano. Un archivo binario (foto, PDF, programa, Excel) trae bytes 0 o cabeceras conocidas.
+   if (esZip || esPdf || esOle || esImagen || esExe) return otroTipo;
+   var utf16 = (b[0] === 0xFF && b[1] === 0xFE) || (b[0] === 0xFE && b[1] === 0xFF);
+   if (!utf16) for (var i = 0; i < b.length; i++) if (b[i] === 0) return danado;
+   var texto = new TextDecoder(utf16 ? 'utf-16le' : 'latin1').decode(b);
+   return /[^\s,;|]/.test(texto) ? null : '"' + nombre + '" no tiene información (solo comas, espacios o filas vacías).';
+  }).catch(function () { return danado; });
+ }
+
+ /* Valida varios archivos y junta todos los problemas en un solo texto (null si todos están bien) */
+ function validarVarios(archivos, tipos) {
+  return Promise.all(Array.prototype.map.call(archivos, function (f) { return validar(f, tipos); })).then(function (r) {
+   var malos = r.filter(Boolean);
+   return malos.length ? malos.join('\n\n') : null;
+  });
+ }
+
  function comprimirArchivo(file, alProgreso) {
   if (!file) return Promise.resolve(file);
   if (/\.docx$/i.test(file.name)) return comprimirOffice(file, 'word', MIME_DOCX, alProgreso);
@@ -244,5 +301,5 @@
 
  function pesoLegible(bytes) { return bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(bytes / 1024)) + ' KB'; }
 
- window.SicaCompresion = {comprimirArchivo: comprimirArchivo, cola: cola, pesoLegible: pesoLegible};
+ window.SicaCompresion = {comprimirArchivo: comprimirArchivo, validar: validar, validarVarios: validarVarios, cola: cola, pesoLegible: pesoLegible};
 })();

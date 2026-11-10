@@ -5,7 +5,7 @@
  *   - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
-const VERSION = 'sica-v26';
+const VERSION = 'sica-v27';
 const C_ESTATICOS = VERSION + '-estaticos';
 const C_PAGINAS = VERSION + '-paginas';
 
@@ -25,6 +25,7 @@ const PRECARGA = [
   '/vendor/pdf.worker.min.js',
   '/img/logo6.png',
   '/img/epo6.jpg',
+  '/img/epo6.webp',
   '/vendor/jszip.min.js?v=21',
   '/vendor/sica-docx.js?v=21',
   '/vendor/sica-compresion.js?v=21',

@@ -68,20 +68,34 @@ class ControlEscolarController extends Controller
             'archivo.max'        => 'El archivo pesa demasiado (máximo 20 MB).',
         ]);
 
-        $ruta = $request->file('archivo')->getRealPath();
-
+        $ruta      = $request->file('archivo')->getRealPath();
+        $extension = strtolower($request->file('archivo')->getClientOriginalExtension());
         $contenido = file_get_contents($ruta);
 
-        if (str_starts_with($contenido, '%PDF-')) {
-            // PDF: se reconoce por su encabezado
-        } elseif (class_exists(\ZipArchive::class)) {
-            // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo
-            $zip = new \ZipArchive();
-            $ok  = $zip->open($ruta) === true && $zip->locateName('word/document.xml') !== false;
-            $zip->close();
-            if (!$ok) {
-                return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) ni un PDF válido.'], 422);
+        // Se revisa el CONTENIDO real (no solo la extensión): que sea de verdad un PDF o un Word, que coincida con su extensión y que no esté dañado
+        $esPdf = str_starts_with($contenido, '%PDF-');
+        $esZip = str_starts_with($contenido, "PK\x03\x04");
+
+        if ($esPdf) {
+            if ($extension !== 'pdf') {
+                return response()->json(['ok' => false, 'message' => 'El archivo es un PDF pero su extensión dice otra cosa. Guárdalo con extensión .pdf.'], 422);
             }
+            if (!str_contains(substr($contenido, -2048), '%%EOF')) {
+                return response()->json(['ok' => false, 'message' => 'El PDF está dañado o incompleto (se cortó al guardarlo). Vuelve a exportarlo.'], 422);
+            }
+        } elseif ($esZip) {
+            // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo (ni un Excel renombrado)
+            $ok = false;
+            if ($extension === 'docx' && class_exists(\ZipArchive::class)) {
+                $zip = new \ZipArchive();
+                $ok  = $zip->open($ruta) === true && $zip->locateName('word/document.xml') !== false;
+                $zip->close();
+            }
+            if (!$ok) {
+                return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) válido o está dañado. Guárdalo de nuevo desde Word.'], 422);
+            }
+        } else {
+            return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) ni un PDF válido.'], 422);
         }
 
         $turno = $request->input('turno');
