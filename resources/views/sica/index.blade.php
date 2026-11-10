@@ -12,8 +12,10 @@
 <meta name="apple-mobile-web-app-title" content="SICA-EPO6">
 <link rel="apple-touch-icon" href="{{ asset('img/logo6.png') }}">
 <link rel="preload" as="image" href="{{ asset('img/logo6.png') }}">
-{{-- Fondo: versión WebP (~100 KB, 35% más ligera que el JPG) con prioridad alta; el JPG queda de respaldo para navegadores viejos --}}
-<link rel="preload" as="image" href="{{ asset('img/epo6.webp') }}" type="image/webp" fetchpriority="high">
+{{-- Fondo: WebP ligero con prioridad alta. Celular (pantalla angosta) baja una versión de ~40 KB; computadora, una de ~100 KB.
+     El JPG queda de respaldo para navegadores viejos. Mientras baja se ve una miniatura borrosa incrustada en el CSS (aparece al instante). --}}
+<link rel="preload" as="image" href="{{ asset('img/epo6-movil.webp') }}" type="image/webp" media="(max-width: 820px)" fetchpriority="high">
+<link rel="preload" as="image" href="{{ asset('img/epo6.webp') }}" type="image/webp" media="(min-width: 821px)" fetchpriority="high">
 {{-- Librerías servidas desde public/vendor (sin CDN): así el sistema abre aunque no haya internet --}}
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
@@ -30,9 +32,12 @@
 <style>
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
 /* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
-.bg-escuela{background:#757362 linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.jpg') }}") center/cover no-repeat fixed !important;min-height:100vh}
-/* Si el navegador sabe WebP usa la imagen ligera; si no entiende image-set() ignora esta línea y queda el JPG de arriba. #757362 = color promedio: nunca se ve blanco mientras baja */
-.bg-escuela{background:#757362 linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),image-set(url("{{ asset('img/epo6.webp') }}") type("image/webp"),url("{{ asset('img/epo6.jpg') }}") type("image/jpeg")) center/cover no-repeat fixed !important}
+.bg-escuela{min-height:100vh;background-color:#757362 !important;background-position:center !important;background-size:cover !important;background-repeat:no-repeat !important;background-attachment:fixed !important;
+ /* capas: 1) oscurecido leve, 2) foto, 3) miniatura borrosa de 32 px (la que se ve mientras la foto baja) */
+ background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.jpg') }}"),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}
+/* Si el navegador sabe WebP usa la imagen ligera; si no entiende image-set() ignora estas reglas y queda el JPG de arriba */
+.bg-escuela{background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),image-set(url("{{ asset('img/epo6.webp') }}") type("image/webp"),url("{{ asset('img/epo6.jpg') }}") type("image/jpeg")),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}
+@media (max-width:820px){.bg-escuela{background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),image-set(url("{{ asset('img/epo6-movil.webp') }}") type("image/webp"),url("{{ asset('img/epo6.jpg') }}") type("image/jpeg")),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}}
 #input-clave::-ms-reveal,#input-clave::-ms-clear{display:none}
 .bg-login{background:#fff !important;min-height:100vh}
 .main-card{background:rgba(255,255,255,.95);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.3);border:1px solid rgba(128,0,32,.25)}
@@ -1084,30 +1089,48 @@ function armarNombre(fila, desde, modo) {
  callback(filas) recibe un arreglo de arreglos, igual que sheet_to_json({header:1}). */
 /* Varios archivos a la vez: se leen UNO POR UNO (así no se satura la memoria ni se traba la pantalla), a cada uno se le quita su
    fila de encabezados y todas las filas se juntan en una sola lista. extensiones = regex de los tipos válidos. */
+const MAX_ARCHIVOS = 30, MAX_MB_ARCHIVO = 30, MAX_MB_TOTAL = 100;   // límites para que el navegador no se trabe
 function leerFilasVarios(input, tipos, esEncabezado, callback, onError) {
- const archivos = Array.from(input.files || []);
+ // El mismo archivo elegido dos veces (mismo nombre y peso) se lee una sola vez
+ const vistos = new Set(), archivos = Array.from(input.files || []).filter(f => { const k = f.name + '|' + f.size; if (vistos.has(k)) return false; vistos.add(k); return true; });
  if (!archivos.length) { onError && onError('Selecciona al menos un archivo.'); return; }
+ const total = archivos.reduce((t, f) => t + f.size, 0), grande = archivos.find(f => f.size > MAX_MB_ARCHIVO * 1048576);
+ if (archivos.length > MAX_ARCHIVOS) { input.value = ''; onError && onError('Elegiste ' + archivos.length + ' archivos y el máximo es ' + MAX_ARCHIVOS + ' a la vez. Súbelos en dos tandas.'); return; }
+ if (grande) { input.value = ''; onError && onError('"' + grande.name + '" pesa ' + (grande.size / 1048576).toFixed(1) + ' MB y el máximo por archivo es ' + MAX_MB_ARCHIVO + ' MB.'); return; }
+ if (total > MAX_MB_TOTAL * 1048576) { input.value = ''; onError && onError('Los archivos juntos pesan ' + (total / 1048576).toFixed(0) + ' MB y el máximo es ' + MAX_MB_TOTAL + ' MB. Súbelos en varias tandas.'); return; }
+ // Línea de avance debajo del cuadro de archivos (se crea la primera vez)
+ let caja = $(input).nextAll('.avance-archivos').first();
+ if (!caja.length) caja = $('<div class="form-text avance-archivos" role="status"></div>').insertAfter(input);
+ caja.text(archivos.length > 1 ? 'Revisando ' + archivos.length + ' archivos…' : '');
  // Antes de leer nada se revisa que TODOS sean del tipo permitido, de verdad (no solo por la extensión) y no estén dañados.
  // Si uno falla no se carga ninguno: así no queda la lista a medias.
  const revisar = window.SicaCompresion ? SicaCompresion.validarVarios(archivos, tipos) : Promise.resolve(archivos.every(f => new RegExp('\\.(' + tipos.join('|') + ')$', 'i').test(f.name)) ? null : 'Alguno de los archivos no es de un tipo permitido (' + tipos.join(', ') + ').');
  revisar.then(problema => {
-  if (problema) { input.value = ''; onError && onError(problema); return; }
-  leerVariosValidados(archivos, esEncabezado, callback, onError);
+  if (problema) { input.value = ''; caja.text(''); onError && onError(problema); return; }
+  leerVariosValidados(archivos, esEncabezado, callback, onError, caja);
  });
 }
-function leerVariosValidados(archivos, esEncabezado, callback, onError) {
- const todas = [];
+function leerVariosValidados(archivos, esEncabezado, callback, onError, caja) {
+ const todas = [], resumen = [];
  let i = 0;
+ const texto = t => { if (caja) caja.text(t); };
  const siguiente = () => {
-  if (i >= archivos.length) { callback(todas); return; }
+  if (i >= archivos.length) {
+   if (archivos.length > 1) texto('Se leyeron ' + archivos.length + ' archivos (' + todas.length + ' filas en total): ' + resumen.join('; ') + '.');
+   else texto('');
+   callback(todas);
+   return;
+  }
   const original = archivos[i++];
+  if (archivos.length > 1) texto('Leyendo archivo ' + i + ' de ' + archivos.length + ': ' + original.name + '…');
   // Excel con imágenes, PDF con fotos o CSV con filas vacías se aligeran antes de leerse (el original no se modifica)
   (window.SicaCompresion ? SicaCompresion.comprimirArchivo(original).catch(() => original) : Promise.resolve(original)).then(f => leerFilasDesdeArchivo(f, filas => {
    const lim = (filas || []).filter(r => r && r.some && r.some(x => x != null && String(x).trim() !== ''));
    if (lim.length && esEncabezado(lim[0])) lim.shift();
    lim.forEach(r => todas.push(r));
+   resumen.push(original.name + ' (' + lim.length + ')');
    setTimeout(siguiente, 0);   // cede el control entre archivos para que la pantalla siga respondiendo
-  }, msg => onError && onError(original.name + ': ' + msg)));
+  }, msg => { texto(''); onError && onError(original.name + ': ' + msg + (archivos.length > 1 ? '\n\nNo se cargó ningún archivo: corrige este y vuelve a subirlos todos.' : '')); }));
  };
  siguiente();
 }
@@ -2007,13 +2030,16 @@ function repetirAviso() {
  else vigilarRepeticion();
 }
 /* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
-let _consultandoOlvidos = false;
+let _consultandoOlvidos = false, _etagOlvidos = null;
 function consultarOlvidosInicio() {
  if (rolActivo || _consultandoOlvidos) return;
  _consultandoOlvidos = true;
- fetchT('/api/sica/olvidos', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 6000)
-  .then(r => r.ok ? r.json() : null)
-  .then(d => { if (d && d.ok && !rolActivo) pintarBurbujas(d.roles || [], d.orientadores || [], false); })
+ // Se manda el ETag a mano: si nada cambió el servidor responde 304 sin cuerpo (se consulta cada 1.5 s en cada equipo)
+ const cab = {'Accept': 'application/json'};
+ if (_etagOlvidos) cab['If-None-Match'] = _etagOlvidos;
+ fetchT('/api/sica/olvidos', {headers: cab, cache: 'no-store'}, 6000)
+  .then(r => { if (!r.ok) return null; const et = r.headers.get('ETag'); return r.json().then(d => { d._etag = et; return d; }); })
+  .then(d => { if (d && d.ok && !rolActivo) { _etagOlvidos = d._etag; pintarBurbujas(d.roles || [], d.orientadores || [], false); } })
   .catch(() => {})
   .then(() => { _consultandoOlvidos = false; });
 }

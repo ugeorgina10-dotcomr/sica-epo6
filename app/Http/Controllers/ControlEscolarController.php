@@ -88,8 +88,13 @@ class ControlEscolarController extends Controller
             $ok = false;
             if ($extension === 'docx' && class_exists(\ZipArchive::class)) {
                 $zip = new \ZipArchive();
-                $ok  = $zip->open($ruta) === true && $zip->locateName('word/document.xml') !== false;
-                $zip->close();
+                if ($zip->open($ruta) === true) {   // si el zip está truncado o corrupto, open() falla y NO hay nada que cerrar
+                    $ok = $zip->locateName('word/document.xml') !== false;
+                    $zip->close();
+                }
+            }
+            if ($extension !== 'docx') {
+                return response()->json(['ok' => false, 'message' => 'El archivo es un documento comprimido (zip, Word, Excel...) pero su extensión no es .docx. Sube un Word guardado como .docx o un PDF.'], 422);
             }
             if (!$ok) {
                 return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) válido o está dañado. Guárdalo de nuevo desde Word.'], 422);

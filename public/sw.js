@@ -5,7 +5,7 @@
  *   - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
-const VERSION = 'sica-v27';
+const VERSION = 'sica-v28';
 const C_ESTATICOS = VERSION + '-estaticos';
 const C_PAGINAS = VERSION + '-paginas';
 
@@ -26,6 +26,7 @@ const PRECARGA = [
   '/img/logo6.png',
   '/img/epo6.jpg',
   '/img/epo6.webp',
+  '/img/epo6-movil.webp',
   '/vendor/jszip.min.js?v=21',
   '/vendor/sica-docx.js?v=21',
   '/vendor/sica-compresion.js?v=21',
@@ -105,6 +106,18 @@ self.addEventListener('fetch', e => {
         if (res.ok) { const copia = res.clone(); caches.open(C_ESTATICOS).then(c => c.put(req, copia)); }
         return res;
       }))
+    );
+    return;
+  }
+
+  // Fondo y logo: no cambian nunca, así que salen de la copia guardada al instante (sin esperar a la red); si no está, se baja y se guarda
+  if (/^\/img\/(epo6\.(webp|jpg)|epo6-movil\.webp|logo6\.png)$/.test(url.pathname)) {
+    const clave = new Request(url.origin + url.pathname);
+    e.respondWith(
+      caches.open(C_ESTATICOS).then(c => c.match(clave).then(r => r || fetch(req).then(res => {
+        if (res.ok) c.put(clave, res.clone());
+        return res;
+      })))
     );
     return;
   }
