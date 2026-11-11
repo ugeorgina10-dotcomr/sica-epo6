@@ -773,7 +773,8 @@ const save = () => {
  // Mientras tanto queda la marca de pendiente: si se cierra la página antes, se envía al volver a abrir.
  try { localStorage.setItem(PEND_TODO, '1'); } catch (e) {}
  clearTimeout(_temporizadorSave);
- _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 600);
+ acelerarSync();   // se está trabajando: se consulta más seguido durante unos segundos
+ _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 300);
 };
 /* Envía YA lo guardado (sin esperar el medio segundo de agrupación de save()). Para acciones grandes y únicas, como subir una lista. */
 const guardarYa = () => { if (ES_MOVIL) return; clearTimeout(_temporizadorSave); _temporizadorSave = null; enviarTodo(); };
@@ -813,7 +814,7 @@ const LOTE_ALUMNOS = 250;
 const _firmasGuardadas = new Map();   // id del alumno -> firma de lo que ya tiene el servidor
 const firmaAlumno = a => JSON.stringify([a.curp, a.nombre, a.grado, a.grupo, a.turno, a.reg]);
 let _enviando = false, _hayOtroEnvio = false;
-function _postSync(accion, datos, ms) {
+function _postSyncBase(accion, datos, ms) {
  return fetchT('/api/sica/sync', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
@@ -827,6 +828,11 @@ function _postSync(accion, datos, ms) {
    body: JSON.stringify({ accion: accion, datos: datos })
   }, ms || 60000));
  });
+}
+/* Toda escritura confirmada por el servidor (guardar, borrar, subir lista...) avisa a las otras pestañas de este equipo para que
+   se actualicen AL INSTANTE (no esperan su próxima consulta), y acelera la consulta de este equipo unos segundos. */
+function _postSync(accion, datos, ms) {
+ return _postSyncBase(accion, datos, ms).then(r => { if (r && r.ok) { acelerarSync(); avisarEstado(); } return r; });
 }
 /* sinVacios = true: si no hay ningún alumno distinto al del servidor, no manda nada. Devuelve una promesa con true/false. */
 function enviarTodo(sinVacios) {
@@ -968,6 +974,7 @@ function descargarEstadoServidor() {
    _descargandoEstado = false;
    if (!s) return;
    fusionarServidor(s, inicioConsulta);
+   acelerarSync(6000);   // hubo cambios: seguramente vienen más (una fila de alumnos escaneando, una lista que se sube...)
    autoSubirPendientes();
    if (orientadorActivo) {
     orientadorActivo = db.orientadores.find(o => o.id === orientadorActivo.id) || orientadorActivo;
@@ -2352,7 +2359,7 @@ function vaciarCola() {
   }, 12000).then(r => {
    if (r.status === 419 && !reintentoCsrf) return refrescarCsrf().then(() => enviar(true, huboExito));
    if (r.status === 401) { terminar(huboExito); sesionExpirada(); return; }   // la cola se conserva hasta volver a iniciar sesión
-   if (r.ok) { colaEscaneos.shift(); guardarCola(); return enviar(false, true); }
+   if (r.ok) { colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
    if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; return terminar(huboExito); }
    // 403 / 404 / 422: el servidor lo rechazó de forma definitiva -> se descarta para no atorar la cola
    colaEscaneos.shift(); guardarCola();
@@ -2390,7 +2397,13 @@ function iniciarScanner(el, modoFn) {
  if (el === 'cam-fija') { camFijaError = Date.now(); $('#res-cam-fija').removeClass('text-success').addClass('text-danger').text('No se pudo abrir la cámara. Permite el acceso a la cámara en el navegador (requiere https o localhost).'); return; }
  alert('No se pudo abrir la cámara (requiere permiso y https o localhost): ' + e);
  };
- const mejorarImagen = () => { try { s.applyVideoConstraints({width:{ideal:1920}, height:{ideal:1080}, advanced:[{focusMode:'continuous'}]}).catch(() => {}); } catch (e) {} };   // más resolución y enfoque automático continuo (si la cámara lo permite)
+ // Enfoque automático continuo (si la cámara lo permite) y resolución según cómo se lee el QR:
+ //  - Con lector nativo del navegador (BarcodeDetector: Chrome en Android, Mac...) se usa 1080p: lo decodifica el sistema, es rápido y alcanza de más lejos.
+ //  - Con el lector en JavaScript (iPhone, Windows, la mayoría de computadoras) 1080p tarda más del doble por cuadro que 720p (medido: ~75 ms contra ~33 ms),
+ //    así que se pide 720p: lee el QR en menos tiempo cuando se acerca la credencial a la cámara.
+ const nativo = typeof window.BarcodeDetector !== 'undefined';
+ const resolucion = nativo ? {width:{ideal:1920}, height:{ideal:1080}} : {width:{ideal:1280}, height:{ideal:720}};
+ const mejorarImagen = () => { try { s.applyVideoConstraints(Object.assign({advanced:[{focusMode:'continuous'}]}, resolucion)).catch(() => {}); } catch (e) {} setTimeout(precalentarIndiceQr, 0); };
  const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).then(mejorarImagen).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
  if (!ES_MOVIL) { probar([{facingMode:'user'}], 0); return; } // Computadora: cámara frontal
  // Teléfono/tablet: SIEMPRE trasera. Se busca en la lista real de cámaras la que se llame back/rear/trasera...
@@ -2438,6 +2451,11 @@ function procesarQR(curp, modo, el) {
   r.then(mostrar);
  } else mostrar(r);
 }
+let _guardarPend = null;
+function guardarYPintarLuego() {   // varios escaneos seguidos se juntan en un solo guardado
+ if (_guardarPend) return;
+ _guardarPend = setTimeout(() => { _guardarPend = null; save(); renderTabla(); }, 0);
+}
 function aplicarRegistro(a, modo) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
  const f = hoy(), r = a.reg[f] = a.reg[f] || {};
@@ -2451,14 +2469,30 @@ function aplicarRegistro(a, modo) {
  }
  // Cada escaneo entra a la cola: se envía al servidor ya (o en cuanto vuelva el internet) y aparece en todos los equipos
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
- save(); renderTabla();
+ guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
  return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), modo === 'Salida' ? permDe(r) : '') +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
+/* Índice código-del-QR -> alumno. Antes, cada lectura calculaba el código (un hash) de los alumnos uno por uno hasta dar con el correcto;
+   ahora se arma una sola vez (al encender la cámara) y cada lectura es una búsqueda directa. */
+let _idxQr = {lista: null, n: -1, clave: null, mapa: new Map()};
+function construirIndiceQr() {
+ const m = new Map();
+ (db.alumnos || []).forEach(a => { if (a.curp) { const c = qrCodigo(a.curp); if (c) m.set(c.toUpperCase(), a); } });
+ _idxQr = {lista: db.alumnos, n: (db.alumnos || []).length, clave: db.qrClave, mapa: m};
+ return m;
+}
+function precalentarIndiceQr() { try { if (db && db.qrClave) construirIndiceQr(); } catch (e) {} }
+function alumnoPorCodigoQr(cod) {
+ const vigente = _idxQr.lista === db.alumnos && _idxQr.n === db.alumnos.length && _idxQr.clave === db.qrClave;
+ let a = (vigente ? _idxQr.mapa : construirIndiceQr()).get(cod);
+ if (a && a.curp && qrCodigo(a.curp).toUpperCase() === cod) return a;   // sigue siendo el mismo alumno
+ return construirIndiceQr().get(cod) || null;                            // no estaba (o cambió algo): se rehace una vez, como antes
+}
 function registrarPorCurp(curp, modo) {
  const a = esClaveQr(curp)
-  ? db.alumnos.find(x => x.curp && qrCodigo(x.curp).toUpperCase() === curp.slice(4))
+  ? alumnoPorCodigoQr(curp.slice(4))
   : db.alumnos.find(x => x.curp && x.curp === curp);
  if (!a) return registrarDesconocido(curp, modo);
  return aplicarRegistro(a, modo);
@@ -3607,6 +3641,38 @@ function restaurarSesion(S) {
 }
 // Computadoras: al volver con "atrás" o recargar, el navegador restaura el rol elegido SIN avisar a la página -> se vuelve a sincronizar el correo
 window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredenciales(); });
+/* ---- Qué tan rápido se ven los cambios ----
+   Antes: cada equipo consultaba cada 3 s (computadoras) o 5 s (teléfonos). Ahora:
+   - consulta normal cada 1.5 s (computadoras) / 2.5 s (teléfonos); si no hubo cambios el servidor responde 304 casi sin trabajo;
+   - "ráfaga": 0.8 s mientras se está trabajando (se guardó, borró, escaneó, o llegaron cambios de otro equipo) y 6 s después del último movimiento;
+   - las otras pestañas del MISMO equipo se enteran al instante por BroadcastChannel (sin esperar consulta);
+   - se espera a que termine una consulta antes de programar la siguiente (no se amontonan si el servidor tarda). */
+var _rafagaHasta = 0;
+function acelerarSync(ms) { _rafagaHasta = Math.max(_rafagaHasta, Date.now() + (ms || 6000)); }
+function programarConsulta() {
+ const espera = Date.now() < _rafagaHasta ? 800 : (ES_MOVIL ? 2500 : 1500);
+ setTimeout(() => {
+  const p = (rolActivo && !document.hidden) ? Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {}) : Promise.resolve();
+  p.then(programarConsulta);
+ }, espera);
+}
+var _canalEstado = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_estado') : null;
+function avisarEstado() { try { if (_canalEstado) _canalEstado.postMessage(Date.now()); } catch (e) {} }
+if (_canalEstado) _canalEstado.onmessage = () => { if (rolActivo) { acelerarSync(); cargarDesdeServidor(); } };
+/* "Permanencia": un alumno sin salida pasa a ese estatus cuando LLEGA la hora de fin de su grupo, aunque no entre ningún dato nuevo.
+   Cada 20 s se revisa si se cruzó alguna hora de fin y, solo entonces, se vuelve a dibujar la tabla. */
+var _minutoPerm = null;
+function horasFinDeHoy() {
+ const f = new Set(Object.values(LIM).map(x => x.fin));
+ Object.values(db.horarios || {}).forEach(h => { if (h && h.entrada && h.salida) f.add(toMin(h.salida)); });
+ return f;
+}
+function cruzoHoraFin(antes, ahora, fines) { for (const m of fines) if (antes < m && ahora >= m) return true; return false; }
+function vigilarPermanencia() {
+ const ahora = toMin(horaAhora());
+ if (_minutoPerm !== null && ahora !== _minutoPerm && rolActivo && cruzoHoraFin(_minutoPerm, ahora, horasFinDeHoy())) renderTablaPronto();
+ _minutoPerm = ahora;
+}
 $(function () {
  precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
  try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
@@ -3618,7 +3684,8 @@ $(function () {
  if (window.SICA_SESION) restaurarSesion(window.SICA_SESION);   // solo pide datos al servidor si hay sesión (cero errores 401 al abrir)
  // Todos los equipos consultan al servidor (computadoras cada 3 s, teléfonos cada 5 s) para ver los mismos datos;
  // se pausa si la pestaña está oculta para no gastar datos ni servidor
- setInterval(() => { if (rolActivo && !document.hidden) cargarDesdeServidor(); }, ES_MOVIL ? 5000 : 3000);
+ programarConsulta();
+ setInterval(() => { if (!document.hidden) vigilarPermanencia(); }, 20000);
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();

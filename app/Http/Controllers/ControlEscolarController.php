@@ -377,7 +377,7 @@ class ControlEscolarController extends Controller
      */
     private function huellaEstado(): string
     {
-        return Cache::remember('sica.huella', 2, fn () => $this->calcularHuella());
+        return Cache::remember('sica.huella', 1, fn () => $this->calcularHuella());
     }
 
     private function calcularHuella(): string
