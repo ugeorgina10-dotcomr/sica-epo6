@@ -101,6 +101,23 @@ h2.fw-bold{font-size:1.15rem}
 .btn{font-size:.8rem}
 }
 canvas#grafica-asistencias{max-width:100%;height:auto !important}
+/* ===== Ajuste al ancho de la pantalla (teléfonos): nada se sale ni se corta a los lados ===== */
+html,body{max-width:100%}
+.main-card,.login-card,#vista-sistema{min-width:0;max-width:100%}
+#vista-sistema img,#vista-sistema canvas,#vista-sistema video{max-width:100%}
+@media (max-width:767.98px){
+#vista-sistema .d-flex{min-width:0}
+#vista-sistema .d-flex>*{min-width:0}
+#vista-sistema h5.fw-bold{overflow-wrap:anywhere}
+#vista-sistema .cct-text{overflow-wrap:anywhere}
+#vista-sistema .d-flex.align-items-center.gap-2{flex-wrap:wrap}
+#badge-rol-activo{white-space:normal;text-align:left;font-size:.85rem !important;max-width:100%;flex:1 1 100%;overflow-wrap:anywhere}
+.btn-recargar-sistema{white-space:normal;flex:1 1 100%}
+#sel-mi-grupo{max-width:100%;text-overflow:ellipsis}
+#bloque-mi-grupo-orientador .badge{white-space:normal;text-align:left}
+.table-responsive{max-width:100%;-webkit-overflow-scrolling:touch}
+.row{margin-left:0;margin-right:0}
+}
 html{-webkit-text-size-adjust:100%}
 body{padding-bottom:env(safe-area-inset-bottom)}
 body{overflow-x:hidden}
@@ -1863,7 +1880,7 @@ function avisarOtrasPestanas(msg) {
 /* ---- Sonido del aviso ----
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
-let _audioCtx = null, _sonidoPendiente = null;
+let _audioCtx = null, _sonidoPendiente = null, _tonosActivos = [];
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -1892,9 +1909,22 @@ function sonarAviso(veces) {
     vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
     osc.connect(vol); vol.connect(_audioCtx.destination);
     osc.start(ini); osc.stop(ini + 0.4);
+    const par = {osc: osc, vol: vol};
+    _tonosActivos.push(par);
+    osc.onended = () => { const i = _tonosActivos.indexOf(par); if (i >= 0) _tonosActivos.splice(i, 1); };
    });
   }
  } catch (e) {}
+}
+/* Corta AL INSTANTE el sonido que esté sonando o programado (antes, al silenciar, terminaba de sonar la tanda que ya estaba en marcha) */
+function silenciarSonidoYa() {
+ _sonidoPendiente = null;
+ const lista = _tonosActivos.splice(0);
+ lista.forEach(p => {
+  try { p.vol.gain.cancelScheduledValues(0); p.vol.gain.setValueAtTime(0.0001, _audioCtx.currentTime); } catch (e) {}
+  try { p.osc.stop(); } catch (e) {}
+  try { p.osc.disconnect(); p.vol.disconnect(); } catch (e) {}
+ });
 }
 let _entrandoPorAviso = false;
 let _esSecundaria = false;      // true en una pestaña que entró sola por un aviso (la "principal" es la que inició sesión a mano)
@@ -2033,8 +2063,10 @@ function pintarMudo(b) {   // b = burbuja (jQuery): el texto del botón y su asp
 function alternarMudoBurbuja(btn, ev) {
  if (ev) ev.stopPropagation();   // no cuenta como pulsar la burbuja (no abre la solicitud)
  const b = $(btn).closest('.burbuja');
- fijarMudo(b.attr('data-k'), !estaMudo(b.attr('data-k')));
+ const k = b.attr('data-k'), alSilenciar = !estaMudo(k);
+ fijarMudo(k, alSilenciar);
  pintarMudo(b);
+ if (alSilenciar && !_pendientesAviso.some(x => !estaMudo(x))) silenciarSonidoYa();   // no queda ninguna sin silenciar: se calla ya
  vigilarRepeticion();
 }
 function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silencia esa alerta
@@ -2042,13 +2074,14 @@ function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silenc
  const b = $(btn).closest('.burbuja');
  fijarMudo(b.attr('data-k'), true);
  b.remove();
+ if (!_pendientesAviso.some(x => !estaMudo(x))) silenciarSonidoYa();
  vigilarRepeticion();
 }
 /* Enciende el temporizador solo cuando hay alguna burbuja y lo apaga cuando ya no queda ninguna */
 function vigilarRepeticion() {
  const hay = _pendientesAviso.length > 0;
  if (hay && !_repiteAviso) _repiteAviso = setInterval(repetirAviso, REPETIR_AVISO_MS);
- else if (!hay && _repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; }
+ else if (!hay && _repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; silenciarSonidoYa(); }   // ya dieron acceso: se calla al momento
 }
 function repetirAviso() {
  $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });   // por si en otra pestaña la silenciaron
