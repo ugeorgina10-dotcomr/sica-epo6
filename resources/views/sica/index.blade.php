@@ -1250,6 +1250,7 @@ function subirOrientadores() {
  if (!permisoPermite()) return;
  const inp = $('#archivo-orientadores')[0];
  if (!inp.files.length) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
+ if (!confirm('¿Seguro que quieres subir los orientadores del archivo "' + inp.files[0].name + '"?\nSe agregarán los nuevos y se asignarán a sus grupos.')) return;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /nombre|orientador/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r[0] && String(r[0]).trim());
   if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
@@ -1358,6 +1359,7 @@ function guardarHorarioInline(btn) {
  if (!k || !db.horarios[k]) return;
  if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
  if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
+ if (!confirm('¿Seguro que quieres guardar este horario? Entrada hasta ' + h12(e) + ' y cierre a las ' + h12(s) + '.')) return;
  db.horarios[k].entrada = e; db.horarios[k].salida = s;
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
@@ -1412,6 +1414,7 @@ function guardarGruposOrientador() {
  const quitan = [];
  nuevas.forEach(k => { const h = db.horarios[k]; if (h && h.orientadorId && h.orientadorId !== id) { const otro = db.orientadores.find(x => x.id === h.orientadorId), c = parseClave(k); quitan.push(c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ') — hoy de ' + (otro ? otro.nombre : 'otro orientador(a)')); } });
  if (quitan.length && !confirm('Estos grupos ya tienen otro orientador(a) y pasarán a ' + o.nombre + ':\n' + quitan.join('\n') + '\n¿Continuar?')) return;
+ if (!quitan.length && !confirm('¿Seguro que quieres guardar los grupos de ' + o.nombre + '?')) return;
  Object.keys(db.horarios).forEach(k => { if (db.horarios[k].orientadorId === id && !nuevas.includes(k)) db.horarios[k].orientadorId = ''; });
  nuevas.forEach(k => { const h = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''}; h.orientadorId = id; db.horarios[k] = h; });
  oriEditando = null;
@@ -1649,6 +1652,7 @@ function aplicarPermisos(rol) {
 }
 function guardarPermisoRol() {
  const rol = $('#select-rol-permiso').val(), tarea = $('#select-tarea-permiso').val();
+ if (!confirm('¿Seguro que quieres cambiar el permiso de ' + nombresRoles[rol] + ' a "' + (tarea === 'editar' ? 'Puede editar / realizar acciones' : 'Solo visualizar') + '"?')) return;
  db.permisos[rol] = tarea; save();
  $('#resumen-permisos').text('Permiso actualizado: ' + nombresRoles[rol] + ' → ' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar'));
  sincronizarConServidor('guardar_permisos', db.permisos);
@@ -1669,7 +1673,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1000);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -1844,11 +1848,12 @@ function avisarOtrasPestanas(msg) {
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
 let _audioCtx = null, _sonidoPendiente = null;
+let _nodosAviso = [];   // tonos que ya están programados o sonando: así se pueden cortar en el acto al silenciar
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
-  if (!_audioCtx) _audioCtx = new AC();
+  if (!_audioCtx) _audioCtx = new AC({latencyHint: 'interactive'});
   if (_audioCtx.state === 'suspended') _audioCtx.resume().then(() => {
    // Si el aviso llegó antes de que alguien tocara la página, suena en cuanto se toca
    if (_sonidoPendiente) { const v = _sonidoPendiente; _sonidoPendiente = null; sonarAviso(v); }
@@ -1872,9 +1877,31 @@ function sonarAviso(veces) {
     vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
     osc.connect(vol); vol.connect(_audioCtx.destination);
     osc.start(ini); osc.stop(ini + 0.4);
+    const nodo = {osc: osc, vol: vol};
+    _nodosAviso.push(nodo);
+    osc.onended = () => { _nodosAviso = _nodosAviso.filter(n => n !== nodo); };
    });
   }
  } catch (e) {}
+}
+/* Corta YA todo el sonido que esté sonando o programado (antes, al silenciar, seguían saliendo los tonos que ya estaban programados) */
+function detenerSonido() {
+ _sonidoPendiente = null;
+ const nodos = _nodosAviso; _nodosAviso = [];
+ nodos.forEach(n => {
+  try { n.vol.gain.cancelScheduledValues(0); n.vol.gain.value = 0; } catch (e) {}
+  try { n.osc.onended = null; n.osc.stop(0); } catch (e) {}
+  try { n.osc.disconnect(); n.vol.disconnect(); } catch (e) {}
+ });
+}
+/* Se llama al instante cuando se silencia o se activa una alerta: corta el sonido actual y, si todavía queda alguna alerta
+   sin silenciar, vuelve a sonar de inmediato (sin esperar los 12 s de la repetición) */
+function aplicarCambioMudo() {
+ $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });
+ detenerSonido();
+ if (_repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; }
+ if (_pendientesAviso.some(k => !estaMudo(k))) sonarAviso(VECES_REPETICION);
+ vigilarRepeticion();
 }
 let _entrandoPorAviso = false;
 let _esSecundaria = false;      // true en una pestaña que entró sola por un aviso (la "principal" es la que inició sesión a mano)
@@ -1931,12 +1958,14 @@ function irAControl(cuenta, silencio) {
 }
 function alRecibirAviso(msg) {
  if (!msg) return;
- if (msg.tipo === 'aviso') entrarSiHaySesion();
+ if (msg.tipo === 'olvido') { if (!rolActivo) consultarOlvidosInicio(); else if (rolActivo === 'control') cargarClaves(); }
+ else if (msg.tipo === 'aviso') entrarSiHaySesion();
  else if (msg.tipo === 'ir-control' && !_esSecundaria) { avisarOtrasPestanas({tipo: 'ack-control'}); irAControl(msg.cuenta); }
  else if (msg.tipo === 'ack-control' && _confirmarEnvio) _confirmarEnvio();
 }
 if (_canalAvisos) _canalAvisos.onmessage = e => alRecibirAviso(e.data);
 window.addEventListener('storage', e => {
+ if (e.key === CLAVE_MUDOS) { aplicarCambioMudo(); return; }
  if (e.key !== 'sica_aviso' || !e.newValue) return;
  try { alRecibirAviso(JSON.parse(e.newValue).m); } catch (x) {}
 });
@@ -2015,14 +2044,14 @@ function alternarMudoBurbuja(btn, ev) {
  const b = $(btn).closest('.burbuja');
  fijarMudo(b.attr('data-k'), !estaMudo(b.attr('data-k')));
  pintarMudo(b);
- vigilarRepeticion();
+ aplicarCambioMudo();   // silenciar corta el sonido en el acto; activar lo hace sonar en el acto
 }
 function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silencia esa alerta
  if (ev) ev.stopPropagation();
  const b = $(btn).closest('.burbuja');
  fijarMudo(b.attr('data-k'), true);
  b.remove();
- vigilarRepeticion();
+ aplicarCambioMudo();
 }
 /* Enciende el temporizador solo cuando hay alguna burbuja y lo apaga cuando ya no queda ninguna */
 function vigilarRepeticion() {
@@ -2038,8 +2067,6 @@ function repetirAviso() {
 }
 /* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
 let _consultandoOlvidos = false, _etagOlvidos = null;
-var _canalOlvidos = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_olvidos') : null;
-function avisarOlvido() { try { if (_canalOlvidos) _canalOlvidos.postMessage(Date.now()); } catch (e) {} }
 function consultarOlvidosInicio() {
  if (rolActivo || _consultandoOlvidos) return;
  _consultandoOlvidos = true;
@@ -2148,6 +2175,7 @@ function guardarClave() {
   url = '/api/sica/claves/rol';
   cuerpo = {rol: c.rol, password: nueva, password_confirmation: conf, password_actual: $('#clave-actual').val()};
  }
+ if (!confirm(c.control ? '¿Seguro que quieres cambiar tu contraseña de Control Escolar?' : '¿Seguro que quieres guardar la contraseña nueva de ' + c.nombre + '?\nReemplazará la anterior y le quitará el bloqueo, si lo tenía.')) return;
  // Esta sí espera al servidor (él revisa que la contraseña sirva y no esté repetida), pero ya no hace una segunda consulta después
  const btns = $('#panel-cuenta-clave button').prop('disabled', true);
  $('#resumen-claves').text('Guardando...');
@@ -2212,7 +2240,7 @@ function borrarClaveCuenta() {
 function desbloquearCuenta() {
  const c = datosCuenta();
  if (!c || !c.bloqueada) return;
- // Sin ventana de confirmación: desbloquear no cambia ni borra nada (solo deja que la persona vuelva a intentar entrar), así es un solo clic.
+ if (!confirm('¿Seguro que quieres desbloquear la cuenta de ' + c.nombre + '?\nLa persona podrá volver a intentar entrar con su contraseña actual. No se cambia ni se borra ninguna contraseña.')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
  const copia = copiaClaves();
  cambiarLocalClaves(c, {bloqueada: false, olvido_at: null});   // el bloqueo desaparece al instante (y su burbuja)
@@ -2287,6 +2315,7 @@ function confirmarOlvido(reintento) {
   // 419: la página llevaba mucho tiempo abierta y su token venció (pasa en computadoras) -> se pide uno nuevo y se reintenta UNA vez
   if (d.status === 419 && !reintento) return refrescarCsrf().then(() => confirmarOlvido(true));
   _olvidoEnCurso = false;
+  if (d.ok !== false && d.bloqueada) avisarOtrasPestanas({tipo: 'olvido'});
   btn.prop('disabled', false);   // (el modal siguiente reemplaza los botones)
   $('#input-clave').val('');
   if (d.ok === false || !d.mensaje) {
@@ -2303,7 +2332,6 @@ function confirmarOlvido(reintento) {
    }
    abrirModalCuenta('info', msg); return;
   }
-  if (d.bloqueada) { avisarOlvido(); consultarOlvidosInicio(); }   // las demás pestañas de este equipo sacan la burbuja al instante
   // Si el mensaje de "Cuenta bloqueada" ya salió al instante y el servidor lo confirma, NO se vuelve a abrir (salía dos veces)
   if (optimista && d.bloqueada) return;
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
@@ -2792,6 +2820,7 @@ function subirHorarios() {
  if (!permisoPermite()) return;
  const inp = $('#archivo-horarios')[0];
  if (!inp.files.length) { alert('Selecciona un archivo de horarios.'); return; }
+ if (!confirm('¿Seguro que quieres subir los horarios del archivo "' + inp.files[0].name + '"?\nSe aplicarán a los grupos que trae el archivo.')) return;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv'], r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
   if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
@@ -3193,6 +3222,7 @@ function subirPlantillaOficial(lado) {
  if (!f) { alert('Primero elige tu archivo (Word o PDF) y luego pulsa "Actualizar".'); return; }
  const esPDF = /\.pdf$/i.test(f.name), esDocx = /\.docx$/i.test(f.name);
  if (!esPDF && !esDocx) { alert('Ese archivo no sirve. Usa un Word guardado como .docx (Archivo > Guardar como > Documento de Word) o un PDF (Archivo > Exportar > PDF).'); $('#input-plantilla-oficial-' + lado).val(''); return; }
+ if (!confirm('¿Seguro que quieres actualizar la plantilla oficial (' + lado + ') del turno ' + (turnoCred || 'Matutino') + ' con el archivo "' + f.name + '"?')) return;
  if (!libsOk('SicaDocx')) return;
  if (esPDF && !libsOk('pdfjsLib')) return;
  const caja = $('#resumen-plantilla-oficial');
@@ -3411,6 +3441,7 @@ function guardarCambiosCredencial() {
  if (!a) { alert('Primero elige un alumno de la lista.'); return; }
  if (!curp || !nombre) { alert('CURP y nombre son obligatorios.'); return; }
  if (!curpLargoValido(curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(curp) + ' (ahora tiene ' + curp.length + ').'); return; }
+ if (!confirm('¿Seguro que quieres guardar los cambios de ' + a.nombre + '?')) return;
  a.curp = curp; a.nombre = nombre; save();
  actualizarVistaPreviaCredencial();
  alert('Cambios guardados en la credencial.');
@@ -3692,10 +3723,7 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
- /* Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde 304 sin cuerpo si nada cambió y
-    guarda la respuesta 1 s en caché). Las otras pestañas del mismo equipo se enteran al instante por BroadcastChannel. */
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1000);
- if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 600);   // burbuja y sonido en la pantalla de inicio
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

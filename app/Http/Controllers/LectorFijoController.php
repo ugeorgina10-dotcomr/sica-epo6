@@ -17,10 +17,8 @@ class LectorFijoController extends Controller
         if ($request->filled('buscar')) {
             $busqueda = $request->buscar;
             $query->whereHas('alumno', function($q) use ($busqueda) {
-                // En Postgres LIKE distingue mayúsculas (en MySQL no): se compara siempre en minúsculas para que busque igual en ambos
-                $patron = '%' . mb_strtolower($busqueda) . '%';
-                $q->whereRaw('LOWER(matricula) LIKE ?', [$patron])
-                  ->orWhereRaw('LOWER(nombre) LIKE ?', [$patron]);
+                $q->where('matricula', 'like', "%{$busqueda}%")
+                  ->orWhere('nombre', 'like', "%{$busqueda}%");
             });
         }
 

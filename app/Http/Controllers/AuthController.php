@@ -129,7 +129,7 @@ class AuthController extends Controller
 
     /**
      * Quién pulsó "¿Olvidaste tu contraseña?" y espera que Control Escolar le dé una nueva.
-     * Es pública a propósito: la pantalla de inicio la consulta cada 1 s (sin sesión) para sacar la burbuja y el sonido de alerta,
+     * Es pública a propósito: la pantalla de inicio la consulta cada 2 s (sin sesión) para sacar la burbuja y el sonido de alerta,
      * así Control Escolar se entera aunque aún no haya iniciado sesión. Solo trae el nombre de la cuenta y la hora de la solicitud
      * (los nombres de los orientadores ya son públicos en la lista del login). Misma forma que /api/sica/claves.
      */
