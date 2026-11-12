@@ -2835,15 +2835,17 @@ function renderGruposCargados() {
  const lista = gruposCargados();
  const vivos = new Set(lista.map(g => g.k));
  _grpSel.forEach(k => { if (!vivos.has(k)) _grpSel.delete(k); });
+ const abierta = caja.find('details').prop('open');   // si estaba abierta, sigue abierta al marcar o borrar
+ const filas = lista.map(g => {
+  const h = db.horarios[g.k], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null;
+  return '<label class="ori-item" style="cursor:pointer"><span class="d-flex align-items-start gap-2">' +
+   '<input type="checkbox" class="form-check-input mt-1" ' + (_grpSel.has(g.k) ? 'checked ' : '') + 'onchange="grpMarcar(\'' + esc(g.k) + '\',this.checked)">' +
+   '<span><span class="fw-semibold">' + g.grado + '° grado, grupo ' + g.grupo + '</span> <span class="text-muted">(' + esc(g.turno) + ')</span><br>' +
+   '<span class="small text-muted">' + g.n + (g.n === 1 ? ' alumno' : ' alumnos') + ' · ' + (o ? esc(o.nombre) : 'sin orientador(a)') + '</span></span></span></label>';
+ }).join('');
  const html = !lista.length ? '<span class="text-muted">Aún no hay grupos con alumnos.</span>' :
-  '<div class="row g-1">' + lista.map(g => {
-   const h = db.horarios[g.k], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null;
-   return '<div class="col-md-6"><label class="d-flex align-items-start gap-2 p-2 bg-white border rounded-3 h-100" style="cursor:pointer">' +
-    '<input type="checkbox" class="form-check-input mt-1" ' + (_grpSel.has(g.k) ? 'checked ' : '') + 'onchange="grpMarcar(\'' + esc(g.k) + '\',this.checked)">' +
-    '<span><span class="fw-semibold">' + g.grado + '° grado, grupo ' + g.grupo + '</span> <span class="text-muted">(' + esc(g.turno) + ')</span><br>' +
-    '<span class="text-muted">' + g.n + (g.n === 1 ? ' alumno' : ' alumnos') + ' · ' + (o ? esc(o.nombre) : 'sin orientador(a)') + '</span></span></label></div>';
-  }).join('') + '</div>';
- if (html !== _grpHtml) { _grpHtml = html; caja.html(html); }
+  '<summary>Ver grupos cargados (' + lista.length + ')</summary><div class="ori-lista">' + filas + '</div>';
+ if (html !== _grpHtml) { _grpHtml = html; caja.html(lista.length ? '<details class="ori-desplegable"' + (abierta ? ' open' : '') + '>' + html + '</details>' : html); }
  $('#btn-grp-borrar-sel').prop('disabled', !_grpSel.size).text(_grpSel.size ? 'Borrar seleccionados (' + _grpSel.size + ')' : 'Borrar seleccionados');
 }
 function grpMarcar(k, on) { if (on) _grpSel.add(k); else _grpSel.delete(k); renderGruposCargados(); }
