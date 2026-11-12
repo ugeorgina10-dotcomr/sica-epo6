@@ -874,9 +874,20 @@ function sincronizarConServidor(accion, datos, reintento) {
 }
 /* Mezcla el estado del servidor con el local sin perder entradas/salidas ya registradas.
  Los alumnos se emparejan por CURP (el id del servidor es distinto al id local). */
+/* Alumnos recién borrados: mientras el servidor aún no confirma (o si una consulta empezó antes de confirmar) no se vuelven a mostrar */
+const _lapidas = new Map();   // clave -> null (pendiente) | momento en que el servidor confirmó el borrado
+const claveAl = a => a.curp ? 'c:' + a.curp : 'i:' + a.id;
+function _lapidaActiva(k, inicioConsulta) {
+ if (!_lapidas.has(k)) return false;
+ const t = _lapidas.get(k);
+ if (t === null) return true;
+ if (Date.now() - t > 60000) { _lapidas.delete(k); return false; }
+ return !inicioConsulta || inicioConsulta <= t;
+}
 function fusionarServidor(s, inicioConsulta) {
  if (!s || !Array.isArray(s.alumnos)) return;
  const clv = a => a.curp ? 'c:' + a.curp : 'i:' + a.id;
+ if (_lapidas.size) s.alumnos = s.alumnos.filter(sa => !_lapidaActiva(clv(sa), inicioConsulta));
  const locales = new Map(db.alumnos.map(a => [clv(a), a])), claves = new Set();
  const lista = s.alumnos.map(sa => {
   claves.add(clv(sa)); sa.reg = sa.reg || {}; sa.enServidor = true;
@@ -1423,15 +1434,25 @@ function eliminarOrientador(id) {
  const o = db.orientadores.find(x => x.id === id); if (!o) return;
  const grupos = Object.entries(db.horarios).filter(([k, v]) => v.orientadorId === id).map(([k]) => { const c = parseClave(k); return 'Grado ' + c.grado + ' Grupo ' + c.grupo + ' (' + c.turno + ')'; });
  if (!confirm('¿Eliminar a ' + o.nombre + '?' + (grupos.length ? '\nSe quitará de: ' + grupos.join(', ') + ' (quedará sin orientador).' : '') + '\nSe borrará de forma permanente de la base de datos, junto con su contraseña. Esta acción no se puede deshacer.')) return;
+ // Se quita de la pantalla al instante; si el servidor no pudo borrarlo, vuelve a aparecer con un aviso
+ const asignados = Object.entries(db.horarios).filter(([k, v]) => v.orientadorId === id).map(([k]) => k);
+ const eraActivo = localStorage.getItem('sica_orientador') === id;
+ db.orientadores = db.orientadores.filter(x => x.id !== id);
+ if (eraActivo) localStorage.removeItem('sica_orientador');
+ asignados.forEach(k => { db.horarios[k].orientadorId = ''; });
+ localStorage.setItem(LS, JSON.stringify(db));
+ renderListaOrientadores(); renderTabla();
+ _oriGuardando++; _oriUltimoCambio = Date.now();   // una consulta vieja del servidor no lo vuelve a poner
  _postSync('eliminar_orientador', {id:o.id, nombre:o.nombre}, 30000)
  .then(r => r.json().catch(() => ({})).then(d => { if (!r.ok || d.ok === false) return Promise.reject(); }))
- .then(() => {
- db.orientadores = db.orientadores.filter(x => x.id !== id);
- if (localStorage.getItem('sica_orientador') === id) localStorage.removeItem('sica_orientador');
- Object.values(db.horarios).forEach(h => { if (h.orientadorId === id) h.orientadorId = ''; });
- localStorage.setItem(LS, JSON.stringify(db));
- renderListaOrientadores();renderTabla();
- }).catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
+ .catch(() => {
+  if (!db.orientadores.some(x => x.id === id)) db.orientadores.push(o);
+  asignados.forEach(k => { if (db.horarios[k] && !db.horarios[k].orientadorId) db.horarios[k].orientadorId = id; });
+  if (eraActivo) localStorage.setItem('sica_orientador', id);
+  localStorage.setItem(LS, JSON.stringify(db));
+  renderListaOrientadores(); renderTabla();
+  alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
+ }).finally(() => { _oriGuardando--; _oriUltimoCambio = Date.now(); });
 }
 /* Grupos que le corresponden a un orientador, según lo que asignó Control Escolar */
 function calcularGruposOrientador(orientadorId) {
@@ -2767,6 +2788,7 @@ function borrarListaGrupo() {
  if (!confirm('¿Borrar la lista completa del ' + g + '° grado, grupo ' + n + ' (' + t + ')?\n' + lista.length + ' alumno(s) y todos sus registros de asistencia se eliminarán de forma permanente. Esta acción no se puede deshacer.')) return;
  // La lista desaparece de la pantalla al instante; si el servidor no pudo borrarla, vuelve a aparecer con un aviso
  const ids = new Set(lista.map(a => a.id));
+ const claves = lista.map(claveAl); claves.forEach(k => _lapidas.set(k, null));
  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
  localStorage.setItem(LS, JSON.stringify(db));
  $('#archivo-lista').val('');
@@ -2774,9 +2796,11 @@ function borrarListaGrupo() {
  if (credSel) selCred(credSel.grado, credSel.grupo);
  _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
   if (!r.ok) return Promise.reject();
+  claves.forEach(k => _lapidas.set(k, Date.now()));
   ids.forEach(id => _firmasGuardadas.delete(id));
   alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
  }).catch(() => {
+  claves.forEach(k => _lapidas.delete(k));
   const hay = new Set(db.alumnos.map(a => a.id));
   lista.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
   localStorage.setItem(LS, JSON.stringify(db));
@@ -3389,12 +3413,14 @@ function eliminarAlumno(id) {
  const a = db.alumnos.find(x => x.id === id); if (!a) return;
  if (!confirm('¿Eliminar a ' + a.nombre + (a.curp ? ' (' + a.curp + ')' : '') + '? Se borrarán también sus registros de asistencia. Esta acción no se puede deshacer.')) return;
  // Se quita de la pantalla al instante; si el servidor no pudo borrarlo, vuelve a aparecer con un aviso
+ const kAl = claveAl(a); _lapidas.set(kAl, null);
  db.alumnos = db.alumnos.filter(x => x.id !== id);
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
  _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
- .then(r => r.ok ? null : Promise.reject())
+ .then(r => r.ok ? _lapidas.set(kAl, Date.now()) : Promise.reject())
  .catch(() => {
+ _lapidas.delete(kAl);
  if (!db.alumnos.some(x => x.id === a.id)) db.alumnos.push(a);
  localStorage.setItem(LS, JSON.stringify(db));
  if (credSel) selCred(credSel.grado, credSel.grupo);
@@ -3408,7 +3434,7 @@ function guardarCambiosCredencial() {
  if (!a) { alert('Primero elige un alumno de la lista.'); return; }
  if (!curp || !nombre) { alert('CURP y nombre son obligatorios.'); return; }
  if (!curpLargoValido(curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(curp) + ' (ahora tiene ' + curp.length + ').'); return; }
- a.curp = curp; a.nombre = nombre; save();
+ a.curp = curp; a.nombre = nombre; save(); guardarYa();
  actualizarVistaPreviaCredencial();
  alert('Cambios guardados en la credencial.');
 }
