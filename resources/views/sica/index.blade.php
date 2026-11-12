@@ -148,6 +148,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .ori-lista{max-height:260px;overflow-y:auto}
 .ori-item{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.5rem .9rem;border-bottom:1px solid #f1e6e8}
 .ori-item:last-child{border-bottom:0}
+.btn-grp-chico{font-size:.8rem;min-height:0 !important;padding-top:.15rem !important;padding-bottom:.15rem !important}
+#btn-grp-borrar-sel:not(:disabled){background:#800020;border-color:#800020;color:#fff}
+#btn-grp-borrar-sel:not(:disabled):hover{background:#600018;border-color:#600018;color:#fff}
 .ori-item>div:first-child,.ori-item>label{min-width:0;overflow-wrap:anywhere}
 @media (max-width:420px){.ori-item{flex-wrap:wrap}.ori-item>.d-flex.flex-shrink-0{width:100%;justify-content:flex-end}}
 #bloque-buscador-orientador.row{margin-left:0;margin-right:0}
@@ -494,8 +497,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
  <h6 class="fw-bold mb-0" style="color:#800020">Grupos cargados</h6>
  <div class="d-flex flex-wrap gap-2">
- <button type="button" onclick="grpSeleccionarTodos(true)" class="btn btn-outline-dark btn-sm py-0 px-2">Seleccionar todos</button>
- <button type="button" onclick="grpSeleccionarTodos(false)" class="btn btn-outline-secondary btn-sm py-0 px-2">Quitar selección</button>
+ <button type="button" onclick="grpSeleccionarTodos(true)" class="btn btn-outline-dark btn-sm py-0 px-2 btn-grp-chico">Seleccionar todos</button>
+ <button type="button" onclick="grpSeleccionarTodos(false)" class="btn btn-outline-secondary btn-sm py-0 px-2 btn-grp-chico">Quitar selección</button>
  </div>
  </div>
  <div id="lista-grupos-cargados" class="small"></div>
@@ -504,8 +507,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <label class="form-check-label" for="grp-borrar-config">Quitar también el horario y el orientador(a) de esos grupos (si no lo marcas, solo se borran los alumnos)</label>
  </div>
  <div class="d-flex flex-wrap gap-2 mt-2">
- <button type="button" id="btn-grp-borrar-sel" onclick="borrarGruposCargados(false)" class="btn btn-outline-danger btn-sm py-2 px-3 fw-semibold" disabled>Borrar seleccionados</button>
- <button type="button" onclick="borrarGruposCargados(true)" class="btn btn-danger btn-sm py-2 px-3 fw-semibold">Borrar todos los grupos</button>
+ <button type="button" id="btn-grp-borrar-sel" onclick="borrarGruposCargados(false)" class="btn btn-outline-danger btn-sm py-0 px-2 fw-semibold btn-grp-chico" disabled>Borrar seleccionados</button>
+ <button type="button" onclick="borrarGruposCargados(true)" class="btn btn-danger btn-sm py-0 px-2 fw-semibold btn-grp-chico">Borrar todos los grupos</button>
  </div>
  </div>
  <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
@@ -1380,7 +1383,7 @@ function renderListaHorarios() {
    '<div class="col-6 col-lg-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
    '<div class="col-6 col-lg-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
    '<div class="col-12 col-lg-3 d-flex flex-wrap gap-1">' +
-   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
+   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
    '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
    '</div></div></div></div>';
  }).join('');
