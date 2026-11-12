@@ -479,7 +479,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="row g-3 align-items-end">
  <div class="col-12 col-md-5 col-xl-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
  <div class="col-12 col-md-7 col-xl-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
- <div class="col-12 col-xl-5 d-flex flex-wrap gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm flex-grow-1 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm flex-grow-1 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
+ <div class="col-12 col-xl-5 d-flex flex-wrap gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm flex-grow-1 py-2 fw-semibold btn-accion-restringida">Subir Lista</button></div>
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
@@ -1380,7 +1380,7 @@ function renderListaHorarios() {
    '<div class="col-6 col-lg-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
    '<div class="col-6 col-lg-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
    '<div class="col-12 col-lg-3 d-flex flex-wrap gap-1">' +
-   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
+   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
    '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
    '</div></div></div></div>';
  }).join('');
@@ -2898,34 +2898,24 @@ function renderGruposCargados() {
    '<input type="checkbox" class="form-check-input mt-1" ' + (_grpSel.has(g.k) ? 'checked ' : '') + 'onchange="grpMarcar(\'' + esc(g.k) + '\',this.checked)">' +
    '<span><span class="fw-semibold">' + g.grado + '° grado, grupo ' + g.grupo + '</span> <span class="text-muted">(' + esc(g.turno) + ')</span><br>' +
    '<span class="small text-muted">' + g.n + (g.n === 1 ? ' alumno' : ' alumnos') + ' · ' + (o ? esc(o.nombre) : 'sin orientador(a)') + '</span></span></label>' +
-   '<div class="d-flex gap-1 flex-shrink-0"><button type="button" data-k="' + esc(g.k) + '" onclick="editarGrupoCargado(this.dataset.k)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Cambiar el orientador(a) y los grupos">Editar</button>' +
-   '<button type="button" data-k="' + esc(g.k) + '" onclick="borrarGruposCargados(false, this.dataset.k)" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar este grupo">Eliminar</button></div></div>';
+   '</div>';
  }).join('');
  const html = !lista.length ? '<span class="text-muted">Aún no hay grupos con alumnos.</span>' :
   '<summary>Ver grupos cargados (' + lista.length + ')</summary><div class="ori-lista">' + filas + '</div>';
  if (html !== _grpHtml) { _grpHtml = html; caja.html(lista.length ? '<details class="ori-desplegable"' + (abierta ? ' open' : '') + '>' + html + '</details>' : html); }
  $('#btn-grp-borrar-sel').prop('disabled', !_grpSel.size).text(_grpSel.size ? 'Borrar seleccionados (' + _grpSel.size + ')' : 'Borrar seleccionados');
 }
-function editarGrupoCargado(k) {
- if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede editar grupos.'); return; }
- const h = db.horarios[k], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null;
- if (!o) { alert('Este grupo todavía no tiene orientador(a). Asígnalo subiendo la lista de orientadores o de horarios.'); return; }
- if (!oriEditando || oriEditando.id !== o.id) editarOrientador(o.id);
- $('#lista-orientadores-actual details').prop('open', true);
- const el = document.getElementById('bloque-orientadores-control');
- if (el && el.scrollIntoView) el.scrollIntoView({behavior: 'smooth', block: 'start'});
-}
 function grpMarcar(k, on) { if (on) _grpSel.add(k); else _grpSel.delete(k); renderGruposCargados(); }
 function grpSeleccionarTodos(on) { _grpSel = new Set(on ? gruposCargados().map(g => g.k) : []); _grpHtml = ''; renderGruposCargados(); }
-function borrarGruposCargados(todos, soloK) {
+function borrarGruposCargados(todos) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar grupos.'); return; }
  const todosLos = gruposCargados();
- const elegidos = soloK ? todosLos.filter(g => g.k === soloK) : todos ? todosLos : todosLos.filter(g => _grpSel.has(g.k));
+ const elegidos = todos ? todosLos : todosLos.filter(g => _grpSel.has(g.k));
  if (!elegidos.length) { alert('Primero selecciona al menos un grupo.'); return; }
  const config = $('#grp-borrar-config').prop('checked');
  const nAlum = elegidos.reduce((t, g) => t + g.n, 0);
  const detalle = elegidos.length <= 8 ? '\n' + elegidos.map(g => '- ' + g.grado + '° grado, grupo ' + g.grupo + ' (' + g.turno + '): ' + g.n + ' alumno(s)').join('\n') : '';
- if (!confirm((soloK ? '¿Estás seguro de borrar este grupo?' : todos ? '¿Borrar TODOS los grupos?' : '¿Borrar los ' + elegidos.length + ' grupo(s) seleccionado(s)?') + detalle +
+ if (!confirm((todos ? '¿Borrar TODOS los grupos?' : '¿Borrar los ' + elegidos.length + ' grupo(s) seleccionado(s)?') + detalle +
   '\n\nSe eliminarán ' + nAlum + ' alumno(s) y todos sus registros de asistencia de forma permanente' + (config ? ', y también el horario y el orientador(a) de esos grupos' : '') + '. Esta acción no se puede deshacer.')) return;
  if (todos && !confirm('Última confirmación: se borrará TODO el alumnado de los ' + elegidos.length + ' grupos. ¿Continuar?')) return;
  // Desaparecen de la pantalla al instante; si el servidor no pudo borrarlos, vuelven a aparecer con un aviso
