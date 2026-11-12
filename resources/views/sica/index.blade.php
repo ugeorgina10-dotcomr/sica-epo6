@@ -101,6 +101,23 @@ h2.fw-bold{font-size:1.15rem}
 .btn{font-size:.8rem}
 }
 canvas#grafica-asistencias{max-width:100%;height:auto !important}
+/* ===== Ajuste al ancho de la pantalla (teléfonos): nada se sale ni se corta a los lados ===== */
+html,body{max-width:100%}
+.main-card,.login-card,#vista-sistema{min-width:0;max-width:100%}
+#vista-sistema img,#vista-sistema canvas,#vista-sistema video{max-width:100%}
+@media (max-width:767.98px){
+#vista-sistema .d-flex{min-width:0}
+#vista-sistema .d-flex>*{min-width:0}
+#vista-sistema h5.fw-bold{overflow-wrap:anywhere}
+#vista-sistema .cct-text{overflow-wrap:anywhere}
+#vista-sistema .d-flex.align-items-center.gap-2{flex-wrap:wrap}
+#badge-rol-activo{white-space:normal;text-align:left;font-size:.85rem !important;max-width:100%;flex:1 1 100%;overflow-wrap:anywhere}
+.btn-recargar-sistema{white-space:normal;flex:1 1 100%}
+#sel-mi-grupo{max-width:100%;text-overflow:ellipsis}
+#bloque-mi-grupo-orientador .badge{white-space:normal;text-align:left}
+.table-responsive{max-width:100%;-webkit-overflow-scrolling:touch}
+.row{margin-left:0;margin-right:0}
+}
 html{-webkit-text-size-adjust:100%}
 body{padding-bottom:env(safe-area-inset-bottom)}
 body{overflow-x:hidden}
@@ -467,7 +484,26 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  </div>
-  <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
+  <!-- SOLO CONTROL ESCOLAR: todos los grupos con alumnos y borrado de varios a la vez -->
+ <div id="bloque-grupos-cargados" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
+ <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+ <h6 class="fw-bold mb-0" style="color:#800020">Grupos cargados</h6>
+ <div class="d-flex flex-wrap gap-2">
+ <button type="button" onclick="grpSeleccionarTodos(true)" class="btn btn-outline-dark btn-sm py-0 px-2">Seleccionar todos</button>
+ <button type="button" onclick="grpSeleccionarTodos(false)" class="btn btn-outline-secondary btn-sm py-0 px-2">Quitar selección</button>
+ </div>
+ </div>
+ <div id="lista-grupos-cargados" class="small"></div>
+ <div class="form-check mt-2 small">
+ <input class="form-check-input" type="checkbox" id="grp-borrar-config">
+ <label class="form-check-label" for="grp-borrar-config">Quitar también el horario y el orientador(a) de esos grupos (si no lo marcas, solo se borran los alumnos)</label>
+ </div>
+ <div class="d-flex flex-wrap gap-2 mt-2">
+ <button type="button" id="btn-grp-borrar-sel" onclick="borrarGruposCargados(false)" class="btn btn-outline-danger btn-sm py-2 px-3 fw-semibold" disabled>Borrar seleccionados</button>
+ <button type="button" onclick="borrarGruposCargados(true)" class="btn btn-danger btn-sm py-2 px-3 fw-semibold">Borrar todos los grupos</button>
+ </div>
+ </div>
+ <!-- SOLO CONTROL ESCOLAR: dar de alta a los orientadores (con su grado, grupo y turno) -->
  <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
  <div class="row g-3 align-items-end mb-2">
@@ -641,7 +677,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 </div>
 <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
  <button onclick="regresarPanel()" id="btn-regresar-panel" class="btn btn-vinotinto px-4 rounded-pill fw-semibold shadow-sm d-none">Regresar</button>
- <button onclick="cerrarSesion()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
+ <button onclick="salirConfirmando()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
 </div>
 </div>
 </div>
@@ -874,20 +910,9 @@ function sincronizarConServidor(accion, datos, reintento) {
 }
 /* Mezcla el estado del servidor con el local sin perder entradas/salidas ya registradas.
  Los alumnos se emparejan por CURP (el id del servidor es distinto al id local). */
-/* Alumnos recién borrados: mientras el servidor aún no confirma (o si una consulta empezó antes de confirmar) no se vuelven a mostrar */
-const _lapidas = new Map();   // clave -> null (pendiente) | momento en que el servidor confirmó el borrado
-const claveAl = a => a.curp ? 'c:' + a.curp : 'i:' + a.id;
-function _lapidaActiva(k, inicioConsulta) {
- if (!_lapidas.has(k)) return false;
- const t = _lapidas.get(k);
- if (t === null) return true;
- if (Date.now() - t > 60000) { _lapidas.delete(k); return false; }
- return !inicioConsulta || inicioConsulta <= t;
-}
 function fusionarServidor(s, inicioConsulta) {
  if (!s || !Array.isArray(s.alumnos)) return;
  const clv = a => a.curp ? 'c:' + a.curp : 'i:' + a.id;
- if (_lapidas.size) s.alumnos = s.alumnos.filter(sa => !_lapidaActiva(clv(sa), inicioConsulta));
  const locales = new Map(db.alumnos.map(a => [clv(a), a])), claves = new Set();
  const lista = s.alumnos.map(sa => {
   claves.add(clv(sa)); sa.reg = sa.reg || {}; sa.enServidor = true;
@@ -1261,6 +1286,7 @@ function subirOrientadores() {
  if (!permisoPermite()) return;
  const inp = $('#archivo-orientadores')[0];
  if (!inp.files.length) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
+ if (!confirm('¿Subir ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' con orientadores?\nSe darán de alta los que falten y se asignarán a sus grupos.')) return;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /nombre|orientador/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r[0] && String(r[0]).trim());
   if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
@@ -1319,6 +1345,7 @@ function renderListaOrientadores() {
 /* Lista desplegable de horarios: un renglón por orientador(a) con SUS grupos. Se elige el grupo, se cambia la hora y se guarda ahí mismo. */
 let _horSel = {};   // grupo elegido en cada orientador(a) de esta lista
 function renderListaHorarios() {
+ renderGruposCargados();
  const caja = $('#lista-horarios-actual');
  if (!caja.length) return;
  const foco = document.activeElement;
@@ -1369,6 +1396,7 @@ function guardarHorarioInline(btn) {
  if (!k || !db.horarios[k]) return;
  if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
  if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
+ { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' y cierre a las ' + h12(s) + '.')) return; }
  db.horarios[k].entrada = e; db.horarios[k].salida = s;
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
@@ -1423,6 +1451,7 @@ function guardarGruposOrientador() {
  const quitan = [];
  nuevas.forEach(k => { const h = db.horarios[k]; if (h && h.orientadorId && h.orientadorId !== id) { const otro = db.orientadores.find(x => x.id === h.orientadorId), c = parseClave(k); quitan.push(c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ') — hoy de ' + (otro ? otro.nombre : 'otro orientador(a)')); } });
  if (quitan.length && !confirm('Estos grupos ya tienen otro orientador(a) y pasarán a ' + o.nombre + ':\n' + quitan.join('\n') + '\n¿Continuar?')) return;
+ if (!quitan.length && !confirm('¿Guardar los grupos de ' + o.nombre + '?\n' + (nuevas.length ? nuevas.map(k => { const c = parseClave(k); return '- ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')'; }).join('\n') : 'Quedará sin ningún grupo asignado.'))) return;
  Object.keys(db.horarios).forEach(k => { if (db.horarios[k].orientadorId === id && !nuevas.includes(k)) db.horarios[k].orientadorId = ''; });
  nuevas.forEach(k => { const h = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''}; h.orientadorId = id; db.horarios[k] = h; });
  oriEditando = null;
@@ -1434,25 +1463,15 @@ function eliminarOrientador(id) {
  const o = db.orientadores.find(x => x.id === id); if (!o) return;
  const grupos = Object.entries(db.horarios).filter(([k, v]) => v.orientadorId === id).map(([k]) => { const c = parseClave(k); return 'Grado ' + c.grado + ' Grupo ' + c.grupo + ' (' + c.turno + ')'; });
  if (!confirm('¿Eliminar a ' + o.nombre + '?' + (grupos.length ? '\nSe quitará de: ' + grupos.join(', ') + ' (quedará sin orientador).' : '') + '\nSe borrará de forma permanente de la base de datos, junto con su contraseña. Esta acción no se puede deshacer.')) return;
- // Se quita de la pantalla al instante; si el servidor no pudo borrarlo, vuelve a aparecer con un aviso
- const asignados = Object.entries(db.horarios).filter(([k, v]) => v.orientadorId === id).map(([k]) => k);
- const eraActivo = localStorage.getItem('sica_orientador') === id;
- db.orientadores = db.orientadores.filter(x => x.id !== id);
- if (eraActivo) localStorage.removeItem('sica_orientador');
- asignados.forEach(k => { db.horarios[k].orientadorId = ''; });
- localStorage.setItem(LS, JSON.stringify(db));
- renderListaOrientadores(); renderTabla();
- _oriGuardando++; _oriUltimoCambio = Date.now();   // una consulta vieja del servidor no lo vuelve a poner
  _postSync('eliminar_orientador', {id:o.id, nombre:o.nombre}, 30000)
  .then(r => r.json().catch(() => ({})).then(d => { if (!r.ok || d.ok === false) return Promise.reject(); }))
- .catch(() => {
-  if (!db.orientadores.some(x => x.id === id)) db.orientadores.push(o);
-  asignados.forEach(k => { if (db.horarios[k] && !db.horarios[k].orientadorId) db.horarios[k].orientadorId = id; });
-  if (eraActivo) localStorage.setItem('sica_orientador', id);
-  localStorage.setItem(LS, JSON.stringify(db));
-  renderListaOrientadores(); renderTabla();
-  alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
- }).finally(() => { _oriGuardando--; _oriUltimoCambio = Date.now(); });
+ .then(() => {
+ db.orientadores = db.orientadores.filter(x => x.id !== id);
+ if (localStorage.getItem('sica_orientador') === id) localStorage.removeItem('sica_orientador');
+ Object.values(db.horarios).forEach(h => { if (h.orientadorId === id) h.orientadorId = ''; });
+ localStorage.setItem(LS, JSON.stringify(db));
+ renderListaOrientadores();renderTabla();
+ }).catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 /* Grupos que le corresponden a un orientador, según lo que asignó Control Escolar */
 function calcularGruposOrientador(orientadorId) {
@@ -1615,6 +1634,7 @@ function recargarSistema(btn) {
  // Último recurso: si por algo no se movió, se fuerza la recarga normal
  setTimeout(() => location.reload(), 5000);
 }
+function salirConfirmando() { if (confirm('¿Cerrar la sesión?\nTendrás que volver a iniciar sesión para entrar al sistema.')) cerrarSesion(); }
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
  // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
@@ -1670,6 +1690,7 @@ function aplicarPermisos(rol) {
 }
 function guardarPermisoRol() {
  const rol = $('#select-rol-permiso').val(), tarea = $('#select-tarea-permiso').val();
+ if (!confirm('¿Cambiar el permiso de ' + nombresRoles[rol] + ' a "' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar') + '"?')) return;
  db.permisos[rol] = tarea; save();
  $('#resumen-permisos').text('Permiso actualizado: ' + nombresRoles[rol] + ' → ' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar'));
  sincronizarConServidor('guardar_permisos', db.permisos);
@@ -1690,7 +1711,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -1864,7 +1885,7 @@ function avisarOtrasPestanas(msg) {
 /* ---- Sonido del aviso ----
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
-let _audioCtx = null, _sonidoPendiente = null;
+let _audioCtx = null, _sonidoPendiente = null, _tonosActivos = [];
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -1893,9 +1914,22 @@ function sonarAviso(veces) {
     vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
     osc.connect(vol); vol.connect(_audioCtx.destination);
     osc.start(ini); osc.stop(ini + 0.4);
+    const par = {osc: osc, vol: vol};
+    _tonosActivos.push(par);
+    osc.onended = () => { const i = _tonosActivos.indexOf(par); if (i >= 0) _tonosActivos.splice(i, 1); };
    });
   }
  } catch (e) {}
+}
+/* Corta AL INSTANTE el sonido que esté sonando o programado (antes, al silenciar, terminaba de sonar la tanda que ya estaba en marcha) */
+function silenciarSonidoYa() {
+ _sonidoPendiente = null;
+ const lista = _tonosActivos.splice(0);
+ lista.forEach(p => {
+  try { p.vol.gain.cancelScheduledValues(0); p.vol.gain.setValueAtTime(0.0001, _audioCtx.currentTime); } catch (e) {}
+  try { p.osc.stop(); } catch (e) {}
+  try { p.osc.disconnect(); p.vol.disconnect(); } catch (e) {}
+ });
 }
 let _entrandoPorAviso = false;
 let _esSecundaria = false;      // true en una pestaña que entró sola por un aviso (la "principal" es la que inició sesión a mano)
@@ -1997,14 +2031,14 @@ function pintarBurbujas(roles, orientadores, avisar) {
  vigilarRepeticion();
 }
 /* ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
-   Mientras haya una burbuja sin atender y sin silenciar, el sonido vuelve a sonar cada REPETIR_AVISO_MS (12 s).
+   Mientras haya una burbuja sin atender y sin silenciar, el sonido es CONSTANTE: una tanda detrás de otra (cada REPETIR_AVISO_MS) hasta que la silencien o den acceso.
    La burbuja se va sola en cuanto Control Escolar le da acceso a esa cuenta (la consulta ya no la trae) y con ella se detiene el sonido.
    El botón "Silenciar" apaga el sonido de ESA alerta (la burbuja se queda a la vista); se guarda en este navegador (localStorage),
    así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
    "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar. */
-const REPETIR_AVISO_MS = 12000;
-const VECES_PRIMER_AVISO = 6;   // el primer aviso suena ~5 s (cada vez = par de tonos de 0.8 s)
-const VECES_REPETICION = 4;     // cada repetición suena ~3 s, dentro de los 12 s entre una y otra
+const REPETIR_AVISO_MS = 1600;   // = lo que dura una tanda de VECES_REPETICION: una empieza justo cuando termina la anterior, sin silencios largos
+const VECES_PRIMER_AVISO = 2;   // cada vez = par de tonos de 0.8 s
+const VECES_REPETICION = 2;     // 2 x 0.8 s = 1.6 s por tanda
 const CLAVE_MUDOS = 'sica_avisos_mudos';
 let _repiteAviso = null;
 let _pendientesAviso = [];   // solicitudes que siguen sin atender (cuenta aún bloqueada), aunque su burbuja ya no esté a la vista
@@ -2034,8 +2068,10 @@ function pintarMudo(b) {   // b = burbuja (jQuery): el texto del botón y su asp
 function alternarMudoBurbuja(btn, ev) {
  if (ev) ev.stopPropagation();   // no cuenta como pulsar la burbuja (no abre la solicitud)
  const b = $(btn).closest('.burbuja');
- fijarMudo(b.attr('data-k'), !estaMudo(b.attr('data-k')));
+ const k = b.attr('data-k'), alSilenciar = !estaMudo(k);
+ fijarMudo(k, alSilenciar);
  pintarMudo(b);
+ if (alSilenciar && !_pendientesAviso.some(x => !estaMudo(x))) silenciarSonidoYa();   // no queda ninguna sin silenciar: se calla ya
  vigilarRepeticion();
 }
 function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silencia esa alerta
@@ -2043,13 +2079,14 @@ function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silenc
  const b = $(btn).closest('.burbuja');
  fijarMudo(b.attr('data-k'), true);
  b.remove();
+ if (!_pendientesAviso.some(x => !estaMudo(x))) silenciarSonidoYa();
  vigilarRepeticion();
 }
 /* Enciende el temporizador solo cuando hay alguna burbuja y lo apaga cuando ya no queda ninguna */
 function vigilarRepeticion() {
  const hay = _pendientesAviso.length > 0;
  if (hay && !_repiteAviso) _repiteAviso = setInterval(repetirAviso, REPETIR_AVISO_MS);
- else if (!hay && _repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; }
+ else if (!hay && _repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; silenciarSonidoYa(); }   // ya dieron acceso: se calla al momento
 }
 function repetirAviso() {
  $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });   // por si en otra pestaña la silenciaron
@@ -2059,6 +2096,8 @@ function repetirAviso() {
 }
 /* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
 let _consultandoOlvidos = false, _etagOlvidos = null;
+var _canalOlvidos = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_olvidos') : null;
+function avisarOlvido() { try { if (_canalOlvidos) _canalOlvidos.postMessage(Date.now()); } catch (e) {} }
 function consultarOlvidosInicio() {
  if (rolActivo || _consultandoOlvidos) return;
  _consultandoOlvidos = true;
@@ -2150,15 +2189,23 @@ function generarClave() {
  $('#ver-claves').prop('checked', true); verClavesNuevas(); revisarRequisitosClave();
 }
 /* Un solo clic: contraseña al azar + guardar. Guardar ya reemplaza la anterior y quita el bloqueo, no hace falta "Borrar" antes. */
-function generarYGuardar() {
- generarClave();
- guardarClave();
+function textoConfirmarClave(c) {
+ return c.control ? '¿Cambiar la contraseña de Control Escolar? Se usará la nueva la próxima vez que inicies sesión.'
+  : '¿Guardar una contraseña nueva para ' + c.nombre + '?' + (c.bloqueada ? '\nSe le dará acceso: se quita el bloqueo y podrá entrar con la contraseña nueva.' : '\nLa contraseña anterior dejará de servir.');
 }
-function guardarClave() {
+function generarYGuardar() {
+ const c = datosCuenta();
+ if (!c) { alert('Primero elige una cuenta.'); return; }
+ if (!confirm(textoConfirmarClave(c).replace('una contraseña nueva', 'una contraseña nueva generada al azar'))) return;
+ generarClave();
+ guardarClave(true);
+}
+function guardarClave(yaConfirmado) {
  const c = datosCuenta();
  if (!c) { alert('Primero elige una cuenta.'); return; }
  const nueva = $('#clave-nueva').val(), conf = $('#clave-confirmar').val();
  if (!revisarRequisitosClave()) { alert('La contraseña nueva aún no cumple las indicaciones que aparecen debajo de las casillas.'); return; }
+ if (yaConfirmado !== true && !confirm(textoConfirmarClave(c))) return;
  let url, cuerpo;
  if (c.tipo === 'ori') {
   url = '/api/sica/claves/orientador';
@@ -2231,7 +2278,7 @@ function borrarClaveCuenta() {
 function desbloquearCuenta() {
  const c = datosCuenta();
  if (!c || !c.bloqueada) return;
- // Sin ventana de confirmación: desbloquear no cambia ni borra nada (solo deja que la persona vuelva a intentar entrar), así es un solo clic.
+ if (!confirm('¿Dar acceso a ' + c.nombre + '?\nSe quita el bloqueo y podrá volver a iniciar sesión con su contraseña actual. No se cambia ni se borra ningún dato.')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
  const copia = copiaClaves();
  cambiarLocalClaves(c, {bloqueada: false, olvido_at: null});   // el bloqueo desaparece al instante (y su burbuja)
@@ -2322,6 +2369,7 @@ function confirmarOlvido(reintento) {
    }
    abrirModalCuenta('info', msg); return;
   }
+  if (d.bloqueada) { avisarOlvido(); consultarOlvidosInicio(); }   // las demás pestañas de este equipo sacan la burbuja al instante
   // Si el mensaje de "Cuenta bloqueada" ya salió al instante y el servidor lo confirma, NO se vuelve a abrir (salía dos veces)
   if (optimista && d.bloqueada) return;
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
@@ -2397,8 +2445,11 @@ window.addEventListener('offline', pintarIndicadorCola);
 const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
 /* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (en la salida, también la permanencia) */
 function detalleRegistro(tipo, a, hora, extra) {
+ // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
+ let ori = '';
+ try { const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null; ori = o ? o.nombre : ''; } catch (e) {}
  return tipo + ' registrada: ' + a.nombre + ' · ' + (nomGrado[a.grado] || a.grado) + ' grado · Grupo ' + (ROMANOS[a.grupo] || a.grupo) +
-  ' · ' + a.turno + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · Permanencia: ' + extra : '');
+  ' · ' + a.turno + (ori ? ' · Orientador(a): ' + ori : '') + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · Permanencia: ' + extra : '');
 }
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
@@ -2672,6 +2723,8 @@ function configurarPanelOrientador() {
  $('#bloque-camara-orientador').toggleClass('d-none', c);
  $('#bloque-orientadores-control').toggleClass('d-none', !c);
  $('#bloque-listas-orientador').toggleClass('d-none', !c);
+ $('#bloque-grupos-cargados').toggleClass('d-none', !c);
+ if (c) renderGruposCargados();
  $('#bloque-horario-control').toggleClass('d-none', !c);
  $('#bloque-visualizar-grupo').toggleClass('d-none', o);
  $('#bloque-mi-grupo-orientador').toggleClass('d-none', !o);
@@ -2745,12 +2798,13 @@ function aplicarPermisosSolo() {
  bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
 }
-function marcarSalida(id) { if (!permisoPermite()) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
+function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
 function subirLista() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
  const inp = $('#archivo-lista')[0];
  if (!inp.files.length) { alert('Selecciona un archivo para la lista.'); return; }
+ if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' en el ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + ')?\nSe agregan los alumnos nuevos y se actualizan los que ya existan.')) return;
  const modo = $('#orden-nombre-lista').val();
  const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /curp|matr|nombre|apellido/i.test(String(r[0] == null ? '' : r[0])), rows => {
@@ -2788,7 +2842,6 @@ function borrarListaGrupo() {
  if (!confirm('¿Borrar la lista completa del ' + g + '° grado, grupo ' + n + ' (' + t + ')?\n' + lista.length + ' alumno(s) y todos sus registros de asistencia se eliminarán de forma permanente. Esta acción no se puede deshacer.')) return;
  // La lista desaparece de la pantalla al instante; si el servidor no pudo borrarla, vuelve a aparecer con un aviso
  const ids = new Set(lista.map(a => a.id));
- const claves = lista.map(claveAl); claves.forEach(k => _lapidas.set(k, null));
  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
  localStorage.setItem(LS, JSON.stringify(db));
  $('#archivo-lista').val('');
@@ -2796,11 +2849,9 @@ function borrarListaGrupo() {
  if (credSel) selCred(credSel.grado, credSel.grupo);
  _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
   if (!r.ok) return Promise.reject();
-  claves.forEach(k => _lapidas.set(k, Date.now()));
   ids.forEach(id => _firmasGuardadas.delete(id));
   alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
  }).catch(() => {
-  claves.forEach(k => _lapidas.delete(k));
   const hay = new Set(db.alumnos.map(a => a.id));
   lista.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
   localStorage.setItem(LS, JSON.stringify(db));
@@ -2809,10 +2860,85 @@ function borrarListaGrupo() {
   alert('No se pudo borrar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
 }
+/* ---- Grupos cargados: ver todos y borrar varios (o todos) de una vez. Solo Control Escolar. ---- */
+let _grpSel = new Set(), _grpHtml = '';
+function gruposCargados() {
+ const m = new Map();
+ (db.alumnos || []).forEach(a => {
+  const k = claveGrupo(a.grado, a.grupo, a.turno);
+  if (!m.has(k)) m.set(k, {k: k, grado: Number(a.grado), grupo: Number(a.grupo), turno: a.turno, n: 0});
+  m.get(k).n++;
+ });
+ // Grupos que solo tienen horario u orientador (sin alumnos) también se pueden limpiar
+ Object.entries(db.horarios || {}).forEach(([k, h]) => {
+  if (m.has(k) || !h || !(h.entrada || h.salida || h.orientadorId)) return;
+  const c = parseClave(k); m.set(k, {k: k, grado: Number(c.grado), grupo: Number(c.grupo), turno: c.turno, n: 0});
+ });
+ return Array.from(m.values()).sort((a, b) => (a.turno === b.turno ? 0 : a.turno === 'Matutino' ? -1 : 1) || a.grado - b.grado || a.grupo - b.grupo);
+}
+function renderGruposCargados() {
+ const caja = $('#lista-grupos-cargados');
+ if (!caja.length || rolActivo !== 'control') return;
+ const lista = gruposCargados();
+ const vivos = new Set(lista.map(g => g.k));
+ _grpSel.forEach(k => { if (!vivos.has(k)) _grpSel.delete(k); });
+ const abierta = caja.find('details').prop('open');   // si estaba abierta, sigue abierta al marcar o borrar
+ const filas = lista.map(g => {
+  const h = db.horarios[g.k], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null;
+  return '<label class="ori-item" style="cursor:pointer"><span class="d-flex align-items-start gap-2">' +
+   '<input type="checkbox" class="form-check-input mt-1" ' + (_grpSel.has(g.k) ? 'checked ' : '') + 'onchange="grpMarcar(\'' + esc(g.k) + '\',this.checked)">' +
+   '<span><span class="fw-semibold">' + g.grado + '° grado, grupo ' + g.grupo + '</span> <span class="text-muted">(' + esc(g.turno) + ')</span><br>' +
+   '<span class="small text-muted">' + g.n + (g.n === 1 ? ' alumno' : ' alumnos') + ' · ' + (o ? esc(o.nombre) : 'sin orientador(a)') + '</span></span></span></label>';
+ }).join('');
+ const html = !lista.length ? '<span class="text-muted">Aún no hay grupos con alumnos.</span>' :
+  '<summary>Ver grupos cargados (' + lista.length + ')</summary><div class="ori-lista">' + filas + '</div>';
+ if (html !== _grpHtml) { _grpHtml = html; caja.html(lista.length ? '<details class="ori-desplegable"' + (abierta ? ' open' : '') + '>' + html + '</details>' : html); }
+ $('#btn-grp-borrar-sel').prop('disabled', !_grpSel.size).text(_grpSel.size ? 'Borrar seleccionados (' + _grpSel.size + ')' : 'Borrar seleccionados');
+}
+function grpMarcar(k, on) { if (on) _grpSel.add(k); else _grpSel.delete(k); renderGruposCargados(); }
+function grpSeleccionarTodos(on) { _grpSel = new Set(on ? gruposCargados().map(g => g.k) : []); _grpHtml = ''; renderGruposCargados(); }
+function borrarGruposCargados(todos) {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar grupos.'); return; }
+ const todosLos = gruposCargados();
+ const elegidos = todos ? todosLos : todosLos.filter(g => _grpSel.has(g.k));
+ if (!elegidos.length) { alert('Primero selecciona al menos un grupo.'); return; }
+ const config = $('#grp-borrar-config').prop('checked');
+ const nAlum = elegidos.reduce((t, g) => t + g.n, 0);
+ const detalle = elegidos.length <= 8 ? '\n' + elegidos.map(g => '- ' + g.grado + '° grado, grupo ' + g.grupo + ' (' + g.turno + '): ' + g.n + ' alumno(s)').join('\n') : '';
+ if (!confirm((todos ? '¿Borrar TODOS los grupos?' : '¿Borrar los ' + elegidos.length + ' grupo(s) seleccionado(s)?') + detalle +
+  '\n\nSe eliminarán ' + nAlum + ' alumno(s) y todos sus registros de asistencia de forma permanente' + (config ? ', y también el horario y el orientador(a) de esos grupos' : '') + '. Esta acción no se puede deshacer.')) return;
+ if (todos && !confirm('Última confirmación: se borrará TODO el alumnado de los ' + elegidos.length + ' grupos. ¿Continuar?')) return;
+ // Desaparecen de la pantalla al instante; si el servidor no pudo borrarlos, vuelven a aparecer con un aviso
+ const claves = new Set(elegidos.map(g => g.k));
+ const quitados = db.alumnos.filter(a => claves.has(claveGrupo(a.grado, a.grupo, a.turno)));
+ const horariosAntes = {};
+ if (config) claves.forEach(k => { if (db.horarios[k]) { horariosAntes[k] = db.horarios[k]; delete db.horarios[k]; } });
+ const ids = new Set(quitados.map(a => a.id));
+ db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
+ localStorage.setItem(LS, JSON.stringify(db));
+ _grpSel = new Set(); _grpHtml = '';
+ renderTabla(); renderListaHorarios(); renderListaOrientadores();
+ if (credSel) selCred(credSel.grado, credSel.grupo);
+ _postSync('eliminar_listas_grupos', {grupos: elegidos.map(g => ({grado: g.grado, grupo: g.grupo, turno: g.turno})), configuracion: config}, 60000).then(r => {
+  if (!r.ok) return Promise.reject();
+  ids.forEach(id => _firmasGuardadas.delete(id));
+  alert('Grupos borrados: ' + elegidos.length + ' grupo(s) y ' + nAlum + ' alumno(s) eliminados.');
+ }).catch(() => {
+  const hay = new Set(db.alumnos.map(a => a.id));
+  quitados.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
+  Object.assign(db.horarios, horariosAntes);
+  localStorage.setItem(LS, JSON.stringify(db));
+  _grpHtml = '';
+  renderTabla(); renderListaHorarios(); renderListaOrientadores();
+  if (credSel) selCred(credSel.grado, credSel.grupo);
+  alert('No se pudieron borrar los grupos en el servidor. Revisa tu conexión e inténtalo de nuevo.');
+ });
+}
 function subirHorarios() {
  if (!permisoPermite()) return;
  const inp = $('#archivo-horarios')[0];
  if (!inp.files.length) { alert('Selecciona un archivo de horarios.'); return; }
+ if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' de horarios del turno ' + turnoActivo + '?\nSe cambiarán el horario y el orientador de los grupos que traiga el archivo.')) return;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv'], r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
   if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
@@ -3216,6 +3342,7 @@ function subirPlantillaOficial(lado) {
  if (!esPDF && !esDocx) { alert('Ese archivo no sirve. Usa un Word guardado como .docx (Archivo > Guardar como > Documento de Word) o un PDF (Archivo > Exportar > PDF).'); $('#input-plantilla-oficial-' + lado).val(''); return; }
  if (!libsOk('SicaDocx')) return;
  if (esPDF && !libsOk('pdfjsLib')) return;
+ if (!confirm('¿Cambiar la plantilla oficial (' + lado + ') del turno ' + turno + ' por "' + f.name + '"?\nLas credenciales nuevas usarán esta plantilla.')) return;
  const caja = $('#resumen-plantilla-oficial');
  caja.removeClass('text-success text-danger').addClass('text-muted').text('Leyendo tu ' + (esPDF ? 'PDF' : 'Word') + '…');
  let envio = f;   // lo que realmente se sube: el Word ya con sus imágenes reducidas (así lo que ves es lo que se guarda)
@@ -3413,14 +3540,12 @@ function eliminarAlumno(id) {
  const a = db.alumnos.find(x => x.id === id); if (!a) return;
  if (!confirm('¿Eliminar a ' + a.nombre + (a.curp ? ' (' + a.curp + ')' : '') + '? Se borrarán también sus registros de asistencia. Esta acción no se puede deshacer.')) return;
  // Se quita de la pantalla al instante; si el servidor no pudo borrarlo, vuelve a aparecer con un aviso
- const kAl = claveAl(a); _lapidas.set(kAl, null);
  db.alumnos = db.alumnos.filter(x => x.id !== id);
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
  _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
- .then(r => r.ok ? _lapidas.set(kAl, Date.now()) : Promise.reject())
+ .then(r => r.ok ? null : Promise.reject())
  .catch(() => {
- _lapidas.delete(kAl);
  if (!db.alumnos.some(x => x.id === a.id)) db.alumnos.push(a);
  localStorage.setItem(LS, JSON.stringify(db));
  if (credSel) selCred(credSel.grado, credSel.grupo);
@@ -3434,7 +3559,8 @@ function guardarCambiosCredencial() {
  if (!a) { alert('Primero elige un alumno de la lista.'); return; }
  if (!curp || !nombre) { alert('CURP y nombre son obligatorios.'); return; }
  if (!curpLargoValido(curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(curp) + ' (ahora tiene ' + curp.length + ').'); return; }
- a.curp = curp; a.nombre = nombre; save(); guardarYa();
+ if (!confirm('¿Guardar los cambios de este alumno?\nNombre: ' + nombre + '\nCURP: ' + curp)) return;
+ a.curp = curp; a.nombre = nombre; save();
  actualizarVistaPreviaCredencial();
  alert('Cambios guardados en la credencial.');
 }
@@ -3715,7 +3841,10 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1500);   // burbuja y sonido en la pantalla de inicio
+ /* Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde 304 sin cuerpo si nada cambió y
+    guarda la respuesta 1 s en caché). Las otras pestañas del mismo equipo se enteran al instante por BroadcastChannel. */
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1000);
+ if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
