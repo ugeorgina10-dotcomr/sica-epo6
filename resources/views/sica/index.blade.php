@@ -1639,7 +1639,7 @@ function recargarSistema(btn) {
  // Último recurso: si por algo no se movió, se fuerza la recarga normal
  setTimeout(() => location.reload(), 5000);
 }
-function salirConfirmando() { if (confirm('¿Cerrar la sesión?\nTendrás que volver a iniciar sesión para entrar al sistema.')) cerrarSesion(); }
+function salirConfirmando() { cerrarSesion(); }   // cierra directo, sin pedir confirmación
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
  // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
