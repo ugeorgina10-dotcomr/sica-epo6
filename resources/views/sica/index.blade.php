@@ -148,6 +148,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .ori-lista{max-height:260px;overflow-y:auto}
 .ori-item{display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.5rem .9rem;border-bottom:1px solid #f1e6e8}
 .ori-item:last-child{border-bottom:0}
+.ori-item>div:first-child,.ori-item>label{min-width:0;overflow-wrap:anywhere}
+@media (max-width:420px){.ori-item{flex-wrap:wrap}.ori-item>.d-flex.flex-shrink-0{width:100%;justify-content:flex-end}}
+#bloque-buscador-orientador.row{margin-left:0;margin-right:0}
+#panel-cuenta-clave .btn,.burbujas-claves{max-width:100%}
+@media (max-width:767.98px){#panel-cuenta-clave .row,#bloque-permisos-roles .row{margin-left:calc(var(--bs-gutter-x,1.5rem) * -.5);margin-right:calc(var(--bs-gutter-x,1.5rem) * -.5)}}
 .ori-actual{background:#fdf3f5}
 /* ---- Contraseñas: botones de cuenta y ventana central ---- */
 .btn-cuenta{border:1.5px solid #d9c3c8;background:#fff;color:#5a1020;border-radius:999px;padding:.4rem .9rem;font-size:.85rem;font-weight:600;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;transition:all .15s}
@@ -472,9 +477,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-listas-orientador" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
  <div class="row g-3 align-items-end">
- <div class="col-md-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
- <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
- <div class="col-md-5 d-flex gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm w-100 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
+ <div class="col-12 col-md-5 col-xl-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
+ <div class="col-12 col-md-7 col-xl-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
+ <div class="col-12 col-xl-5 d-flex flex-wrap gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm flex-grow-1 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm flex-grow-1 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
@@ -507,8 +512,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
  <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
- <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
+ <div class="col-12 col-xl-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
+ <div class="col-12 col-xl-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
  </div>
  <div id="resumen-orientadores" class="small text-muted"></div>
  <div id="estado-sync-orientadores" class="small mt-1"></div>
@@ -518,8 +523,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
  <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
- <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
+ <div class="col-12 col-xl-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
+ <div class="col-12 col-md-5 col-xl-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
  <div id="lista-horarios-actual" class="small mt-3"></div>
@@ -610,7 +615,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <option value="editar">Puede editar / realizar acciones (incluye cámara)</option>
  </select>
  </div>
- <div class="col-md-3"><button onclick="guardarPermisoRol()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button></div>
+ <div class="col-12 col-md-3"><button onclick="guardarPermisoRol()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button></div>
  </div>
  <div id="resumen-permisos" class="mt-3 small text-muted"></div>
  </div>
@@ -635,15 +640,15 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    <div class="col-md-12 d-none" id="campo-clave-actual"><label class="form-label small">Contraseña actual</label>
     <input type="password" id="clave-actual" class="form-control form-control-sm" autocomplete="current-password">
    </div>
-   <div class="col-md-4"><label class="form-label small">Contraseña nueva</label>
+   <div class="col-12 col-md-6 col-xl-4"><label class="form-label small">Contraseña nueva</label>
     <input type="password" id="clave-nueva" class="form-control form-control-sm" autocomplete="new-password" maxlength="72" oninput="revisarRequisitosClave()">
    </div>
-   <div class="col-md-4"><label class="form-label small">Repite la contraseña nueva</label>
+   <div class="col-12 col-md-6 col-xl-4"><label class="form-label small">Repite la contraseña nueva</label>
     <input type="password" id="clave-confirmar" class="form-control form-control-sm" autocomplete="new-password" maxlength="72" oninput="revisarRequisitosClave()">
    </div>
-   <div class="col-md-4 d-flex gap-2">
+   <div class="col-12 col-xl-4 d-flex flex-wrap gap-2">
     <button type="button" onclick="generarClave()" class="btn btn-outline-dark btn-sm py-2 text-nowrap" title="Crea una contraseña segura al azar">Generar</button>
-    <button type="button" onclick="guardarClave()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button>
+    <button type="button" onclick="guardarClave()" class="btn btn-vinotinto btn-sm flex-grow-1 py-2 fw-semibold">Guardar</button>
     <button type="button" id="btn-generar-guardar" onclick="generarYGuardar()" class="btn btn-success btn-sm py-2 text-nowrap fw-semibold d-none" title="Crea una contraseña al azar, la guarda y la deja lista para entregar (no hace falta borrar la anterior)">Generar y guardar</button>
    </div>
   </div>
@@ -1371,10 +1376,10 @@ function renderListaHorarios() {
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
-   '<div class="col-md-5"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
-   '<div class="col-md-3 d-flex flex-wrap gap-1">' +
+   '<div class="col-12 col-lg-5"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
+   '<div class="col-6 col-lg-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
+   '<div class="col-6 col-lg-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
+   '<div class="col-12 col-lg-3 d-flex flex-wrap gap-1">' +
    '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
    '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
    '</div></div></div></div>';
