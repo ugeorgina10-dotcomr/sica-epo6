@@ -2026,14 +2026,14 @@ function pintarBurbujas(roles, orientadores, avisar) {
  vigilarRepeticion();
 }
 /* ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
-   Mientras haya una burbuja sin atender y sin silenciar, el sonido vuelve a sonar cada REPETIR_AVISO_MS (12 s).
+   Mientras haya una burbuja sin atender y sin silenciar, el sonido es CONSTANTE: una tanda detrás de otra (cada REPETIR_AVISO_MS) hasta que la silencien o den acceso.
    La burbuja se va sola en cuanto Control Escolar le da acceso a esa cuenta (la consulta ya no la trae) y con ella se detiene el sonido.
    El botón "Silenciar" apaga el sonido de ESA alerta (la burbuja se queda a la vista); se guarda en este navegador (localStorage),
    así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
    "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar. */
-const REPETIR_AVISO_MS = 12000;
-const VECES_PRIMER_AVISO = 6;   // el primer aviso suena ~5 s (cada vez = par de tonos de 0.8 s)
-const VECES_REPETICION = 4;     // cada repetición suena ~3 s, dentro de los 12 s entre una y otra
+const REPETIR_AVISO_MS = 1600;   // = lo que dura una tanda de VECES_REPETICION: una empieza justo cuando termina la anterior, sin silencios largos
+const VECES_PRIMER_AVISO = 2;   // cada vez = par de tonos de 0.8 s
+const VECES_REPETICION = 2;     // 2 x 0.8 s = 1.6 s por tanda
 const CLAVE_MUDOS = 'sica_avisos_mudos';
 let _repiteAviso = null;
 let _pendientesAviso = [];   // solicitudes que siguen sin atender (cuenta aún bloqueada), aunque su burbuja ya no esté a la vista
