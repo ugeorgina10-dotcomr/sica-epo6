@@ -2889,27 +2889,38 @@ function renderGruposCargados() {
  const abierta = caja.find('details').prop('open');   // si estaba abierta, sigue abierta al marcar o borrar
  const filas = lista.map(g => {
   const h = db.horarios[g.k], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null;
-  return '<label class="ori-item" style="cursor:pointer"><span class="d-flex align-items-start gap-2">' +
+  return '<div class="ori-item"><label class="d-flex align-items-start gap-2 mb-0 flex-grow-1" style="cursor:pointer">' +
    '<input type="checkbox" class="form-check-input mt-1" ' + (_grpSel.has(g.k) ? 'checked ' : '') + 'onchange="grpMarcar(\'' + esc(g.k) + '\',this.checked)">' +
    '<span><span class="fw-semibold">' + g.grado + '° grado, grupo ' + g.grupo + '</span> <span class="text-muted">(' + esc(g.turno) + ')</span><br>' +
-   '<span class="small text-muted">' + g.n + (g.n === 1 ? ' alumno' : ' alumnos') + ' · ' + (o ? esc(o.nombre) : 'sin orientador(a)') + '</span></span></span></label>';
+   '<span class="small text-muted">' + g.n + (g.n === 1 ? ' alumno' : ' alumnos') + ' · ' + (o ? esc(o.nombre) : 'sin orientador(a)') + '</span></span></label>' +
+   '<div class="d-flex gap-1 flex-shrink-0"><button type="button" data-k="' + esc(g.k) + '" onclick="editarGrupoCargado(this.dataset.k)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Cambiar el orientador(a) y los grupos">Editar</button>' +
+   '<button type="button" data-k="' + esc(g.k) + '" onclick="borrarGruposCargados(false, this.dataset.k)" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar este grupo">Eliminar</button></div></div>';
  }).join('');
  const html = !lista.length ? '<span class="text-muted">Aún no hay grupos con alumnos.</span>' :
   '<summary>Ver grupos cargados (' + lista.length + ')</summary><div class="ori-lista">' + filas + '</div>';
  if (html !== _grpHtml) { _grpHtml = html; caja.html(lista.length ? '<details class="ori-desplegable"' + (abierta ? ' open' : '') + '>' + html + '</details>' : html); }
  $('#btn-grp-borrar-sel').prop('disabled', !_grpSel.size).text(_grpSel.size ? 'Borrar seleccionados (' + _grpSel.size + ')' : 'Borrar seleccionados');
 }
+function editarGrupoCargado(k) {
+ if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede editar grupos.'); return; }
+ const h = db.horarios[k], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null;
+ if (!o) { alert('Este grupo todavía no tiene orientador(a). Asígnalo subiendo la lista de orientadores o de horarios.'); return; }
+ if (!oriEditando || oriEditando.id !== o.id) editarOrientador(o.id);
+ $('#lista-orientadores-actual details').prop('open', true);
+ const el = document.getElementById('bloque-orientadores-control');
+ if (el && el.scrollIntoView) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
 function grpMarcar(k, on) { if (on) _grpSel.add(k); else _grpSel.delete(k); renderGruposCargados(); }
 function grpSeleccionarTodos(on) { _grpSel = new Set(on ? gruposCargados().map(g => g.k) : []); _grpHtml = ''; renderGruposCargados(); }
-function borrarGruposCargados(todos) {
+function borrarGruposCargados(todos, soloK) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar grupos.'); return; }
  const todosLos = gruposCargados();
- const elegidos = todos ? todosLos : todosLos.filter(g => _grpSel.has(g.k));
+ const elegidos = soloK ? todosLos.filter(g => g.k === soloK) : todos ? todosLos : todosLos.filter(g => _grpSel.has(g.k));
  if (!elegidos.length) { alert('Primero selecciona al menos un grupo.'); return; }
  const config = $('#grp-borrar-config').prop('checked');
  const nAlum = elegidos.reduce((t, g) => t + g.n, 0);
  const detalle = elegidos.length <= 8 ? '\n' + elegidos.map(g => '- ' + g.grado + '° grado, grupo ' + g.grupo + ' (' + g.turno + '): ' + g.n + ' alumno(s)').join('\n') : '';
- if (!confirm((todos ? '¿Borrar TODOS los grupos?' : '¿Borrar los ' + elegidos.length + ' grupo(s) seleccionado(s)?') + detalle +
+ if (!confirm((soloK ? '¿Estás seguro de borrar este grupo?' : todos ? '¿Borrar TODOS los grupos?' : '¿Borrar los ' + elegidos.length + ' grupo(s) seleccionado(s)?') + detalle +
   '\n\nSe eliminarán ' + nAlum + ' alumno(s) y todos sus registros de asistencia de forma permanente' + (config ? ', y también el horario y el orientador(a) de esos grupos' : '') + '. Esta acción no se puede deshacer.')) return;
  if (todos && !confirm('Última confirmación: se borrará TODO el alumnado de los ' + elegidos.length + ' grupos. ¿Continuar?')) return;
  // Desaparecen de la pantalla al instante; si el servidor no pudo borrarlos, vuelven a aparecer con un aviso
