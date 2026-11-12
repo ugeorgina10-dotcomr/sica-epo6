@@ -667,7 +667,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
     <code id="entrega-clave-texto" class="fs-5 px-3 py-1 bg-white rounded border" style="user-select:all"></code>
     <button type="button" onclick="copiarEntrega()" class="btn btn-outline-success btn-sm">Copiar</button>
     <button type="button" onclick="imprimirEntrega()" class="btn btn-outline-success btn-sm">Imprimir hoja de entrega</button>
-    <button type="button" onclick="ocultarEntrega()" class="btn btn-success btn-sm">Ya la entregué</button>
+    <button type="button" onclick="confirmarEntregada()" class="btn btn-success btn-sm">Ya la entregué</button>
    </div>
    <div class="small text-muted mt-2">Entrégala en persona. Esta es la única vez que se muestra: el sistema solo guarda su versión cifrada.</div>
   </div>
@@ -1690,7 +1690,7 @@ function aplicarPermisos(rol) {
 }
 function guardarPermisoRol() {
  const rol = $('#select-rol-permiso').val(), tarea = $('#select-tarea-permiso').val();
- if (!confirm('¿Cambiar el permiso de ' + nombresRoles[rol] + ' a "' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar') + '"?')) return;
+ if (!confirm('¿Estás seguro de cambiar el permiso de ' + nombresRoles[rol] + ' a "' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar') + '"?' + (tarea === 'editar' ? '\nPodrá hacer cambios en el sistema.' : '\nYa no podrá hacer cambios.'))) return;
  db.permisos[rol] = tarea; save();
  $('#resumen-permisos').text('Permiso actualizado: ' + nombresRoles[rol] + ' → ' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar'));
  sincronizarConServidor('guardar_permisos', db.permisos);
@@ -2031,12 +2031,12 @@ function pintarBurbujas(roles, orientadores, avisar) {
  vigilarRepeticion();
 }
 /* ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
-   Mientras haya una burbuja sin atender y sin silenciar, el sonido es CONSTANTE: una tanda detrás de otra (cada REPETIR_AVISO_MS) hasta que la silencien o den acceso.
+   Mientras haya una burbuja sin atender y sin silenciar, el sonido se repite: una tanda cada 5 segundos (REPETIR_AVISO_MS) hasta que la silencien o den acceso.
    La burbuja se va sola en cuanto Control Escolar le da acceso a esa cuenta (la consulta ya no la trae) y con ella se detiene el sonido.
    El botón "Silenciar" apaga el sonido de ESA alerta (la burbuja se queda a la vista); se guarda en este navegador (localStorage),
    así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
    "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar. */
-const REPETIR_AVISO_MS = 1600;   // = lo que dura una tanda de VECES_REPETICION: una empieza justo cuando termina la anterior, sin silencios largos
+const REPETIR_AVISO_MS = 5000;   // el sonido se repite cada 5 segundos (una tanda dura 1.6 s y luego hay silencio hasta completar los 5 s)
 const VECES_PRIMER_AVISO = 2;   // cada vez = par de tonos de 0.8 s
 const VECES_REPETICION = 2;     // 2 x 0.8 s = 1.6 s por tanda
 const CLAVE_MUDOS = 'sica_avisos_mudos';
@@ -2190,8 +2190,8 @@ function generarClave() {
 }
 /* Un solo clic: contraseña al azar + guardar. Guardar ya reemplaza la anterior y quita el bloqueo, no hace falta "Borrar" antes. */
 function textoConfirmarClave(c) {
- return c.control ? '¿Cambiar la contraseña de Control Escolar? Se usará la nueva la próxima vez que inicies sesión.'
-  : '¿Guardar una contraseña nueva para ' + c.nombre + '?' + (c.bloqueada ? '\nSe le dará acceso: se quita el bloqueo y podrá entrar con la contraseña nueva.' : '\nLa contraseña anterior dejará de servir.');
+ return c.control ? '¿Estás seguro de cambiar la contraseña de Control Escolar?\nSe usará la nueva la próxima vez que inicies sesión.'
+  : '¿Estás seguro de guardar una contraseña nueva para ' + c.nombre + '?' + (c.bloqueada ? '\nSe le dará acceso: se quita el bloqueo y podrá entrar con la contraseña nueva.' : '\nLa contraseña anterior dejará de servir.');
 }
 function generarYGuardar() {
  const c = datosCuenta();
@@ -2233,6 +2233,10 @@ function guardarClave(yaConfirmado) {
   renderClaves();
  }).catch(() => { btns.prop('disabled', false); alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'); });
 }
+function confirmarEntregada() {
+ if (!confirm('¿Estás seguro de que ya entregaste la contraseña?\nDejará de verse en pantalla y no se podrá volver a mostrar.')) return;
+ ocultarEntrega();
+}
 function ocultarEntrega() {
  claveEntrega = null;
  $('#entrega-clave-texto').text(''); $('#entrega-clave').addClass('d-none');
@@ -2265,7 +2269,7 @@ function imprimirEntrega() {
 function borrarClaveCuenta() {
  const c = datosCuenta();
  if (!c || c.control) return;
- if (!confirm('Se borrará la contraseña guardada de: ' + c.nombre + '.\nNo podrá entrar hasta que generes una nueva aquí mismo. No se borra ningún otro dato. ¿Continuar?')) return;
+ if (!confirm('¿Estás seguro de borrar la contraseña guardada de ' + c.nombre + '?\nNo podrá entrar hasta que generes una nueva aquí mismo. No se borra ningún otro dato.')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/borrar' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol);
  const copia = copiaClaves();
  cambiarLocalClaves(c, c.tipo === 'ori' ? {estado: 'borrada'} : {borrada: true});   // se ve al instante
@@ -2278,7 +2282,7 @@ function borrarClaveCuenta() {
 function desbloquearCuenta() {
  const c = datosCuenta();
  if (!c || !c.bloqueada) return;
- if (!confirm('¿Dar acceso a ' + c.nombre + '?\nSe quita el bloqueo y podrá volver a iniciar sesión con su contraseña actual. No se cambia ni se borra ningún dato.')) return;
+ if (!confirm('¿Estás seguro de dar acceso a ' + c.nombre + '?\nSe quita el bloqueo y podrá volver a iniciar sesión con su contraseña actual. No se cambia ni se borra ningún dato.')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
  const copia = copiaClaves();
  cambiarLocalClaves(c, {bloqueada: false, olvido_at: null});   // el bloqueo desaparece al instante (y su burbuja)
@@ -2288,7 +2292,7 @@ function desbloquearCuenta() {
 }
 function quitarClaveOrientador() {
  if (!cuentaSel.startsWith('ori:')) return;
- if (!confirm('Este orientador volverá a entrar con la contraseña general del rol Orientador. ¿Continuar?')) return;
+ if (!confirm('¿Estás seguro de quitar la contraseña propia de este orientador?\nVolverá a entrar con la contraseña general del rol Orientador.')) return;
  const c = datosCuenta(), copia = copiaClaves();
  cambiarLocalClaves(c, {estado: 'general', bloqueada: false, olvido_at: null});
  $('#resumen-claves').text('Se quitó la contraseña propia. Ahora usa la general del rol Orientador.');
