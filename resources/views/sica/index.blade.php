@@ -12,13 +12,16 @@
 <meta name="apple-mobile-web-app-title" content="SICA-EPO6">
 <link rel="apple-touch-icon" href="{{ asset('img/logo6.png') }}">
 <link rel="preload" as="image" href="{{ asset('img/logo6.png') }}">
-<link rel="prefetch" as="image" href="{{ asset('img/epo6.jpg') }}">   {{-- el fondo del login ya está listo cuando se pulsa Ingresar --}}
+{{-- Fondo: WebP ligero con prioridad alta. Celular (pantalla angosta) baja una versión de ~40 KB; computadora, una de ~100 KB.
+     El JPG queda de respaldo para navegadores viejos. Mientras baja se ve una miniatura borrosa incrustada en el CSS (aparece al instante). --}}
+<link rel="preload" as="image" href="{{ asset('img/epo6-movil.webp') }}" type="image/webp" media="(max-width: 820px)" fetchpriority="high">
+<link rel="preload" as="image" href="{{ asset('img/epo6.webp') }}" type="image/webp" media="(min-width: 821px)" fetchpriority="high">
 {{-- Librerías servidas desde public/vendor (sin CDN): así el sistema abre aunque no haya internet --}}
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
 {{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
      Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
-@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js'] as $lib)
+@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js'] as $lib)
 <link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
 @foreach (['html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
@@ -29,7 +32,12 @@
 <style>
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
 /* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
-.bg-escuela{background:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.jpg') }}") center/cover no-repeat fixed !important;min-height:100vh}
+.bg-escuela{min-height:100vh;background-color:#757362 !important;background-position:center !important;background-size:cover !important;background-repeat:no-repeat !important;background-attachment:fixed !important;
+ /* capas: 1) oscurecido leve, 2) foto, 3) miniatura borrosa de 32 px (la que se ve mientras la foto baja) */
+ background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.jpg') }}"),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}
+/* Si el navegador sabe WebP usa la imagen ligera; si no entiende image-set() ignora estas reglas y queda el JPG de arriba */
+.bg-escuela{background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),image-set(url("{{ asset('img/epo6.webp') }}") type("image/webp"),url("{{ asset('img/epo6.jpg') }}") type("image/jpeg")),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}
+@media (max-width:820px){.bg-escuela{background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),image-set(url("{{ asset('img/epo6-movil.webp') }}") type("image/webp"),url("{{ asset('img/epo6.jpg') }}") type("image/jpeg")),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}}
 #input-clave::-ms-reveal,#input-clave::-ms-clear{display:none}
 .bg-login{background:#fff !important;min-height:100vh}
 .main-card{background:rgba(255,255,255,.95);border-radius:20px;box-shadow:0 20px 40px rgba(0,0,0,.3);border:1px solid rgba(128,0,32,.25)}
@@ -150,6 +158,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .burbujas-claves{position:fixed;top:14px;right:14px;z-index:1900;display:flex;flex-direction:column;gap:10px;max-width:340px;width:calc(100% - 28px)}
 .burbuja{position:relative;background:#800020;color:#fff;border-radius:1.1rem 1.1rem .3rem 1.1rem;padding:.8rem 2rem .8rem 1rem;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:.9rem;animation:burbujaEntra .35s ease-out}
 .burbuja-x{position:absolute;top:4px;right:10px;border:0;background:transparent;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;opacity:.8}
+.burbuja .burbuja-acciones{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.burbuja .burbuja-acciones .mt-2{margin-top:0!important}
+.burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.5rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
+.burbuja .burbuja-mudo:hover{background:rgba(255,255,255,.15)}
+.burbuja.silenciada{background:#5c1a2c}
 @keyframes burbujaEntra{from{opacity:0;transform:translateY(-12px) scale(.95)}to{opacity:1;transform:none}}
 </style>
 </head>
@@ -443,7 +456,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
  <div class="row g-3 align-items-end">
  <div class="col-md-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
- <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
  <div class="col-md-5 d-flex gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm w-100 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
@@ -458,7 +471,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
  <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf"></div>
+ <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
  <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
  </div>
  <div id="resumen-orientadores" class="small text-muted"></div>
@@ -469,7 +482,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
  <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv"></div>
+ <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
  <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
@@ -647,8 +660,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    así que desde la segunda visita salen del equipo). Lo que tarda en estar listo se avisa con libsOk(). */
 (function(){
  const base = "{{ asset('vendor') }}/";
+ window.SICA_VENDOR_BASE = base;   // la compresión de PDF baja pdf-lib solo cuando hace falta, desde esta misma ruta
  const grupos = [
-  ['jszip.min.js', 'qrious.min.js', 'sica-docx.js'],                 // lo mínimo para dibujar credenciales (lector de Word + QR)
+  ['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js'],   // lo mínimo para dibujar credenciales (lector de Word + QR) y reducir el peso de lo que se sube
   ['html5-qrcode.min.js', 'chart.umd.min.js'],                        // escáner y gráficas
   ['xlsx.full.min.js', 'exceljs.min.js', 'jspdf.umd.min.js', 'pdf.min.js']   // Excel, Excel con gráficas, PDF y lector de PDF
  ];
@@ -759,7 +773,8 @@ const save = () => {
  // Mientras tanto queda la marca de pendiente: si se cierra la página antes, se envía al volver a abrir.
  try { localStorage.setItem(PEND_TODO, '1'); } catch (e) {}
  clearTimeout(_temporizadorSave);
- _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 600);
+ acelerarSync();   // se está trabajando: se consulta más seguido durante unos segundos
+ _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 300);
 };
 /* Envía YA lo guardado (sin esperar el medio segundo de agrupación de save()). Para acciones grandes y únicas, como subir una lista. */
 const guardarYa = () => { if (ES_MOVIL) return; clearTimeout(_temporizadorSave); _temporizadorSave = null; enviarTodo(); };
@@ -799,7 +814,7 @@ const LOTE_ALUMNOS = 250;
 const _firmasGuardadas = new Map();   // id del alumno -> firma de lo que ya tiene el servidor
 const firmaAlumno = a => JSON.stringify([a.curp, a.nombre, a.grado, a.grupo, a.turno, a.reg]);
 let _enviando = false, _hayOtroEnvio = false;
-function _postSync(accion, datos, ms) {
+function _postSyncBase(accion, datos, ms) {
  return fetchT('/api/sica/sync', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
@@ -813,6 +828,11 @@ function _postSync(accion, datos, ms) {
    body: JSON.stringify({ accion: accion, datos: datos })
   }, ms || 60000));
  });
+}
+/* Toda escritura confirmada por el servidor (guardar, borrar, subir lista...) avisa a las otras pestañas de este equipo para que
+   se actualicen AL INSTANTE (no esperan su próxima consulta), y acelera la consulta de este equipo unos segundos. */
+function _postSync(accion, datos, ms) {
+ return _postSyncBase(accion, datos, ms).then(r => { if (r && r.ok) { acelerarSync(); avisarEstado(); } return r; });
 }
 /* sinVacios = true: si no hay ningún alumno distinto al del servidor, no manda nada. Devuelve una promesa con true/false. */
 function enviarTodo(sinVacios) {
@@ -954,6 +974,7 @@ function descargarEstadoServidor() {
    _descargandoEstado = false;
    if (!s) return;
    fusionarServidor(s, inicioConsulta);
+   acelerarSync(6000);   // hubo cambios: seguramente vienen más (una fila de alumnos escaneando, una lista que se sube...)
    autoSubirPendientes();
    if (orientadorActivo) {
     orientadorActivo = db.orientadores.find(o => o.id === orientadorActivo.id) || orientadorActivo;
@@ -1073,6 +1094,53 @@ function armarNombre(fila, desde, modo) {
  Punto único para leer listas de nombres: si es .xlsx/.xls/.csv usa SheetJS (como antes);
  si es .pdf usa pdf.js y trata cada línea de texto del PDF como una fila (una sola columna).
  callback(filas) recibe un arreglo de arreglos, igual que sheet_to_json({header:1}). */
+/* Varios archivos a la vez: se leen UNO POR UNO (así no se satura la memoria ni se traba la pantalla), a cada uno se le quita su
+   fila de encabezados y todas las filas se juntan en una sola lista. extensiones = regex de los tipos válidos. */
+const MAX_ARCHIVOS = 30, MAX_MB_ARCHIVO = 30, MAX_MB_TOTAL = 100;   // límites para que el navegador no se trabe
+function leerFilasVarios(input, tipos, esEncabezado, callback, onError) {
+ // El mismo archivo elegido dos veces (mismo nombre y peso) se lee una sola vez
+ const vistos = new Set(), archivos = Array.from(input.files || []).filter(f => { const k = f.name + '|' + f.size; if (vistos.has(k)) return false; vistos.add(k); return true; });
+ if (!archivos.length) { onError && onError('Selecciona al menos un archivo.'); return; }
+ const total = archivos.reduce((t, f) => t + f.size, 0), grande = archivos.find(f => f.size > MAX_MB_ARCHIVO * 1048576);
+ if (archivos.length > MAX_ARCHIVOS) { input.value = ''; onError && onError('Elegiste ' + archivos.length + ' archivos y el máximo es ' + MAX_ARCHIVOS + ' a la vez. Súbelos en dos tandas.'); return; }
+ if (grande) { input.value = ''; onError && onError('"' + grande.name + '" pesa ' + (grande.size / 1048576).toFixed(1) + ' MB y el máximo por archivo es ' + MAX_MB_ARCHIVO + ' MB.'); return; }
+ if (total > MAX_MB_TOTAL * 1048576) { input.value = ''; onError && onError('Los archivos juntos pesan ' + (total / 1048576).toFixed(0) + ' MB y el máximo es ' + MAX_MB_TOTAL + ' MB. Súbelos en varias tandas.'); return; }
+ // Línea de avance debajo del cuadro de archivos (se crea la primera vez)
+ let caja = $(input).nextAll('.avance-archivos').first();
+ if (!caja.length) caja = $('<div class="form-text avance-archivos" role="status"></div>').insertAfter(input);
+ caja.text(archivos.length > 1 ? 'Revisando ' + archivos.length + ' archivos…' : '');
+ // Antes de leer nada se revisa que TODOS sean del tipo permitido, de verdad (no solo por la extensión) y no estén dañados.
+ // Si uno falla no se carga ninguno: así no queda la lista a medias.
+ const revisar = window.SicaCompresion ? SicaCompresion.validarVarios(archivos, tipos) : Promise.resolve(archivos.every(f => new RegExp('\\.(' + tipos.join('|') + ')$', 'i').test(f.name)) ? null : 'Alguno de los archivos no es de un tipo permitido (' + tipos.join(', ') + ').');
+ revisar.then(problema => {
+  if (problema) { input.value = ''; caja.text(''); onError && onError(problema); return; }
+  leerVariosValidados(archivos, esEncabezado, callback, onError, caja);
+ });
+}
+function leerVariosValidados(archivos, esEncabezado, callback, onError, caja) {
+ const todas = [], resumen = [];
+ let i = 0;
+ const texto = t => { if (caja) caja.text(t); };
+ const siguiente = () => {
+  if (i >= archivos.length) {
+   if (archivos.length > 1) texto('Se leyeron ' + archivos.length + ' archivos (' + todas.length + ' filas en total): ' + resumen.join('; ') + '.');
+   else texto('');
+   callback(todas);
+   return;
+  }
+  const original = archivos[i++];
+  if (archivos.length > 1) texto('Leyendo archivo ' + i + ' de ' + archivos.length + ': ' + original.name + '…');
+  // Excel con imágenes, PDF con fotos o CSV con filas vacías se aligeran antes de leerse (el original no se modifica)
+  (window.SicaCompresion ? SicaCompresion.comprimirArchivo(original).catch(() => original) : Promise.resolve(original)).then(f => leerFilasDesdeArchivo(f, filas => {
+   const lim = (filas || []).filter(r => r && r.some && r.some(x => x != null && String(x).trim() !== ''));
+   if (lim.length && esEncabezado(lim[0])) lim.shift();
+   lim.forEach(r => todas.push(r));
+   resumen.push(original.name + ' (' + lim.length + ')');
+   setTimeout(siguiente, 0);   // cede el control entre archivos para que la pantalla siga respondiendo
+  }, msg => { texto(''); onError && onError(original.name + ': ' + msg + (archivos.length > 1 ? '\n\nNo se cargó ningún archivo: corrige este y vuelve a subirlos todos.' : '')); }));
+ };
+ siguiente();
+}
 function leerFilasDesdeArchivo(file, callback, onError) {
  if (/\.pdf$/i.test(file.name)) {
  if (typeof pdfjsLib === 'undefined') { onError && onError('No se pudo cargar el lector de PDF. Revisa tu conexión a internet.'); return; }
@@ -1180,10 +1248,9 @@ function leerFilaOrientador(r) {
 }
 function subirOrientadores() {
  if (!permisoPermite()) return;
- const file = $('#archivo-orientadores')[0].files[0];
- if (!file) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
- if (!/\.(xlsx|xls|csv|pdf)$/i.test(file.name)) { alert('Usa un archivo Excel (.xlsx/.xls), .csv o .pdf.'); return; }
- leerFilasDesdeArchivo(file, rows => {
+ const inp = $('#archivo-orientadores')[0];
+ if (!inp.files.length) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
+ leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /nombre|orientador/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r[0] && String(r[0]).trim());
   if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
   if (!rows.length) { alert('El archivo no trae orientadores. Revisa que el nombre esté en la primera columna.'); return; }
@@ -1876,8 +1943,8 @@ window.addEventListener('storage', e => {
 // Una pestaña que se quedó en el login (o se "durmió") revisa al volver a verla si ya hay sesión abierta
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) entrarSiHaySesion(); });
 function sincronizarBurbujas() {
- if (rolActivo !== 'control') { if (rolActivo) $('#burbujas-claves').empty(); return; }   // sin sesión las dibuja la consulta pública de abajo
- $('#burbujas-claves .burbuja button:not(.burbuja-x)').text('Dar acceso');   // las que salieron en la pantalla de inicio
+ if (rolActivo !== 'control') { if (rolActivo) { $('#burbujas-claves').empty(); _pendientesAviso = []; vigilarRepeticion(); } return; }   // sin sesión las dibuja la consulta pública de abajo
+ $('#burbujas-claves .burbuja .btn-dar-acceso').text('Dar acceso');   // las que salieron en la pantalla de inicio
  pintarBurbujas(clavesRoles, clavesOrientadores, true);
 }
 /* roles / orientadores con la misma forma que /api/sica/claves (bloqueada, olvido_at). avisar = avisar también a las otras pestañas */
@@ -1886,30 +1953,100 @@ function pintarBurbujas(roles, orientadores, avisar) {
  roles.forEach(r => { if (r.bloqueada) pend.push({cuenta: 'rol:' + r.rol, nombre: NOMBRES_CUENTA[r.rol] || r.rol, k: 'rol:' + r.rol + '|' + r.olvido_at}); });
  orientadores.forEach(o => { if (o.bloqueada) pend.push({cuenta: 'ori:' + o.id, nombre: 'Orientador ' + o.nombre, k: 'ori:' + o.id + '|' + o.olvido_at}); });
  const claves = pend.map(p => p.k);
+ _pendientesAviso = claves;
  $('#burbujas-claves .burbuja').each(function () { if (claves.indexOf($(this).attr('data-k')) === -1) $(this).remove(); });
  let hayNueva = false;
  pend.forEach(p => {
   if (burbujasVistas[p.k]) return;
   burbujasVistas[p.k] = true;
-  hayNueva = true;
+  if (!estaMudo(p.k)) hayNueva = true;   // una alerta que ya se silenció (por ejemplo, antes de recargar la página) no vuelve a sonar
   if (avisar) avisarOtrasPestanas({tipo: 'aviso', k: p.k, nombre: p.nombre});   // las otras pestañas en el login entran y lo ven también
   $('#burbujas-claves').append(
-   '<div class="burbuja" role="alert" style="cursor:pointer" onclick="clicBurbuja(this, event)" data-k="' + esc(p.k) + '" data-cuenta="' + esc(p.cuenta) + '">' +
-   '<button type="button" class="burbuja-x" aria-label="Cerrar" onclick="event.stopPropagation(); $(this).closest(\'.burbuja\').remove()">&times;</button>' +
+   '<div class="burbuja' + (estaMudo(p.k) ? ' silenciada' : '') + '" role="alert" style="cursor:pointer" onclick="clicBurbuja(this, event)" data-k="' + esc(p.k) + '" data-cuenta="' + esc(p.cuenta) + '">' +
+   '<button type="button" class="burbuja-x" aria-label="Cerrar" onclick="cerrarBurbuja(this, event)">&times;</button>' +
    '<div class="fw-bold">' + esc(p.nombre) + ' solicita su nueva contraseña</div>' +
    '<div class="small mt-1">Marcó "¿Olvidaste tu contraseña?". Su cuenta quedó bloqueada y no podrá entrar hasta que le des acceso.</div>' +
-   '<button type="button" class="btn btn-sm btn-light fw-semibold mt-2" onclick="clicBurbuja(this, event)">' + (rolActivo ? 'Dar acceso' : 'Entrar como Control Escolar') + '</button></div>');
+   '<div class="burbuja-acciones">' +
+   '<button type="button" class="btn btn-sm btn-light fw-semibold btn-dar-acceso" onclick="clicBurbuja(this, event)">' + (rolActivo ? 'Dar acceso' : 'Entrar como Control Escolar') + '</button>' +
+   '<button type="button" class="burbuja-mudo" onclick="alternarMudoBurbuja(this, event)"></button>' +
+   '</div></div>');
  });
- if (hayNueva) sonarAviso(3);
+ $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });
+ if (hayNueva) sonarAviso(VECES_PRIMER_AVISO);
+ vigilarRepeticion();
+}
+/* ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
+   Mientras haya una burbuja sin atender y sin silenciar, el sonido vuelve a sonar cada REPETIR_AVISO_MS (12 s).
+   La burbuja se va sola en cuanto Control Escolar le da acceso a esa cuenta (la consulta ya no la trae) y con ella se detiene el sonido.
+   El botón "Silenciar" apaga el sonido de ESA alerta (la burbuja se queda a la vista); se guarda en este navegador (localStorage),
+   así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
+   "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar. */
+const REPETIR_AVISO_MS = 12000;
+const VECES_PRIMER_AVISO = 6;   // el primer aviso suena ~5 s (cada vez = par de tonos de 0.8 s)
+const VECES_REPETICION = 4;     // cada repetición suena ~3 s, dentro de los 12 s entre una y otra
+const CLAVE_MUDOS = 'sica_avisos_mudos';
+let _repiteAviso = null;
+let _pendientesAviso = [];   // solicitudes que siguen sin atender (cuenta aún bloqueada), aunque su burbuja ya no esté a la vista
+function leerMudos() {
+ try {
+  const m = JSON.parse(localStorage.getItem(CLAVE_MUDOS) || '{}') || {};
+  const hoy = Date.now();
+  Object.keys(m).forEach(k => { if (hoy - m[k] > 86400000) delete m[k]; });   // se olvidan los de más de un día
+  return m;
+ } catch (e) { return {}; }
+}
+function estaMudo(k) { return !!leerMudos()[k]; }
+function fijarMudo(k, mudo) {
+ try {
+  const m = leerMudos();
+  if (mudo) m[k] = Date.now(); else delete m[k];
+  localStorage.setItem(CLAVE_MUDOS, JSON.stringify(m));
+ } catch (e) {}
+}
+function pintarMudo(b) {   // b = burbuja (jQuery): el texto del botón y su aspecto siguen al estado guardado
+ const mudo = estaMudo(b.attr('data-k'));
+ b.toggleClass('silenciada', mudo);
+ b.find('.burbuja-mudo')
+  .text(mudo ? 'Activar sonido' : 'Silenciar')
+  .attr('title', mudo ? 'Volver a activar el sonido de esta alerta' : 'Silenciar el sonido de esta alerta (la burbuja se queda)');
+}
+function alternarMudoBurbuja(btn, ev) {
+ if (ev) ev.stopPropagation();   // no cuenta como pulsar la burbuja (no abre la solicitud)
+ const b = $(btn).closest('.burbuja');
+ fijarMudo(b.attr('data-k'), !estaMudo(b.attr('data-k')));
+ pintarMudo(b);
+ vigilarRepeticion();
+}
+function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silencia esa alerta
+ if (ev) ev.stopPropagation();
+ const b = $(btn).closest('.burbuja');
+ fijarMudo(b.attr('data-k'), true);
+ b.remove();
+ vigilarRepeticion();
+}
+/* Enciende el temporizador solo cuando hay alguna burbuja y lo apaga cuando ya no queda ninguna */
+function vigilarRepeticion() {
+ const hay = _pendientesAviso.length > 0;
+ if (hay && !_repiteAviso) _repiteAviso = setInterval(repetirAviso, REPETIR_AVISO_MS);
+ else if (!hay && _repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; }
+}
+function repetirAviso() {
+ $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });   // por si en otra pestaña la silenciaron
+ const suena = _pendientesAviso.some(k => !estaMudo(k));   // suena mientras haya una solicitud sin atender y sin silenciar
+ if (suena) sonarAviso(VECES_REPETICION);
+ else vigilarRepeticion();
 }
 /* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
-let _consultandoOlvidos = false;
+let _consultandoOlvidos = false, _etagOlvidos = null;
 function consultarOlvidosInicio() {
  if (rolActivo || _consultandoOlvidos) return;
  _consultandoOlvidos = true;
- fetchT('/api/sica/olvidos', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 6000)
-  .then(r => r.ok ? r.json() : null)
-  .then(d => { if (d && d.ok && !rolActivo) pintarBurbujas(d.roles || [], d.orientadores || [], false); })
+ // Se manda el ETag a mano: si nada cambió el servidor responde 304 sin cuerpo (se consulta cada 1.5 s en cada equipo)
+ const cab = {'Accept': 'application/json'};
+ if (_etagOlvidos) cab['If-None-Match'] = _etagOlvidos;
+ fetchT('/api/sica/olvidos', {headers: cab, cache: 'no-store'}, 6000)
+  .then(r => { if (!r.ok) return null; const et = r.headers.get('ETag'); return r.json().then(d => { d._etag = et; return d; }); })
+  .then(d => { if (d && d.ok && !rolActivo) { _etagOlvidos = d._etag; pintarBurbujas(d.roles || [], d.orientadores || [], false); } })
   .catch(() => {})
   .then(() => { _consultandoOlvidos = false; });
 }
@@ -1940,7 +2077,8 @@ function clicBurbuja(el, ev) {
 function abrirSolicitud(btn) {
  const b = $(btn).closest('.burbuja');
  const v = b.attr('data-cuenta');
- b.remove();
+ // La burbuja NO se quita aquí: sigue a la vista (con su botón Silenciar) y el sonido se repite hasta que se dé acceso;
+ // se va sola cuando la cuenta se desbloquea.
  abrirSolicitudCuenta(v);
 }
 function abrirSolicitudCuenta(v) {
@@ -2120,7 +2258,10 @@ function olvideContrasena() {
  abrirModalCuenta('confirmar');
 }
 const MENSAJE_OLVIDO_LOCAL = '¿Olvidaste tu contraseña? Avisa a Control Escolar. Ellos borrarán tu contraseña anterior y generarán una nueva. Mientras tanto tu cuenta está bloqueada y no podrás entrar.';
+let _olvidoEnCurso = false;   // evita que el aviso se mande (y el mensaje salga) dos veces
 function confirmarOlvido(reintento) {
+ if (_olvidoEnCurso && !reintento) return;
+ _olvidoEnCurso = true;
  const rol = $('#rol-select').val();
  const o = rol === 'orientador' ? db.orientadores.find(x => x.id === $('#select-orientador-login').val()) : null;
  // El correo se toma del ROL elegido (no del campo de texto): en computadora el navegador puede dejar ese campo vacío,
@@ -2143,6 +2284,7 @@ function confirmarOlvido(reintento) {
  .then(d => {
   // 419: la página llevaba mucho tiempo abierta y su token venció (pasa en computadoras) -> se pide uno nuevo y se reintenta UNA vez
   if (d.status === 419 && !reintento) return refrescarCsrf().then(() => confirmarOlvido(true));
+  _olvidoEnCurso = false;
   btn.prop('disabled', false);   // (el modal siguiente reemplaza los botones)
   $('#input-clave').val('');
   if (d.ok === false || !d.mensaje) {
@@ -2159,9 +2301,11 @@ function confirmarOlvido(reintento) {
    }
    abrirModalCuenta('info', msg); return;
   }
+  // Si el mensaje de "Cuenta bloqueada" ya salió al instante y el servidor lo confirma, NO se vuelve a abrir (salía dos veces)
+  if (optimista && d.bloqueada) return;
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
  })
- .catch(() => { btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo avisar a Control Escolar: no hay conexión con el servidor. Tu cuenta NO se bloqueó. Revisa tu conexión e inténtalo de nuevo.'); });
+ .catch(() => { _olvidoEnCurso = false; btn.prop('disabled', false); abrirModalCuenta('info', 'No se pudo avisar a Control Escolar: no hay conexión con el servidor. Tu cuenta NO se bloqueó. Revisa tu conexión e inténtalo de nuevo.'); });
 }
 /* ============ COLA DE ESCANEOS (funciona sin internet) ============
  Cada escaneo se guarda primero en este equipo y se envía al servidor en cuanto hay conexión.
@@ -2215,7 +2359,7 @@ function vaciarCola() {
   }, 12000).then(r => {
    if (r.status === 419 && !reintentoCsrf) return refrescarCsrf().then(() => enviar(true, huboExito));
    if (r.status === 401) { terminar(huboExito); sesionExpirada(); return; }   // la cola se conserva hasta volver a iniciar sesión
-   if (r.ok) { colaEscaneos.shift(); guardarCola(); return enviar(false, true); }
+   if (r.ok) { colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
    if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; return terminar(huboExito); }
    // 403 / 404 / 422: el servidor lo rechazó de forma definitiva -> se descarta para no atorar la cola
    colaEscaneos.shift(); guardarCola();
@@ -2253,7 +2397,13 @@ function iniciarScanner(el, modoFn) {
  if (el === 'cam-fija') { camFijaError = Date.now(); $('#res-cam-fija').removeClass('text-success').addClass('text-danger').text('No se pudo abrir la cámara. Permite el acceso a la cámara en el navegador (requiere https o localhost).'); return; }
  alert('No se pudo abrir la cámara (requiere permiso y https o localhost): ' + e);
  };
- const mejorarImagen = () => { try { s.applyVideoConstraints({width:{ideal:1920}, height:{ideal:1080}, advanced:[{focusMode:'continuous'}]}).catch(() => {}); } catch (e) {} };   // más resolución y enfoque automático continuo (si la cámara lo permite)
+ // Enfoque automático continuo (si la cámara lo permite) y resolución según cómo se lee el QR:
+ //  - Con lector nativo del navegador (BarcodeDetector: Chrome en Android, Mac...) se usa 1080p: lo decodifica el sistema, es rápido y alcanza de más lejos.
+ //  - Con el lector en JavaScript (iPhone, Windows, la mayoría de computadoras) 1080p tarda más del doble por cuadro que 720p (medido: ~75 ms contra ~33 ms),
+ //    así que se pide 720p: lee el QR en menos tiempo cuando se acerca la credencial a la cámara.
+ const nativo = typeof window.BarcodeDetector !== 'undefined';
+ const resolucion = nativo ? {width:{ideal:1920}, height:{ideal:1080}} : {width:{ideal:1280}, height:{ideal:720}};
+ const mejorarImagen = () => { try { s.applyVideoConstraints(Object.assign({advanced:[{focusMode:'continuous'}]}, resolucion)).catch(() => {}); } catch (e) {} setTimeout(precalentarIndiceQr, 0); };
  const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).then(mejorarImagen).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
  if (!ES_MOVIL) { probar([{facingMode:'user'}], 0); return; } // Computadora: cámara frontal
  // Teléfono/tablet: SIEMPRE trasera. Se busca en la lista real de cámaras la que se llame back/rear/trasera...
@@ -2301,6 +2451,11 @@ function procesarQR(curp, modo, el) {
   r.then(mostrar);
  } else mostrar(r);
 }
+let _guardarPend = null;
+function guardarYPintarLuego() {   // varios escaneos seguidos se juntan en un solo guardado
+ if (_guardarPend) return;
+ _guardarPend = setTimeout(() => { _guardarPend = null; save(); renderTabla(); }, 0);
+}
 function aplicarRegistro(a, modo) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
  const f = hoy(), r = a.reg[f] = a.reg[f] || {};
@@ -2314,14 +2469,30 @@ function aplicarRegistro(a, modo) {
  }
  // Cada escaneo entra a la cola: se envía al servidor ya (o en cuanto vuelva el internet) y aparece en todos los equipos
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
- save(); renderTabla();
+ guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
  return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), modo === 'Salida' ? permDe(r) : '') +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
+/* Índice código-del-QR -> alumno. Antes, cada lectura calculaba el código (un hash) de los alumnos uno por uno hasta dar con el correcto;
+   ahora se arma una sola vez (al encender la cámara) y cada lectura es una búsqueda directa. */
+let _idxQr = {lista: null, n: -1, clave: null, mapa: new Map()};
+function construirIndiceQr() {
+ const m = new Map();
+ (db.alumnos || []).forEach(a => { if (a.curp) { const c = qrCodigo(a.curp); if (c) m.set(c.toUpperCase(), a); } });
+ _idxQr = {lista: db.alumnos, n: (db.alumnos || []).length, clave: db.qrClave, mapa: m};
+ return m;
+}
+function precalentarIndiceQr() { try { if (db && db.qrClave) construirIndiceQr(); } catch (e) {} }
+function alumnoPorCodigoQr(cod) {
+ const vigente = _idxQr.lista === db.alumnos && _idxQr.n === db.alumnos.length && _idxQr.clave === db.qrClave;
+ let a = (vigente ? _idxQr.mapa : construirIndiceQr()).get(cod);
+ if (a && a.curp && qrCodigo(a.curp).toUpperCase() === cod) return a;   // sigue siendo el mismo alumno
+ return construirIndiceQr().get(cod) || null;                            // no estaba (o cambió algo): se rehace una vez, como antes
+}
 function registrarPorCurp(curp, modo) {
  const a = esClaveQr(curp)
-  ? db.alumnos.find(x => x.curp && qrCodigo(x.curp).toUpperCase() === curp.slice(4))
+  ? alumnoPorCodigoQr(curp.slice(4))
   : db.alumnos.find(x => x.curp && x.curp === curp);
  if (!a) return registrarDesconocido(curp, modo);
  return aplicarRegistro(a, modo);
@@ -2557,12 +2728,11 @@ function marcarSalida(id) { if (!permisoPermite()) return; const r = registrarPo
 function subirLista() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
- const file = $('#archivo-lista')[0].files[0];
- if (!file) { alert('Selecciona un archivo para la lista.'); return; }
- if (!/\.(xlsx|xls|csv|pdf)$/i.test(file.name)) { alert('Para cargar los alumnos automáticamente usa un archivo Excel (.xlsx/.xls), .csv o .pdf.'); return; }
+ const inp = $('#archivo-lista')[0];
+ if (!inp.files.length) { alert('Selecciona un archivo para la lista.'); return; }
  const modo = $('#orden-nombre-lista').val();
  const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
- leerFilasDesdeArchivo(file, rows => {
+ leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /curp|matr|nombre|apellido/i.test(String(r[0] == null ? '' : r[0])), rows => {
  rows = rows.filter(r => r && r[0] != null && String(r[0]).trim());
  if (rows.length && /curp|matr|nombre|apellido/i.test(String(rows[0][0]))) rows.shift();
  if (!rows.length) { alert('El archivo no trae alumnos. Pon la CURP en la columna A y el nombre en la B.'); return; }
@@ -2617,10 +2787,9 @@ function borrarListaGrupo() {
 }
 function subirHorarios() {
  if (!permisoPermite()) return;
- const file = $('#archivo-horarios')[0].files[0];
- if (!file) { alert('Selecciona un archivo de horarios.'); return; }
- if (!/\.(xlsx|xls|csv)$/i.test(file.name)) { alert('Usa un archivo Excel (.xlsx/.xls) o .csv.'); return; }
- leerFilasDesdeArchivo(file, rows => {
+ const inp = $('#archivo-horarios')[0];
+ if (!inp.files.length) { alert('Selecciona un archivo de horarios.'); return; }
+ leerFilasVarios(inp, ['xlsx', 'xls', 'csv'], r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
   if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
   if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador y Turno (opcional).'); return; }
@@ -3020,12 +3189,24 @@ function subirPlantillaOficial(lado) {
  const f = $('#input-plantilla-oficial-' + lado)[0].files[0];
  if (!f) { alert('Primero elige tu archivo (Word o PDF) y luego pulsa "Actualizar".'); return; }
  const esPDF = /\.pdf$/i.test(f.name), esDocx = /\.docx$/i.test(f.name);
- if (!esPDF && !esDocx) { alert('Ese archivo no sirve. Usa un Word guardado como .docx (Archivo > Guardar como > Documento de Word) o un PDF (Archivo > Exportar > PDF).'); return; }
+ if (!esPDF && !esDocx) { alert('Ese archivo no sirve. Usa un Word guardado como .docx (Archivo > Guardar como > Documento de Word) o un PDF (Archivo > Exportar > PDF).'); $('#input-plantilla-oficial-' + lado).val(''); return; }
  if (!libsOk('SicaDocx')) return;
  if (esPDF && !libsOk('pdfjsLib')) return;
  const caja = $('#resumen-plantilla-oficial');
  caja.removeClass('text-success text-danger').addClass('text-muted').text('Leyendo tu ' + (esPDF ? 'PDF' : 'Word') + '…');
- f.arrayBuffer().then(buf => SicaDocx.cargar(buf)).then(m => {
+ let envio = f;   // lo que realmente se sube: el Word ya con sus imágenes reducidas (así lo que ves es lo que se guarda)
+ // 1) Se revisa que sea de verdad un Word o un PDF y que no esté dañado; 2) se reduce su peso; 3) se lee y se sube
+ const validar = window.SicaCompresion ? SicaCompresion.validar(f, ['docx', 'pdf']) : Promise.resolve(null);
+ const preparar = validar.then(problema => {
+  if (problema) { const err = new Error(problema); err.esValidacion = true; throw err; }
+  return window.SicaCompresion ? SicaCompresion.comprimirArchivo(f, t => caja.text(t)).catch(() => f) : f;
+ });
+ preparar.then(g => {
+  envio = g;
+  if (g.size > 20 * 1048576) throw new Error('El archivo pesa ' + (g.size / 1048576).toFixed(1) + ' MB incluso después de reducirlo y el máximo es 20 MB. Si es un Word, quítale imágenes; si es un PDF, expórtalo con menor calidad de imagen.');
+  if (g !== f) caja.text('Peso reducido de ' + SicaCompresion.pesoLegible(f.size) + ' a ' + SicaCompresion.pesoLegible(g.size) + '. Leyendo…');
+  return g.arrayBuffer();
+ }).then(buf => SicaDocx.cargar(buf)).then(m => {
   if (lado === 'frente') {
    const falta = problemasFrente(m);
    if (falta.length && !confirm('En este archivo no encontré ' + falta.join(', ') + '. Sin eso, los datos del alumno no quedarían bien en la credencial.\n\n¿Subirlo de todos modos?')) { caja.text(''); return; }
@@ -3035,26 +3216,37 @@ function subirPlantillaOficial(lado) {
   refrescarPreviewPlantillaOficial();
   if (idEditando) actualizarVistaPreviaCredencial();
   caja.removeClass('text-success text-danger').addClass('text-muted').text('Guardando en el servidor…');
-  return Promise.all(turnos.map(t => {
+  // Cada turno es una subida; van en cola (pocas a la vez) y se reintentan si falla la red o el servidor
+  const subir = t => () => {
    const fd = new FormData();
-   fd.append('archivo', f, f.name);
+   fd.append('archivo', envio, envio.name);
    fd.append('turno', t);
    return fetch('/api/sica/plantilla-oficial/' + lado, {
     method: 'POST',
     headers: {'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
     body: fd
-   }).then(r => r.ok ? r.json() : r.json().catch(() => ({})).then(d => Promise.reject((d && (d.message || d.mensaje)) || ('error ' + r.status))));
-  })).then(() => {
+   }).then(r => r.ok ? r.json() : r.json().catch(() => ({})).then(d => {
+    const err = new Error((d && (d.message || d.mensaje)) || ('error ' + r.status));
+    err.noReintentar = r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429 && r.status !== 419;   // el servidor rechazó el archivo: repetir no sirve
+    throw err;
+   }));
+  };
+  return SicaCompresion.cola(turnos.map(subir), {simultaneas: 2, reintentos: 2}).then(res => {
+   const fallo = res.find(x => !x.ok);
+   if (fallo) throw fallo.error;
+  }).then(() => {
    turnos.forEach(t => { origenPlantilla[t + '-' + lado] = 'servidor'; });
    actualizarBotonesPlantilla();
    caja.removeClass('text-muted text-danger').addClass('text-success')
     .text('¡Listo! La plantilla ' + turnos.join(' y ') + ' (' + lado + ') ya se actualizó. Las credenciales de ' + (turnos.length > 1 ? 'los dos turnos' : 'ese turno') + ' se hacen con este diseño.');
   }, e => {
    caja.removeClass('text-muted text-success').addClass('text-danger')
-    .text('La plantilla se cambió solo en este navegador; el servidor no la guardó (' + e + '). Intenta de nuevo.');
+    .text('La plantilla se cambió solo en este navegador; el servidor no la guardó (' + (e && e.message ? e.message : e) + '). Intenta de nuevo.');
   });
  }).catch(e => {
-  caja.removeClass('text-muted text-success').addClass('text-danger').text('No se pudo leer ese archivo: ' + (e && e.message ? e.message : e));
+  const msg = e && e.message ? e.message : e;
+  caja.removeClass('text-muted text-success').addClass('text-danger').text(e && e.esValidacion ? msg : 'No se pudo leer ese archivo: ' + msg);
+  if (e && e.esValidacion) alert(msg);
  }).then(() => $('#input-plantilla-oficial-' + lado).val(''));
 }
 function restaurarPlantillaOficial() {
@@ -3227,9 +3419,10 @@ function actualizarVistaPreviaCredencial() {
  const a = db.alumnos.find(x => x.id === idEditando);
  if (!a) return;
  const datosPreview = {
- nombre: $('#edit-nombre-alumno').val().trim() || a.nombre,
- curp: $('#edit-curp-alumno').val().trim().toUpperCase() || a.curp,
- grado: a.grado, grupo: a.grupo, turno: a.turno
+ // Solo lo que hay escrito en los cuadros: si borras el nombre o la CURP, la plantilla los muestra vacíos (antes volvía a salir el dato guardado)
+ nombre: $('#edit-nombre-alumno').val().trim(),
+ curp: $('#edit-curp-alumno').val().trim().toUpperCase(),
+ grado: a.grado, grupo: a.grupo, turno: a.turno, vistaPrevia: true
  };
  datosPreview.qr = qrValorDe(datosPreview.curp); datosPreview.conQR = !!(datosPreview.curp && datosPreview.qr);
  pintarCredencialCanvas(document.getElementById('preview-canvas-frente'), datosPreview, 'frente');
@@ -3239,7 +3432,8 @@ function actualizarVistaPreviaCredencial() {
    Apellido paterno, Apellido materno y Nombre(s). */
 function datosCredencial(a) {
  return {
-  nombre: a.nombre || '(SIN NOMBRE)', curp: a.curp || '(SIN CURP)',
+  // En la vista previa de edición lo vacío se deja vacío; en el PDF y en la lista se avisa con (SIN NOMBRE) / (SIN CURP)
+  nombre: a.nombre || (a.vistaPrevia ? '' : '(SIN NOMBRE)'), curp: a.curp || (a.vistaPrevia ? '' : '(SIN CURP)'),
   // El QR sale de la CURP del alumno: datos de la escuela + un código propio de cada alumno (no la CURP a la vista)
   qr: qrValorDe(a.curp), conQR: !!(a.curp && qrValorDe(a.curp)),
   grado: nomGrado[a.grado] || '',
@@ -3447,6 +3641,38 @@ function restaurarSesion(S) {
 }
 // Computadoras: al volver con "atrás" o recargar, el navegador restaura el rol elegido SIN avisar a la página -> se vuelve a sincronizar el correo
 window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredenciales(); });
+/* ---- Qué tan rápido se ven los cambios ----
+   Antes: cada equipo consultaba cada 3 s (computadoras) o 5 s (teléfonos). Ahora:
+   - consulta normal cada 1.5 s (computadoras) / 2.5 s (teléfonos); si no hubo cambios el servidor responde 304 casi sin trabajo;
+   - "ráfaga": 0.8 s mientras se está trabajando (se guardó, borró, escaneó, o llegaron cambios de otro equipo) y 6 s después del último movimiento;
+   - las otras pestañas del MISMO equipo se enteran al instante por BroadcastChannel (sin esperar consulta);
+   - se espera a que termine una consulta antes de programar la siguiente (no se amontonan si el servidor tarda). */
+var _rafagaHasta = 0;
+function acelerarSync(ms) { _rafagaHasta = Math.max(_rafagaHasta, Date.now() + (ms || 6000)); }
+function programarConsulta() {
+ const espera = Date.now() < _rafagaHasta ? 800 : (ES_MOVIL ? 2500 : 1500);
+ setTimeout(() => {
+  const p = (rolActivo && !document.hidden) ? Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {}) : Promise.resolve();
+  p.then(programarConsulta);
+ }, espera);
+}
+var _canalEstado = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_estado') : null;
+function avisarEstado() { try { if (_canalEstado) _canalEstado.postMessage(Date.now()); } catch (e) {} }
+if (_canalEstado) _canalEstado.onmessage = () => { if (rolActivo) { acelerarSync(); cargarDesdeServidor(); } };
+/* "Permanencia": un alumno sin salida pasa a ese estatus cuando LLEGA la hora de fin de su grupo, aunque no entre ningún dato nuevo.
+   Cada 20 s se revisa si se cruzó alguna hora de fin y, solo entonces, se vuelve a dibujar la tabla. */
+var _minutoPerm = null;
+function horasFinDeHoy() {
+ const f = new Set(Object.values(LIM).map(x => x.fin));
+ Object.values(db.horarios || {}).forEach(h => { if (h && h.entrada && h.salida) f.add(toMin(h.salida)); });
+ return f;
+}
+function cruzoHoraFin(antes, ahora, fines) { for (const m of fines) if (antes < m && ahora >= m) return true; return false; }
+function vigilarPermanencia() {
+ const ahora = toMin(horaAhora());
+ if (_minutoPerm !== null && ahora !== _minutoPerm && rolActivo && cruzoHoraFin(_minutoPerm, ahora, horasFinDeHoy())) renderTablaPronto();
+ _minutoPerm = ahora;
+}
 $(function () {
  precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
  try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
@@ -3458,7 +3684,8 @@ $(function () {
  if (window.SICA_SESION) restaurarSesion(window.SICA_SESION);   // solo pide datos al servidor si hay sesión (cero errores 401 al abrir)
  // Todos los equipos consultan al servidor (computadoras cada 3 s, teléfonos cada 5 s) para ver los mismos datos;
  // se pausa si la pestaña está oculta para no gastar datos ni servidor
- setInterval(() => { if (rolActivo && !document.hidden) cargarDesdeServidor(); }, ES_MOVIL ? 5000 : 3000);
+ programarConsulta();
+ setInterval(() => { if (!document.hidden) vigilarPermanencia(); }, 20000);
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();

@@ -61,27 +61,46 @@ class ControlEscolarController extends Controller
         abort_unless(in_array($lado, ['frente', 'reverso'], true), 404);
 
         $request->validate([
-            'archivo' => 'required|file|max:10240|extensions:docx,pdf',
+            'archivo' => 'required|file|max:20480|extensions:docx,pdf',
             'turno'   => 'required|in:Matutino,Vespertino',
         ], [
             'archivo.extensions' => 'La plantilla debe ser un Word (.docx) o un PDF.',
-            'archivo.max'        => 'El archivo pesa demasiado (máximo 10 MB).',
+            'archivo.max'        => 'El archivo pesa demasiado (máximo 20 MB).',
         ]);
 
-        $ruta = $request->file('archivo')->getRealPath();
-
+        $ruta      = $request->file('archivo')->getRealPath();
+        $extension = strtolower($request->file('archivo')->getClientOriginalExtension());
         $contenido = file_get_contents($ruta);
 
-        if (str_starts_with($contenido, '%PDF-')) {
-            // PDF: se reconoce por su encabezado
-        } elseif (class_exists(\ZipArchive::class)) {
-            // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo
-            $zip = new \ZipArchive();
-            $ok  = $zip->open($ruta) === true && $zip->locateName('word/document.xml') !== false;
-            $zip->close();
-            if (!$ok) {
-                return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) ni un PDF válido.'], 422);
+        // Se revisa el CONTENIDO real (no solo la extensión): que sea de verdad un PDF o un Word, que coincida con su extensión y que no esté dañado
+        $esPdf = str_starts_with($contenido, '%PDF-');
+        $esZip = str_starts_with($contenido, "PK\x03\x04");
+
+        if ($esPdf) {
+            if ($extension !== 'pdf') {
+                return response()->json(['ok' => false, 'message' => 'El archivo es un PDF pero su extensión dice otra cosa. Guárdalo con extensión .pdf.'], 422);
             }
+            if (!str_contains(substr($contenido, -2048), '%%EOF')) {
+                return response()->json(['ok' => false, 'message' => 'El PDF está dañado o incompleto (se cortó al guardarlo). Vuelve a exportarlo.'], 422);
+            }
+        } elseif ($esZip) {
+            // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo (ni un Excel renombrado)
+            $ok = false;
+            if ($extension === 'docx' && class_exists(\ZipArchive::class)) {
+                $zip = new \ZipArchive();
+                if ($zip->open($ruta) === true) {   // si el zip está truncado o corrupto, open() falla y NO hay nada que cerrar
+                    $ok = $zip->locateName('word/document.xml') !== false;
+                    $zip->close();
+                }
+            }
+            if ($extension !== 'docx') {
+                return response()->json(['ok' => false, 'message' => 'El archivo es un documento comprimido (zip, Word, Excel...) pero su extensión no es .docx. Sube un Word guardado como .docx o un PDF.'], 422);
+            }
+            if (!$ok) {
+                return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) válido o está dañado. Guárdalo de nuevo desde Word.'], 422);
+            }
+        } else {
+            return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) ni un PDF válido.'], 422);
         }
 
         $turno = $request->input('turno');
@@ -100,7 +119,17 @@ class ControlEscolarController extends Controller
     {
         abort_unless(in_array($turno, ['Matutino', 'Vespertino'], true) && in_array($lado, ['frente', 'reverso'], true), 404);
 
-        $a = Ajuste::find(self::clavePlantilla($turno, $lado));
+        // Primero solo la fecha de la plantilla (sin traer el archivo de la BD): si el equipo ya tiene esta versión, responde 304 al instante
+        $clave = self::clavePlantilla($turno, $lado);
+        $meta  = Ajuste::select('clave', 'updated_at')->find($clave);
+        abort_unless($meta, 404);
+
+        $etag = '"' . md5($clave . '|' . ($meta->updated_at?->getTimestamp() ?? 0)) . '"';
+        if (in_array(request()->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
+            return response('', 304)->header('ETag', $etag)->header('Cache-Control', 'no-cache');
+        }
+
+        $a = Ajuste::find($clave);
         abort_unless($a && $a->valor, 404);
 
         $bytes = base64_decode($a->valor);
@@ -112,8 +141,7 @@ class ControlEscolarController extends Controller
             'Content-Type'  => $tipo,
             'Cache-Control' => 'no-cache',
         ]);
-        $respuesta->setEtag(md5($a->valor));
-        $respuesta->isNotModified(request());   // 304 si el equipo ya tiene esta plantilla
+        $respuesta->headers->set('ETag', $etag);
 
         return $respuesta;
     }
@@ -349,7 +377,7 @@ class ControlEscolarController extends Controller
      */
     private function huellaEstado(): string
     {
-        return Cache::remember('sica.huella', 2, fn () => $this->calcularHuella());
+        return Cache::remember('sica.huella', 1, fn () => $this->calcularHuella());
     }
 
     private function calcularHuella(): string

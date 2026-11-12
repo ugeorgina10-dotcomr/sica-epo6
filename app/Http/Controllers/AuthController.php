@@ -133,7 +133,7 @@ class AuthController extends Controller
      * así Control Escolar se entera aunque aún no haya iniciado sesión. Solo trae el nombre de la cuenta y la hora de la solicitud
      * (los nombres de los orientadores ya son públicos en la lista del login). Misma forma que /api/sica/claves.
      */
-    public function olvidos(): JsonResponse
+    public function olvidos(Request $request): JsonResponse
     {
         $datos = Cache::remember('sica.olvidos', 2, fn () => [
             'ok'           => true,
@@ -143,7 +143,14 @@ class AuthController extends Controller
                 ->map(fn ($o) => ['id' => (string) $o->id, 'nombre' => $o->nombre, 'bloqueada' => true, 'olvido_at' => (string) $o->olvido_at])->values()->all(),
         ]);
 
-        return response()->json($datos);
+        // ETag: la pantalla de inicio consulta esto cada 1.5 s en cada equipo; si nada cambió se responde 304 sin cuerpo
+        $etag = '"' . md5(json_encode($datos)) . '"';
+
+        if (in_array($request->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
+            return response()->json(null, 304)->header('ETag', $etag);
+        }
+
+        return response()->json($datos)->header('ETag', $etag);
     }
 
     /** Cierra la sesión y descarta la sesión actual. */
