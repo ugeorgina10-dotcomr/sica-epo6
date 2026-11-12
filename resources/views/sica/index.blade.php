@@ -631,7 +631,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
     <code id="entrega-clave-texto" class="fs-5 px-3 py-1 bg-white rounded border" style="user-select:all"></code>
     <button type="button" onclick="copiarEntrega()" class="btn btn-outline-success btn-sm">Copiar</button>
     <button type="button" onclick="imprimirEntrega()" class="btn btn-outline-success btn-sm">Imprimir hoja de entrega</button>
-    <button type="button" onclick="ocultarEntrega()" class="btn btn-success btn-sm">Ya la entregué</button>
+    <button type="button" onclick="confirmarYaEntregue()" class="btn btn-success btn-sm">Ya la entregué</button>
    </div>
    <div class="small text-muted mt-2">Entrégala en persona. Esta es la única vez que se muestra: el sistema solo guarda su versión cifrada.</div>
   </div>
@@ -1690,7 +1690,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control') cargarClaves(); }, 1000);   // cada 1 s (también con la pestaña en segundo plano): la burbuja y el sonido salen casi al instante
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -1865,6 +1865,15 @@ function avisarOtrasPestanas(msg) {
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
 let _audioCtx = null, _sonidoPendiente = null;
+let _sonidosActivos = [];   // lo que está sonando ahora (oscilador + volumen), para poder cortarlo al instante al silenciar
+function detenerSonido() {
+ _sonidoPendiente = null;
+ _sonidosActivos.forEach(n => {
+  try { n.vol.disconnect(); } catch (e) {}   // al desconectarlo deja de oírse en ese mismo instante
+  try { n.osc.stop(); } catch (e) {}
+ });
+ _sonidosActivos = [];
+}
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -1893,6 +1902,9 @@ function sonarAviso(veces) {
     vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
     osc.connect(vol); vol.connect(_audioCtx.destination);
     osc.start(ini); osc.stop(ini + 0.4);
+    const nodo = {osc: osc, vol: vol};
+    _sonidosActivos.push(nodo);
+    osc.onended = () => { _sonidosActivos = _sonidosActivos.filter(x => x !== nodo); };
    });
   }
  } catch (e) {}
@@ -1953,6 +1965,7 @@ function irAControl(cuenta, silencio) {
 function alRecibirAviso(msg) {
  if (!msg) return;
  if (msg.tipo === 'aviso') entrarSiHaySesion();
+ else if (msg.tipo === 'olvido') { if (!rolActivo) consultarOlvidosInicio(); else if (rolActivo === 'control') cargarClaves(); }   // otra pestaña acaba de avisar: se consulta YA
  else if (msg.tipo === 'ir-control' && !_esSecundaria) { avisarOtrasPestanas({tipo: 'ack-control'}); irAControl(msg.cuenta); }
  else if (msg.tipo === 'ack-control' && _confirmarEnvio) _confirmarEnvio();
 }
@@ -2031,11 +2044,24 @@ function pintarMudo(b) {   // b = burbuja (jQuery): el texto del botón y su asp
   .text(mudo ? 'Activar sonido' : 'Silenciar')
   .attr('title', mudo ? 'Volver a activar el sonido de esta alerta' : 'Silenciar el sonido de esta alerta (la burbuja se queda)');
 }
+/* Corta al instante lo que esté sonando si ya no queda ninguna alerta sin silenciar */
+function cortarSiTodoMudo() {
+ if (!_pendientesAviso.some(k => !estaMudo(k))) detenerSonido();
+}
 function alternarMudoBurbuja(btn, ev) {
  if (ev) ev.stopPropagation();   // no cuenta como pulsar la burbuja (no abre la solicitud)
  const b = $(btn).closest('.burbuja');
- fijarMudo(b.attr('data-k'), !estaMudo(b.attr('data-k')));
+ const k = b.attr('data-k');
+ const silenciar = !estaMudo(k);
+ fijarMudo(k, silenciar);
  pintarMudo(b);
+ if (silenciar) {
+  cortarSiTodoMudo();   // Silenciar: el sonido se corta en el acto, sin esperar a que termine el aviso que ya había empezado
+ } else {
+  // Activar sonido: suena en el acto y la repetición se reinicia desde este momento
+  if (_repiteAviso) { clearInterval(_repiteAviso); _repiteAviso = null; }
+  sonarAviso(VECES_REPETICION);
+ }
  vigilarRepeticion();
 }
 function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silencia esa alerta
@@ -2043,8 +2069,15 @@ function cerrarBurbuja(btn, ev) {   // la "x" quita la burbuja y también silenc
  const b = $(btn).closest('.burbuja');
  fijarMudo(b.attr('data-k'), true);
  b.remove();
+ cortarSiTodoMudo();
  vigilarRepeticion();
 }
+// Si en otra pestaña del mismo navegador silenciaron o activaron una alerta, aquí se refleja y se corta el sonido en el acto
+window.addEventListener('storage', e => {
+ if (e.key !== CLAVE_MUDOS) return;
+ $('#burbujas-claves .burbuja').each(function () { pintarMudo($(this)); });
+ cortarSiTodoMudo();
+});
 /* Enciende el temporizador solo cuando hay alguna burbuja y lo apaga cuando ya no queda ninguna */
 function vigilarRepeticion() {
  const hay = _pendientesAviso.length > 0;
@@ -2159,6 +2192,7 @@ function guardarClave() {
  if (!c) { alert('Primero elige una cuenta.'); return; }
  const nueva = $('#clave-nueva').val(), conf = $('#clave-confirmar').val();
  if (!revisarRequisitosClave()) { alert('La contraseña nueva aún no cumple las indicaciones que aparecen debajo de las casillas.'); return; }
+ if (!confirm(c.control ? 'Se cambiará tu contraseña de Control Escolar por la nueva.\n¿Estás seguro de hacerlo?' : 'Se guardará la contraseña nueva de: ' + c.nombre + '.\nReemplaza la anterior y le devuelve el acceso. ¿Estás seguro de hacerlo?')) return;
  let url, cuerpo;
  if (c.tipo === 'ori') {
   url = '/api/sica/claves/orientador';
@@ -2185,6 +2219,10 @@ function guardarClave() {
   limpiarCamposClave();
   renderClaves();
  }).catch(() => { btns.prop('disabled', false); alert('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.'); });
+}
+function confirmarYaEntregue() {
+ if (!confirm('La contraseña dejará de mostrarse y ya no se podrá volver a ver.\n¿Ya la entregaste y estás seguro de ocultarla?')) return;
+ ocultarEntrega();
 }
 function ocultarEntrega() {
  claveEntrega = null;
@@ -2231,7 +2269,7 @@ function borrarClaveCuenta() {
 function desbloquearCuenta() {
  const c = datosCuenta();
  if (!c || !c.bloqueada) return;
- // Sin ventana de confirmación: desbloquear no cambia ni borra nada (solo deja que la persona vuelva a intentar entrar), así es un solo clic.
+ if (!confirm('Se quitará el bloqueo de: ' + c.nombre + ' SIN cambiar su contraseña.\nLa persona podrá volver a intentar entrar. ¿Estás seguro de hacerlo?')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
  const copia = copiaClaves();
  cambiarLocalClaves(c, {bloqueada: false, olvido_at: null});   // el bloqueo desaparece al instante (y su burbuja)
@@ -2322,6 +2360,7 @@ function confirmarOlvido(reintento) {
    }
    abrirModalCuenta('info', msg); return;
   }
+  if (d.bloqueada) avisarOtrasPestanas({tipo: 'olvido'});   // las otras pestañas de este navegador consultan al instante, sin esperar su turno
   // Si el mensaje de "Cuenta bloqueada" ya salió al instante y el servidor lo confirma, NO se vuelve a abrir (salía dos veces)
   if (optimista && d.bloqueada) return;
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
@@ -3715,7 +3754,7 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1500);   // burbuja y sonido en la pantalla de inicio
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo) consultarOlvidosInicio(); }, 1000);   // burbuja y sonido en la pantalla de inicio
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
