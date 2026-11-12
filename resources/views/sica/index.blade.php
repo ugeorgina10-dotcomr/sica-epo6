@@ -677,7 +677,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 </div>
 <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
  <button onclick="regresarPanel()" id="btn-regresar-panel" class="btn btn-vinotinto px-4 rounded-pill fw-semibold shadow-sm d-none">Regresar</button>
- <button onclick="cerrarSesion()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
+ <button onclick="salirConfirmando()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
 </div>
 </div>
 </div>
@@ -1286,6 +1286,7 @@ function subirOrientadores() {
  if (!permisoPermite()) return;
  const inp = $('#archivo-orientadores')[0];
  if (!inp.files.length) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
+ if (!confirm('¿Subir ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' con orientadores?\nSe darán de alta los que falten y se asignarán a sus grupos.')) return;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /nombre|orientador/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r[0] && String(r[0]).trim());
   if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
@@ -1395,6 +1396,7 @@ function guardarHorarioInline(btn) {
  if (!k || !db.horarios[k]) return;
  if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
  if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
+ { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' y cierre a las ' + h12(s) + '.')) return; }
  db.horarios[k].entrada = e; db.horarios[k].salida = s;
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
@@ -1449,6 +1451,7 @@ function guardarGruposOrientador() {
  const quitan = [];
  nuevas.forEach(k => { const h = db.horarios[k]; if (h && h.orientadorId && h.orientadorId !== id) { const otro = db.orientadores.find(x => x.id === h.orientadorId), c = parseClave(k); quitan.push(c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ') — hoy de ' + (otro ? otro.nombre : 'otro orientador(a)')); } });
  if (quitan.length && !confirm('Estos grupos ya tienen otro orientador(a) y pasarán a ' + o.nombre + ':\n' + quitan.join('\n') + '\n¿Continuar?')) return;
+ if (!quitan.length && !confirm('¿Guardar los grupos de ' + o.nombre + '?\n' + (nuevas.length ? nuevas.map(k => { const c = parseClave(k); return '- ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')'; }).join('\n') : 'Quedará sin ningún grupo asignado.'))) return;
  Object.keys(db.horarios).forEach(k => { if (db.horarios[k].orientadorId === id && !nuevas.includes(k)) db.horarios[k].orientadorId = ''; });
  nuevas.forEach(k => { const h = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''}; h.orientadorId = id; db.horarios[k] = h; });
  oriEditando = null;
@@ -1631,6 +1634,7 @@ function recargarSistema(btn) {
  // Último recurso: si por algo no se movió, se fuerza la recarga normal
  setTimeout(() => location.reload(), 5000);
 }
+function salirConfirmando() { if (confirm('¿Cerrar la sesión?\nTendrás que volver a iniciar sesión para entrar al sistema.')) cerrarSesion(); }
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
  // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
@@ -1686,6 +1690,7 @@ function aplicarPermisos(rol) {
 }
 function guardarPermisoRol() {
  const rol = $('#select-rol-permiso').val(), tarea = $('#select-tarea-permiso').val();
+ if (!confirm('¿Cambiar el permiso de ' + nombresRoles[rol] + ' a "' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar') + '"?')) return;
  db.permisos[rol] = tarea; save();
  $('#resumen-permisos').text('Permiso actualizado: ' + nombresRoles[rol] + ' → ' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar'));
  sincronizarConServidor('guardar_permisos', db.permisos);
@@ -2184,15 +2189,23 @@ function generarClave() {
  $('#ver-claves').prop('checked', true); verClavesNuevas(); revisarRequisitosClave();
 }
 /* Un solo clic: contraseña al azar + guardar. Guardar ya reemplaza la anterior y quita el bloqueo, no hace falta "Borrar" antes. */
-function generarYGuardar() {
- generarClave();
- guardarClave();
+function textoConfirmarClave(c) {
+ return c.control ? '¿Cambiar la contraseña de Control Escolar? Se usará la nueva la próxima vez que inicies sesión.'
+  : '¿Guardar una contraseña nueva para ' + c.nombre + '?' + (c.bloqueada ? '\nSe le dará acceso: se quita el bloqueo y podrá entrar con la contraseña nueva.' : '\nLa contraseña anterior dejará de servir.');
 }
-function guardarClave() {
+function generarYGuardar() {
+ const c = datosCuenta();
+ if (!c) { alert('Primero elige una cuenta.'); return; }
+ if (!confirm(textoConfirmarClave(c).replace('una contraseña nueva', 'una contraseña nueva generada al azar'))) return;
+ generarClave();
+ guardarClave(true);
+}
+function guardarClave(yaConfirmado) {
  const c = datosCuenta();
  if (!c) { alert('Primero elige una cuenta.'); return; }
  const nueva = $('#clave-nueva').val(), conf = $('#clave-confirmar').val();
  if (!revisarRequisitosClave()) { alert('La contraseña nueva aún no cumple las indicaciones que aparecen debajo de las casillas.'); return; }
+ if (yaConfirmado !== true && !confirm(textoConfirmarClave(c))) return;
  let url, cuerpo;
  if (c.tipo === 'ori') {
   url = '/api/sica/claves/orientador';
@@ -2265,7 +2278,7 @@ function borrarClaveCuenta() {
 function desbloquearCuenta() {
  const c = datosCuenta();
  if (!c || !c.bloqueada) return;
- // Sin ventana de confirmación: desbloquear no cambia ni borra nada (solo deja que la persona vuelva a intentar entrar), así es un solo clic.
+ if (!confirm('¿Dar acceso a ' + c.nombre + '?\nSe quita el bloqueo y podrá volver a iniciar sesión con su contraseña actual. No se cambia ni se borra ningún dato.')) return;
  const url = c.tipo === 'ori' ? '/api/sica/claves/orientador/' + encodeURIComponent(cuentaSel.slice(4)) + '/desbloquear' : '/api/sica/claves/rol/' + encodeURIComponent(c.rol) + '/desbloquear';
  const copia = copiaClaves();
  cambiarLocalClaves(c, {bloqueada: false, olvido_at: null});   // el bloqueo desaparece al instante (y su burbuja)
@@ -2785,12 +2798,13 @@ function aplicarPermisosSolo() {
  bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
 }
-function marcarSalida(id) { if (!permisoPermite()) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
+function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
 function subirLista() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
  const inp = $('#archivo-lista')[0];
  if (!inp.files.length) { alert('Selecciona un archivo para la lista.'); return; }
+ if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' en el ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + ')?\nSe agregan los alumnos nuevos y se actualizan los que ya existan.')) return;
  const modo = $('#orden-nombre-lista').val();
  const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /curp|matr|nombre|apellido/i.test(String(r[0] == null ? '' : r[0])), rows => {
@@ -2924,6 +2938,7 @@ function subirHorarios() {
  if (!permisoPermite()) return;
  const inp = $('#archivo-horarios')[0];
  if (!inp.files.length) { alert('Selecciona un archivo de horarios.'); return; }
+ if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' de horarios del turno ' + turnoActivo + '?\nSe cambiarán el horario y el orientador de los grupos que traiga el archivo.')) return;
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv'], r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
   if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
@@ -3327,6 +3342,7 @@ function subirPlantillaOficial(lado) {
  if (!esPDF && !esDocx) { alert('Ese archivo no sirve. Usa un Word guardado como .docx (Archivo > Guardar como > Documento de Word) o un PDF (Archivo > Exportar > PDF).'); $('#input-plantilla-oficial-' + lado).val(''); return; }
  if (!libsOk('SicaDocx')) return;
  if (esPDF && !libsOk('pdfjsLib')) return;
+ if (!confirm('¿Cambiar la plantilla oficial (' + lado + ') del turno ' + turno + ' por "' + f.name + '"?\nLas credenciales nuevas usarán esta plantilla.')) return;
  const caja = $('#resumen-plantilla-oficial');
  caja.removeClass('text-success text-danger').addClass('text-muted').text('Leyendo tu ' + (esPDF ? 'PDF' : 'Word') + '…');
  let envio = f;   // lo que realmente se sube: el Word ya con sus imágenes reducidas (así lo que ves es lo que se guarda)
@@ -3543,6 +3559,7 @@ function guardarCambiosCredencial() {
  if (!a) { alert('Primero elige un alumno de la lista.'); return; }
  if (!curp || !nombre) { alert('CURP y nombre son obligatorios.'); return; }
  if (!curpLargoValido(curp)) { alert('La CURP debe tener exactamente ' + CURP_LARGO + ' caracteres. ' + curpDiferencia(curp) + ' (ahora tiene ' + curp.length + ').'); return; }
+ if (!confirm('¿Guardar los cambios de este alumno?\nNombre: ' + nombre + '\nCURP: ' + curp)) return;
  a.curp = curp; a.nombre = nombre; save();
  actualizarVistaPreviaCredencial();
  alert('Cambios guardados en la credencial.');
