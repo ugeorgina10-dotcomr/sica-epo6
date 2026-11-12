@@ -1669,7 +1669,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -2038,6 +2038,8 @@ function repetirAviso() {
 }
 /* Pantalla de inicio (sin sesión): consulta cada 2 s quién pidió contraseña nueva y saca la burbuja con sonido para que Control Escolar entre */
 let _consultandoOlvidos = false, _etagOlvidos = null;
+var _canalOlvidos = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_olvidos') : null;
+function avisarOlvido() { try { if (_canalOlvidos) _canalOlvidos.postMessage(Date.now()); } catch (e) {} }
 function consultarOlvidosInicio() {
  if (rolActivo || _consultandoOlvidos) return;
  _consultandoOlvidos = true;
@@ -2301,6 +2303,7 @@ function confirmarOlvido(reintento) {
    }
    abrirModalCuenta('info', msg); return;
   }
+  if (d.bloqueada) { avisarOlvido(); consultarOlvidosInicio(); }   // las demás pestañas de este equipo sacan la burbuja al instante
   // Si el mensaje de "Cuenta bloqueada" ya salió al instante y el servidor lo confirma, NO se vuelve a abrir (salía dos veces)
   if (optimista && d.bloqueada) return;
   abrirModalCuenta(d.bloqueada ? 'bloqueada' : 'info', d.mensaje);
@@ -3689,7 +3692,10 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1500);   // burbuja y sonido en la pantalla de inicio
+ /* Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde 304 sin cuerpo si nada cambió y
+    guarda la respuesta 1 s en caché). Las otras pestañas del mismo equipo se enteran al instante por BroadcastChannel. */
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1000);
+ if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
