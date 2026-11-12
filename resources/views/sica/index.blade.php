@@ -733,35 +733,6 @@ if (!localStorage.getItem(LIMPIEZA)) {
  localStorage.setItem(LIMPIEZA, '1');
 }
 // Detecta si se abrió desde un teléfono (cámara trasera, modo "solo escanear" para el orientador)
-/* ---- Avisos de confirmación ----
-   Todo lo que se hace en el sistema (guardar, editar, borrar, subir, registrar...) muestra un aviso en pantalla. Los avisos NO bloquean:
-   aparecen abajo, se quitan solos y se pueden cerrar con un toque, así el sistema sigue respondiendo al instante.
-   Los mensajes que antes eran ventanas "alert" (que detenían todo hasta pulsar Aceptar) ahora salen como avisos; las preguntas
-   de "¿seguro?" (confirm) se conservan porque sí necesitan una respuesta. */
-(function () {
- const css = document.createElement('style');
- css.textContent = '#avisos-sica{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:20000;display:flex;flex-direction:column;gap:8px;align-items:center;width:min(560px,calc(100vw - 24px));pointer-events:none}' +
-  '.aviso-sica{pointer-events:auto;width:100%;background:#fff;color:#222;border-radius:10px;border-left:6px solid #198754;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:10px 14px;font-size:.92rem;line-height:1.35;white-space:pre-line;word-break:break-word;cursor:pointer;animation:avisoEntra .16s ease-out}' +
-  '.aviso-sica.aviso-error{border-left-color:#b00020}.aviso-sica.aviso-info{border-left-color:#800020}' +
-  '@keyframes avisoEntra{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}';
- document.head.appendChild(css);
-})();
-const RX_AVISO_ERROR = /^(no se|no hay|no tienes|no puedes|no tiene|no esta|no está|solo |solo el|primero|selecciona|escribe|indica|esa |ese |tu sesi|demasiad|error|el navegador|la hora|todav|la contrase|el archivo|curp y|la curp|falta)|no se pudo|no se carg|sin conexi|expir|inv[aá]lid|rechaz/i;
-function avisar(msg, tipo) {
- msg = String(msg == null ? '' : msg).trim(); if (!msg) return;
- tipo = tipo || (RX_AVISO_ERROR.test(msg) ? 'error' : 'ok');
- let caja = document.getElementById('avisos-sica');
- if (!caja) { caja = document.createElement('div'); caja.id = 'avisos-sica'; caja.setAttribute('role', 'status'); caja.setAttribute('aria-live', 'polite'); document.body.appendChild(caja); }
- while (caja.children.length >= 4) caja.removeChild(caja.firstChild);   // no se amontonan
- const el = document.createElement('div');
- el.className = 'aviso-sica' + (tipo === 'error' ? ' aviso-error' : (tipo === 'info' ? ' aviso-info' : ''));
- el.textContent = msg;
- const quitar = () => { if (el.parentNode) el.parentNode.removeChild(el); };
- el.addEventListener('click', quitar);
- caja.appendChild(el);
- setTimeout(quitar, Math.min(14000, Math.max(3500, 2200 + msg.length * 45)));   // más largo = más tiempo para leerlo
-}
-window.alert = function (m) { avisar(m); };
 const ES_MOVIL = /Android|iPhone|iPad|iPod|Mobile|Tablet|Silk|webOS|BlackBerry|Opera Mini/i.test(navigator.userAgent)
  || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1) // iPad con iPadOS se identifica como Mac
  || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches); // pantalla táctil (aunque use "sitio de escritorio")
@@ -1411,7 +1382,6 @@ function guardarHorarioInline(btn) {
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
  $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + '.');
- avisar('Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ') de ' + h12(e) + ' a ' + h12(s) + '.');
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -1421,7 +1391,6 @@ function quitarHorarioGrupo(k) {
  if (!confirm('¿Quitar el horario del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Volverá a usar el horario predeterminado. El orientador(a) no se modifica.')) return;
  h.entrada = ''; h.salida = '';
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
- avisar('Horario quitado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ').');
 }
 /* Quita a un orientador de UN grupo (conserva el horario del grupo y sus demás grupos). */
 function quitarGrupoOrientador(id, clave) {
@@ -1431,7 +1400,6 @@ function quitarGrupoOrientador(id, clave) {
  if (!confirm('¿Quitar a ' + (o ? o.nombre : 'este orientador(a)') + ' del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? El grupo quedará sin orientador.')) return;
  h.orientadorId = '';
  guardarOrientadoresServidor(); renderListaOrientadores();refrescarHorarioForm(); renderTabla();
- avisar((o ? o.nombre : 'Orientador(a)') + ' ya no está en ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ').');
 }
 /* ---- Editar los grados y grupos de un orientador (puede tener varios) ---- */
 let oriEditando = null;   // {id, filas:[{turno, grado, grupo}]}
@@ -1468,7 +1436,6 @@ function guardarGruposOrientador() {
  nuevas.forEach(k => { const h = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''}; h.orientadorId = id; db.horarios[k] = h; });
  oriEditando = null;
  guardarOrientadoresServidor(); renderListaOrientadores();refrescarHorarioForm(); renderTabla();
- avisar('Grupos de ' + o.nombre + ' guardados (' + nuevas.length + (nuevas.length === 1 ? ' grupo' : ' grupos') + ').');
 }
 /* Elimina un orientador del servidor y de este navegador. Sus grupos quedan "sin asignar". Solo Control Escolar. */
 function eliminarOrientador(id) {
@@ -1484,7 +1451,6 @@ function eliminarOrientador(id) {
  Object.values(db.horarios).forEach(h => { if (h.orientadorId === id) h.orientadorId = ''; });
  localStorage.setItem(LS, JSON.stringify(db));
  renderListaOrientadores();renderTabla();
- avisar('Orientador(a) eliminado: ' + o.nombre + '.');
  }).catch(() => alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.'));
 }
 /* Grupos que le corresponden a un orientador, según lo que asignó Control Escolar */
@@ -1705,7 +1671,6 @@ function guardarPermisoRol() {
  const rol = $('#select-rol-permiso').val(), tarea = $('#select-tarea-permiso').val();
  db.permisos[rol] = tarea; save();
  $('#resumen-permisos').text('Permiso actualizado: ' + nombresRoles[rol] + ' → ' + (tarea === 'editar' ? 'Puede editar / realizar acciones (incluye cámara)' : 'Solo visualizar'));
- avisar('Permiso actualizado: ' + nombresRoles[rol] + ' ' + (tarea === 'editar' ? 'puede editar' : 'solo puede visualizar') + '.');
  sincronizarConServidor('guardar_permisos', db.permisos);
 }
 /* ============ CONTRASEÑAS (solo Control Escolar) ============ */
@@ -2787,7 +2752,7 @@ function aplicarPermisosSolo() {
  bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
 }
-function marcarSalida(id) { if (!permisoPermite()) return; const r = registrarPorId(id, 'Salida'); avisar(r.msg, r.ok ? 'ok' : 'error'); }
+function marcarSalida(id) { if (!permisoPermite()) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
 function subirLista() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
@@ -2908,7 +2873,7 @@ function borrarGruposCargados(todos) {
  _postSync('eliminar_listas_grupos', {grupos: elegidos.map(g => ({grado: g.grado, grupo: g.grupo, turno: g.turno})), configuracion: config}, 60000).then(r => {
   if (!r.ok) return Promise.reject();
   ids.forEach(id => _firmasGuardadas.delete(id));
-  avisar('Grupos borrados: ' + elegidos.length + ' grupo(s) y ' + nAlum + ' alumno(s).');
+  alert('Grupos borrados: ' + elegidos.length + ' grupo(s) y ' + nAlum + ' alumno(s) eliminados.');
  }).catch(() => {
   const hay = new Set(db.alumnos.map(a => a.id));
   quitados.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
@@ -3528,7 +3493,7 @@ function eliminarAlumno(id) {
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
  _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
- .then(r => r.ok ? avisar('Alumno eliminado: ' + a.nombre + '.') : Promise.reject())
+ .then(r => r.ok ? null : Promise.reject())
  .catch(() => {
  if (!db.alumnos.some(x => x.id === a.id)) db.alumnos.push(a);
  localStorage.setItem(LS, JSON.stringify(db));
