@@ -46,6 +46,7 @@ class ControlEscolarController extends Controller
             'registrar_asistencia' => $this->registrarAsistencia($validado['datos']),
             'eliminar_alumno'      => $this->eliminarAlumno($validado['datos']),
             'eliminar_lista_grupo' => $this->eliminarListaGrupo($validado['datos']),
+            'eliminar_listas_grupos' => $this->eliminarListasGrupos($validado['datos']),
             'guardar_orientadores' => $this->guardarSoloOrientadores($validado['datos']),
             'eliminar_orientador'  => $this->eliminarOrientador($validado['datos']),
             default                => response()->json(['ok' => false, 'mensaje' => 'Acción no reconocida'], 400),
@@ -556,6 +557,55 @@ class ControlEscolarController extends Controller
         }
 
         return response()->json(['ok' => true, 'borrados' => $borrados]);
+    }
+
+    /**
+     * Borra de una sola vez los alumnos (y sus asistencias) de VARIOS grupos: ['grupos' => [['grado','grupo','turno'], ...], 'configuracion' => bool].
+     * Con configuracion = true también se quitan el horario y el orientador de esos grupos (y el grupo se borra si queda vacío).
+     * Todo en una transacción: o se borra todo o no se borra nada.
+     */
+    private function eliminarListasGrupos(array $d): JsonResponse
+    {
+        $objetivos = [];
+        foreach (array_slice((array) ($d['grupos'] ?? []), 0, 24) as $g) {   // 3 grados x 4 grupos x 2 turnos = 24 como máximo
+            $grado = (int) ($g['grado'] ?? 0);
+            $n     = (int) ($g['grupo'] ?? 0);
+            $turno = (($g['turno'] ?? '') === 'Vespertino') ? 'Vespertino' : 'Matutino';
+            if ($grado >= 1 && $grado <= 3 && $n >= 1 && $n <= 4) {
+                $objetivos[$grado . '|' . $n . '|' . $turno] = [$grado, $n, $turno];
+            }
+        }
+
+        if (!$objetivos) {
+            return response()->json(['ok' => false, 'mensaje' => 'No se indicó ningún grupo válido'], 422);
+        }
+
+        $quitarConfig = !empty($d['configuracion']);
+        $borrados = 0;
+        $gruposBorrados = 0;
+
+        DB::transaction(function () use ($objetivos, $quitarConfig, &$borrados, &$gruposBorrados) {
+            foreach ($objetivos as [$grado, $n, $turno]) {
+                $grupo = Grupo::where('grado', $grado)->where('nombre', $grado . '° ' . $n)->where('turno', $turno)
+                    ->first(['id', 'hora_entrada', 'hora_salida', 'orientador_id']);
+                if (!$grupo) {
+                    continue;
+                }
+
+                Asistencia::whereIn('alumno_id', Alumno::where('grupo_id', $grupo->id)->select('id'))->delete();
+                $borrados += Alumno::where('grupo_id', $grupo->id)->delete();
+
+                if ($quitarConfig) {
+                    Grupo::whereKey($grupo->id)->update(['hora_entrada' => null, 'hora_salida' => null, 'orientador_id' => null]);
+                    $grupo->hora_entrada = $grupo->hora_salida = $grupo->orientador_id = null;
+                }
+                if ($this->borrarGrupoSiEstaVacio($grupo)) {
+                    $gruposBorrados++;
+                }
+            }
+        });
+
+        return response()->json(['ok' => true, 'borrados' => $borrados, 'grupos' => $gruposBorrados]);
     }
 
     /** Un grupo sin horario, sin orientador, sin plantilla propia y sin alumnos no tiene por qué seguir en la base de datos */

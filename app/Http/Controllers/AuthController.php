@@ -129,13 +129,13 @@ class AuthController extends Controller
 
     /**
      * Quién pulsó "¿Olvidaste tu contraseña?" y espera que Control Escolar le dé una nueva.
-     * Es pública a propósito: la pantalla de inicio la consulta cada 2 s (sin sesión) para sacar la burbuja y el sonido de alerta,
+     * Es pública a propósito: la pantalla de inicio la consulta cada 1 s (sin sesión) para sacar la burbuja y el sonido de alerta,
      * así Control Escolar se entera aunque aún no haya iniciado sesión. Solo trae el nombre de la cuenta y la hora de la solicitud
      * (los nombres de los orientadores ya son públicos en la lista del login). Misma forma que /api/sica/claves.
      */
     public function olvidos(Request $request): JsonResponse
     {
-        $datos = Cache::remember('sica.olvidos', 2, fn () => [
+        $datos = Cache::remember('sica.olvidos', 1, fn () => [
             'ok'           => true,
             'roles'        => User::select('rol', 'olvido_at')->whereIn('rol', ['director', 'subdirector', 'orientador'])->whereNotNull('olvido_at')->get()
                 ->map(fn ($u) => ['rol' => $u->rol, 'bloqueada' => true, 'olvido_at' => (string) $u->olvido_at])->values()->all(),
