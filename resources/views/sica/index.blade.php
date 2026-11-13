@@ -21,10 +21,10 @@
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
 {{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
      Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
-@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js'] as $lib)
+@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js', 'chart.umd.min.js', 'html5-qrcode.min.js'] as $lib)
 <link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
-@foreach (['html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
+@foreach (['xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
 <link rel="preload" as="script" fetchpriority="low" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
@@ -677,7 +677,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 </div>
 <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
  <button onclick="regresarPanel()" id="btn-regresar-panel" class="btn btn-vinotinto px-4 rounded-pill fw-semibold shadow-sm d-none">Regresar</button>
- <button onclick="salirConfirmando()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
+ <button onclick="cerrarSesion()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
 </div>
 </div>
 </div>
@@ -712,9 +712,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
  // Todo arranca de inmediato y en paralelo (ya están precargados desde la cabecera); solo autotable espera a jsPDF
  window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(x => cargar(x)));
+ // Escáner y gráficas SÍ se ven al entrar (prioridad normal); Excel y PDF solo se usan al descargar (siguen bajando detrás, sin frenar la entrada)
+ window.SICA_VISTA_LISTA = Promise.all([window.SICA_DOCX_LISTO].concat(grupos[1].map(x => cargar(x))));
  const resto = Promise.all([
   window.SICA_DOCX_LISTO,
-  Promise.all(grupos[1].map(x => cargar(x, true))),
+  window.SICA_VISTA_LISTA,
   Promise.all(grupos[2].map(x => cargar(x, true))).then(() => cargar('jspdf.plugin.autotable.min.js', true))   // autotable depende de jsPDF
  ]);
  window.SICA_LIBS_LISTAS = resto.then(() => {
@@ -1634,7 +1636,6 @@ function recargarSistema(btn) {
  // Último recurso: si por algo no se movió, se fuerza la recarga normal
  setTimeout(() => location.reload(), 5000);
 }
-function salirConfirmando() { if (confirm('¿Cerrar la sesión?\nTendrás que volver a iniciar sesión para entrar al sistema.')) cerrarSesion(); }
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
  // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
@@ -2504,11 +2505,8 @@ function detener(el) {
 }
 /* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
    porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
-const reQr = /SICA([0-9A-F]{16,20})$/;
-const reQrUrl = /\/E\W{0,3}([0-9A-F]{16})$/;   // QR actual: enlace a la página pública de la escuela + "#" + código (el teléfono de cualquiera solo ve la escuela)   // 16 = código actual; hasta 20 = versión anterior del QR
+const reQr = /SICA([0-9A-F]{16,20})$/;   // 16 = código actual; hasta 20 = versión anterior del QR
 function claveDeLectura(txt) {
- const u = String(txt).trim().toUpperCase().match(reQrUrl);
- if (u) return 'SICA' + u[1];
  const s = String(txt).toUpperCase().replace(/[^A-Z0-9]/g, ''), m = s.match(reQr);
  return m ? 'SICA' + m[1].slice(0, 16) : String(txt).trim().toUpperCase();
 }
@@ -2631,7 +2629,8 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
   return null;
  }
  // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
- const enCampo = el => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && el.offsetParent !== null;
+ // Solo cuentan los campos donde de verdad se escribe texto: un menú (Grado/Grupo), casilla o botón con el foco NO debe bloquear al lector
+ const enCampo = el => !!el && ((el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color|image)$/i.test(el.type)) || el.isContentEditable) && el.offsetParent !== null;
  function tono(ok) {
   try {
    desbloquearAudio();
@@ -2774,8 +2773,12 @@ function elegirGrupoLector(v) {
 function sincronizarFiltroLector() {
  $('#sel-grupo-lector').val(filtro ? filtro.grado + '-' + filtro.grupo : '');
 }
+/* Orden de las listas: el nombre se guarda como "Apellido paterno, Apellido materno, Nombre(s)", así que ordenar el texto
+   completo en español (sin importar mayúsculas ni acentos) acomoda por paterno, luego materno y luego nombre(s). Siempre en automático. */
+const _cmpNombre = new Intl.Collator('es', {sensitivity: 'base', numeric: true});
+const porApellidos = (a, b) => _cmpNombre.compare(String(a.nombre || '').trim(), String(b.nombre || '').trim());
 function filtrados() {
- return db.alumnos.filter(a => a.turno === turnoActivo && (!filtro || (a.grado === filtro.grado && a.grupo === filtro.grupo)));
+ return db.alumnos.filter(a => a.turno === turnoActivo && (!filtro || (a.grado === filtro.grado && a.grupo === filtro.grupo))).sort(porApellidos);
 }
 /* Orientador(a) del grupo del alumno: sale solo de la asignación del grupo, así aparece apenas se sube la lista. */
 function nombreOrientadorDe(a) {
@@ -3071,7 +3074,7 @@ function dibujarGraficaAsistencias(s) {
  if (!libsOk('Chart')) return;
  if (chartAsistencias) { chartAsistencias.data = data; chartAsistencias.options.plugins.title.text = titulo; chartAsistencias.update(); return; }
  chartAsistencias = new Chart(ctx, { type: 'bar', data: data, options: {
- responsive:true, maintainAspectRatio:true,
+ responsive:true, maintainAspectRatio:true, animation:false,
  plugins:{ legend:{position:'bottom'}, title:{display:true, text:titulo, font:{size:13, weight:'bold'}, color:'#800020', padding:{bottom:10}} },
  scales:{y:{beginAtZero:true, ticks:{precision:0}}}
  }});
@@ -3217,13 +3220,23 @@ const existeOriginal = {};   // 'FrenteMatutino.docx' -> true/false (false = ya 
 try { localStorage.removeItem('sica_epo6_plantilla_oficial'); } catch (e) {}   // ya no se guardan imágenes de plantilla en el navegador
 /* Lee y analiza un Word/PDF de plantilla UNA sola vez (url -> promesa). Se usa al iniciar y también por adelantado en la pantalla de login. */
 const _plantillasLeidas = {};
+const _plantillasFirma = {};   // url -> {firma, modelo}: si el archivo no cambió, no se vuelve a analizar (analizar un Word es lo más lento)
+function firmaBuffer(buf) {
+ const u = new Uint8Array(buf); let h = 2166136261;
+ for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 16777619); }
+ return u.length + ':' + (h >>> 0);
+}
 function leerPlantilla(url, forzar) {
- return (!forzar && _plantillasLeidas[url]) || (_plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
+ if (!forzar && _plantillasLeidas[url]) return _plantillasLeidas[url];
+ return _plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
   .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
   .then(buf => {
+   const firma = firmaBuffer(buf), previa = _plantillasFirma[url];
+   if (previa && previa.firma === firma) return previa.modelo;   // mismo archivo: se reutiliza lo ya analizado (y su dibujo)
    const esPdf = new Uint8Array(buf, 0, 5).join() === '37,80,68,70,45';   // "%PDF-": el lector de PDF puede tardar en cargar
-   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf));
-  }).catch(e => { delete _plantillasLeidas[url]; throw e; }));
+   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf))
+    .then(m => { _plantillasFirma[url] = {firma: firma, modelo: m}; return m; });
+  }).catch(e => { delete _plantillasLeidas[url]; delete _plantillasFirma[url]; throw e; });
 }
 /* Deja listos (ya leídos) los Word originales mientras la persona escribe su contraseña: al entrar, las plantillas aparecen al instante. */
 let _tsPrecalentado = 0;   // cuándo se leyeron por adelantado (si pasó mucho rato se vuelven a revisar al entrar)
@@ -3474,7 +3487,7 @@ function _hmacSha256Hex(clave, texto) {
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
 /* Texto del QR: nombre corto de la escuela (lo que ve cualquier otra app de escaneo, sin enlace) y al final el código propio del alumno. Total: 25 caracteres, igual de simple que el QR con la CURP */
-const QR_TEXTO_ESCUELA = 'EPO6 ';   // (versión anterior del QR; ya no se usa para generar)   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
+const QR_TEXTO_ESCUELA = 'EPO6 ';   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
@@ -3486,9 +3499,9 @@ function qrCodigo(curp) {
  _memoQr.set(k, c); return c;
 }
 /* Lo que lleva el QR impreso: datos de la escuela + código del alumno (no la CURP). */
-const qrValorDe = curp => { const c = qrCodigo(curp); return c ? location.origin + '/e#' + c : ''; };
+const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + 'SICA' + c : ''; };
 const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:valor, size:220}).toDataURL();
-const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred);
+const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred).sort(porApellidos);
 /* CAMBIO: al elegir Matutino/Vespertino abajo, la etiqueta del turno y la
  vista previa (frente y reverso) de arriba cambian al mismo turno. */
 function setTurnoCred(t) {
@@ -3745,21 +3758,35 @@ function entrarAlSistema(restaurando) {
  const plantillas = precargarPlantillasEntrada();
  // 2) Datos: si ya llegaron con el inicio de sesión / la página (o hay copia local) no se espera nada; si no, se descargan
  const datosListos = (db.alumnos.length || Object.keys(db.horarios).length) ? Promise.resolve() : cargarDesdeServidor();
- // 3) El panel se abre cuando lo que se ve está listo: datos, lector de plantillas + QR y plantillas ya leídas. Las librerías pesadas
- //    (Excel, PDF, gráficas) siguen bajando en segundo plano y la gráfica se dibuja sola en cuanto llegan (así la primera vez no se espera por ellas).
- //    Tope de 2.5 s para no dejar a nadie esperando.
- const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas]).catch(() => {});
- if (window.SICA_LIBS_LISTAS) window.SICA_LIBS_LISTAS.then(() => { if (rolActivo) { renderStats(); prepararPanelesOcultos(); } });
- // El panel NO espera las plantillas de Word ni las librerías: se abre en cuanto hay datos (tope de 1 s) y lo demás sigue cargando detrás.
- const datosParaAbrir = Promise.resolve(datosListos).catch(() => {});
- return Promise.race([datosParaAbrir, new Promise(r => setTimeout(r, 1000))]).then(() => {
+ // 3) El panel se abre cuando TODO lo de cada rol ya está cargado: datos, lector de plantillas + QR, plantillas ya leídas, librerías
+ //    (escáner y gráficas; Excel y PDF siguen bajando detrás porque solo se usan al descargar) y las pestañas ocultas ya dibujadas. Así al entrar no hay nada "cargando" ni se espera al cambiar de pestaña.
+ //    Tope de 5 s para no dejar a nadie atorado si algo no baja (sin internet, servidor lento): entonces abre y lo demás sigue detrás.
+ const libs = Promise.resolve(window.SICA_VISTA_LISTA).catch(() => {});   // Excel y PDF NO se esperan: solo se usan al descargar
+ const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas, libs]).catch(() => {});
+ if (restaurando) pantallaCarga(true);   // al recargar la página con la sesión abierta no se ve el login mientras tanto
+ return Promise.race([todo, new Promise(r => setTimeout(r, 5000))]).then(() => {
   abrir();
+  prepararPanelesOcultos(true);   // estadísticas, gráfica y vista previa de plantillas ya dibujadas antes de mostrar nada
+  pantallaCarga(false);
+  // Si el tope de 10 s se cumplió antes de que llegara todo, lo que falte se completa solo cuando llegue
+  todo.then(() => { if (rolActivo) prepararPanelesOcultos(true); });
+  if (window.SICA_LIBS_LISTAS) window.SICA_LIBS_LISTAS.then(() => { if (rolActivo) { renderStats(); prepararPanelesOcultos(true); } });
   // Sincroniza con el servidor en segundo plano (primera consulta: 304 si el estado ya venía en el login)
   cargarDesdeServidor();
   // Al recargar, el service worker ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
   if (!restaurando) setTimeout(guardarPaginaOffline, 4000);   // al iniciar sesión sí: así se puede abrir sin internet
-  return todo.then(() => { if (rolActivo) prepararPanelesOcultos(); });
  });
+}
+/* Pantalla de "Cargando…" a todo lo ancho (solo al recargar con la sesión abierta; al iniciar sesión basta el botón "Entrando...") */
+function pantallaCarga(mostrar) {
+ let el = document.getElementById('pantalla-carga-sica');
+ if (!mostrar) { if (el) el.remove(); return; }
+ if (el) return;
+ el = document.createElement('div');
+ el.id = 'pantalla-carga-sica';
+ el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(244,246,249,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-weight:600;color:#800020';
+ el.innerHTML = '<div class="spinner-border" role="status" style="color:#800020"></div><div>Cargando el sistema…</div>';
+ document.body.appendChild(el);
 }
 /* Empieza a leer las plantillas de Word al entrar (una sola vez) y devuelve la promesa de que ya están listas. */
 let _promesaPlantillas = null;
@@ -3772,7 +3799,7 @@ function precargarPlantillasEntrada() {
 /* Deja dibujado, sin que nadie lo pida, lo que está en las otras pestañas del panel (vista previa de las plantillas
    en el Portal del Alumno, estadísticas y gráfica): al cambiar de pestaña ya está todo ahí. */
 let _preparando = false;
-function prepararPanelesOcultos() {
+function prepararPanelesOcultos(ya) {
  if (_preparando || !rolActivo) return;
  _preparando = true;
  const tarea = () => {
@@ -3782,7 +3809,8 @@ function prepararPanelesOcultos() {
   } catch (e) {}
   _preparando = false;
  };
- if (window.requestIdleCallback) requestIdleCallback(tarea, {timeout: 800}); else setTimeout(tarea, 50);
+ if (ya) tarea();   // al entrar: se dibuja ya, no cuando el navegador tenga un hueco
+ else if (window.requestIdleCallback) requestIdleCallback(tarea, {timeout: 800}); else setTimeout(tarea, 50);
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
 function restaurarSesion(S) {
