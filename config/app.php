@@ -15,6 +15,9 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    // Dirección que se muestra en la página pública del QR de las credenciales (poner en .env: ESCUELA_UBICACION="Calle, Colonia, Municipio, Estado")
+    'escuela_ubicacion' => env('ESCUELA_UBICACION', ''),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

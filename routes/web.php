@@ -27,6 +27,12 @@ Route::get('/', function () {
     ]);
 });
 
+// Página pública que abre el QR de la credencial al escanearlo con un teléfono cualquiera:
+// solo nombre de la escuela, C.C.T. y ubicación. Nada del sistema (el código del alumno va después del "#" y nunca llega aquí).
+Route::get('/e', function () {
+    return view('sica.qr_publico', ['ubicacion' => config('app.escuela_ubicacion')]);
+})->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class])->name('qr.publico');
+
 Route::get('/login', function () {
     return view('sica.dashboard');
 })->name('login');
