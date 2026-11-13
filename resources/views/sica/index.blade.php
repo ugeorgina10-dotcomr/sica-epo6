@@ -2504,8 +2504,11 @@ function detener(el) {
 }
 /* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
    porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
-const reQr = /SICA([0-9A-F]{16,20})$/;   // 16 = código actual; hasta 20 = versión anterior del QR
+const reQr = /SICA([0-9A-F]{16,20})$/;
+const reQrUrl = /\/E\W{0,3}([0-9A-F]{16})$/;   // QR actual: enlace a la página pública de la escuela + "#" + código (el teléfono de cualquiera solo ve la escuela)   // 16 = código actual; hasta 20 = versión anterior del QR
 function claveDeLectura(txt) {
+ const u = String(txt).trim().toUpperCase().match(reQrUrl);
+ if (u) return 'SICA' + u[1];
  const s = String(txt).toUpperCase().replace(/[^A-Z0-9]/g, ''), m = s.match(reQr);
  return m ? 'SICA' + m[1].slice(0, 16) : String(txt).trim().toUpperCase();
 }
@@ -3471,7 +3474,7 @@ function _hmacSha256Hex(clave, texto) {
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
 /* Texto del QR: nombre corto de la escuela (lo que ve cualquier otra app de escaneo, sin enlace) y al final el código propio del alumno. Total: 25 caracteres, igual de simple que el QR con la CURP */
-const QR_TEXTO_ESCUELA = 'EPO6 ';   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
+const QR_TEXTO_ESCUELA = 'EPO6 ';   // (versión anterior del QR; ya no se usa para generar)   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
@@ -3483,7 +3486,7 @@ function qrCodigo(curp) {
  _memoQr.set(k, c); return c;
 }
 /* Lo que lleva el QR impreso: datos de la escuela + código del alumno (no la CURP). */
-const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + 'SICA' + c : ''; };
+const qrValorDe = curp => { const c = qrCodigo(curp); return c ? location.origin + '/e#' + c : ''; };
 const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:valor, size:220}).toDataURL();
 const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred);
 /* CAMBIO: al elegir Matutino/Vespertino abajo, la etiqueta del turno y la
