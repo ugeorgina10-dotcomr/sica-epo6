@@ -2838,6 +2838,8 @@ function subirLista() {
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
  else { db.alumnos.push({id:generarId(), curp:curp, nombre:nombre, grado:filtro.grado, grupo:filtro.grupo, turno:turnoActivo, reg:{}}); nuevos++; }
  });
+ // Sin importar cómo venga el archivo (en desorden), la lista queda acomodada por apellido paterno, materno y nombre(s), en orden alfabético
+ db.alumnos.sort((a, b) => (a.turno === b.turno ? 0 : a.turno === 'Matutino' ? -1 : 1) || a.grado - b.grado || a.grupo - b.grupo || porApellidos(a, b));
  save(); guardarYa(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);   // la lista ya va al servidor mientras se lee el aviso
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
  const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
