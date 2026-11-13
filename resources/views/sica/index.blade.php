@@ -473,8 +473,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista del Grupo</h6>
  <div class="row g-3 align-items-end">
  <div class="col-md-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
- <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
- <div class="col-md-5 d-flex gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm w-100 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
+ <div class="col-md-5"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
+ <div class="col-md-4 d-flex"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-1 fw-semibold btn-accion-restringida" style="max-width:220px">Subir Lista</button></div>
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
@@ -914,11 +914,13 @@ function sincronizarConServidor(accion, datos, reintento) {
  Los alumnos se emparejan por CURP (el id del servidor es distinto al id local). */
 function fusionarServidor(s, inicioConsulta) {
  if (!s || !Array.isArray(s.alumnos)) return;
+ let corregidos = 0;
  const clv = a => a.curp ? 'c:' + a.curp : 'i:' + a.id;
  const locales = new Map(db.alumnos.map(a => [clv(a), a])), claves = new Set();
  const lista = s.alumnos.map(sa => {
   claves.add(clv(sa)); sa.reg = sa.reg || {}; sa.enServidor = true;
   const firmaServidor = firmaAlumno(sa);   // lo que el servidor ya tiene de este alumno (antes de mezclar lo local)
+  if (sa.curp) { const ok = acomodarConCurp(sa.nombre, sa.curp); if (ok !== sa.nombre) { sa.nombre = ok; corregidos++; } }   // nombres viejos: se acomodan solos
   const la = locales.get(clv(sa));
   if (la) {
    sa.id = la.id;
@@ -940,6 +942,7 @@ function fusionarServidor(s, inicioConsulta) {
  if (s.permisos) db.permisos = s.permisos;
  if (s.qrClave) db.qrClave = s.qrClave;
  localStorage.setItem(LS, JSON.stringify(db));
+ if (corregidos && rolActivo === 'control' && !ES_MOVIL) setTimeout(guardarYa, 0);   // la corrección de nombres queda guardada en el servidor
 }
 /* Control Escolar: lo que tenga este equipo y aún no esté en el servidor se sube SOLO (sin respaldos manuales). */
 let _autoSubiendo = false;
@@ -1120,13 +1123,77 @@ function reordenarNombrePrimero(txt) {
  return ap1.concat(ap2, p).join(' ');
 }
 /* fila = renglón del archivo; desde = columna donde empieza el nombre.
- Si vienen 3 columnas (paterno, materno, nombre) las une en ese orden;
- si viene una sola, la reordena o la deja tal cual según el selector. */
+ Si vienen 3 columnas de texto, el selector dice en qué orden están:
+   "reordenar"  -> Nombre(s) | Apellido paterno | Apellido materno  (queda: paterno materno nombre)
+   "tal-cual"   -> Apellido paterno | Apellido materno | Nombre(s)  (queda igual)
+ Si viene una sola columna, la reordena o la deja tal cual según el selector.
+ Una columna con número o una sola letra (grado, grupo, sexo) no se toma como parte del nombre. */
 function armarNombre(fila, desde, modo) {
  const c = [0,1,2].map(i => String(fila[desde + i] == null ? '' : fila[desde + i]).trim());
- if (c[1] && c[2]) return c.join(' ').replace(/\s+/g, ' ').trim();
+ const esTexto = t => t.length > 1 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(t) && !/^\d+$/.test(t);
+ if (esTexto(c[1]) && esTexto(c[2])) {
+  const partes = modo === 'reordenar' ? [c[1], c[2], c[0]] : c;
+  return partes.join(' ').replace(/\s+/g, ' ').trim();
+ }
  const t = c[0].replace(/\s+/g, ' ');
  return modo === 'reordenar' ? reordenarNombrePrimero(t) : t;
+}
+/* ---- Acomodar el nombre con ayuda de la CURP ----
+   Las primeras 4 letras de la CURP son: inicial del apellido paterno, su primera vocal interna, inicial del materno e inicial del
+   nombre. Con eso el sistema sabe cuál palabra es cada cosa aunque la lista venga revuelta ("Aguilar Óscar Pérez" con CURP PEAO...
+   queda "Pérez Aguilar Óscar"). Si el nombre ya está bien, no lo cambia. Sin CURP o si no cuadra, lo deja como está. */
+const _nombresCurp = new Map();
+function acomodarConCurp(nombre, curp) {
+ const c = String(curp || '').toUpperCase();
+ if (!/^[A-Z]{4}\d{6}/.test(c)) return nombre;
+ const llave = nombre + '|' + c.slice(0, 4);
+ if (_nombresCurp.has(llave)) return _nombresCurp.get(llave);
+ const res = _acomodarConCurp(String(nombre || ''), c);
+ if (_nombresCurp.size > 8000) _nombresCurp.clear();
+ _nombresCurp.set(llave, res);
+ return res;
+}
+function _acomodarConCurp(nombre, c) {
+ const t = nombre.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+ if (t.length < 2 || t.length > 9) return nombre;
+ const esPart = w => PARTICULAS.includes(norm(w));
+ const bloques = []; let pend = [];
+ t.forEach(w => { pend.push(w); if (!esPart(w)) { bloques.push(pend); pend = []; } });
+ if (pend.length) { if (bloques.length) bloques[bloques.length - 1] = bloques[bloques.length - 1].concat(pend); else return nombre; }
+ const n = bloques.length;
+ if (n < 2 || n > 7) return nombre;
+ const sinAcento = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+ const ini = w => /^[ñÑ]/.test(w) ? 'X' : sinAcento(w).charAt(0);
+ const principal = b => b.find(w => !esPart(w)) || b[0];
+ const vocal = w => { const m = sinAcento(w.replace(/^[ñÑ]/, 'X')).slice(1).match(/[AEIOU]/); return m ? m[0] : 'X'; };
+ const iniNombre = bs => {
+  const ws = [].concat.apply([], bs).filter(w => !esPart(w));
+  const quitar = ['maria', 'jose', 'ma', 'ma.', 'j', 'j.'];
+  return ini(ws.length > 1 && quitar.indexOf(norm(ws[0])) > -1 ? ws[1] : ws[0]);
+ };
+ const variantes = c.charAt(2) === 'X' ? [false, true] : [true];
+ let mejor = null;
+ const probar = perm => {
+  variantes.forEach(conMat => {
+   const nom = perm.slice(conMat ? 2 : 1);
+   if (!nom.length) return;
+   const pat = principal(perm[0]);
+   if (ini(pat) !== c.charAt(0)) return;
+   if (conMat ? ini(principal(perm[1])) !== c.charAt(2) : c.charAt(2) !== 'X') return;
+   if (iniNombre(nom) !== c.charAt(3)) return;
+   const moved = perm.reduce((k, b, i) => k + (b === bloques[i] ? 0 : 1), 0);
+   let inv = 0;   // los nombres de pila conservan su orden original (María José, no José María)
+   for (let i = 0; i < nom.length - 1; i++) if (bloques.indexOf(nom[i]) > bloques.indexOf(nom[i + 1])) inv++;
+   const punt = (vocal(pat) === c.charAt(1) ? 0 : 100) + moved + inv * 0.5;   // primero la que cuadra con la vocal; luego la que menos mueve
+   if (!mejor || punt < mejor.punt) mejor = {punt: punt, perm: perm.slice()};
+  });
+ };
+ const usados = new Array(n).fill(false), actual = [];
+ (function permutar() {
+  if (actual.length === n) { probar(actual); return; }
+  for (let i = 0; i < n; i++) if (!usados[i]) { usados[i] = true; actual.push(bloques[i]); permutar(); actual.pop(); usados[i] = false; }
+ })();
+ return mejor ? [].concat.apply([], mejor.perm).join(' ') : nombre;
 }
 /* ============ LECTURA DE ARCHIVOS (Excel / CSV / PDF) ============
  Punto único para leer listas de nombres: si es .xlsx/.xls/.csv usa SheetJS (como antes);
@@ -2773,8 +2840,8 @@ function elegirGrupoLector(v) {
 function sincronizarFiltroLector() {
  $('#sel-grupo-lector').val(filtro ? filtro.grado + '-' + filtro.grupo : '');
 }
-/* Orden de las listas: el nombre se guarda como "Apellido paterno, Apellido materno, Nombre(s)", así que ordenar el texto
-   completo en español (sin importar mayúsculas ni acentos) acomoda por paterno, luego materno y luego nombre(s). Siempre en automático. */
+/* Orden de las listas: alfabético en español (sin importar mayúsculas ni acentos) sobre el nombre guardado, que queda como
+   "Apellido paterno, Apellido materno, Nombre(s)" gracias al selector "Orden de los nombres en el archivo" al subir la lista. */
 const _cmpNombre = new Intl.Collator('es', {sensitivity: 'base', numeric: true});
 const porApellidos = (a, b) => _cmpNombre.compare(String(a.nombre || '').trim(), String(b.nombre || '').trim());
 function filtrados() {
@@ -2824,13 +2891,16 @@ function subirLista() {
  const c0 = String(r[0]).trim();
  if (RX_CURP.test(c0)) { curp = c0.toUpperCase(); desde = 1; }   // Excel: CURP en columna A
  else { const m = c0.match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/); if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; } else if (/^[A-Za-z0-9]{10,25}$/.test(c0) && /\d/.test(c0) && /[A-Za-z]/.test(c0)) { curpsInvalidas.push(c0 + ' (' + (c0.length === CURP_LARGO ? 'formato no válido' : curpDiferencia(c0).toLowerCase()) + ')'); return; } }   // PDF: "CURP Nombre"; si parece CURP pero no es válida, se omite
- const nombre = armarNombre(fila, desde, modo);
+ let nombre = armarNombre(fila, desde, modo);
  if (!nombre) return;
+ if (curp) nombre = acomodarConCurp(nombre, curp);   // con la CURP se sabe cuál es paterno, materno y nombre aunque la lista venga revuelta
  let a = curp ? db.alumnos.find(x => x.curp === curp) : null;
  if (!a) a = db.alumnos.find(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && (!curp ? true : !x.curp) && norm(x.nombre) === norm(nombre));
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
  else { db.alumnos.push({id:generarId(), curp:curp, nombre:nombre, grado:filtro.grado, grupo:filtro.grupo, turno:turnoActivo, reg:{}}); nuevos++; }
  });
+ // Sin importar cómo venga el archivo (en desorden), la lista queda acomodada por apellido paterno, materno y nombre(s), en orden alfabético
+ db.alumnos.sort((a, b) => (a.turno === b.turno ? 0 : a.turno === 'Matutino' ? -1 : 1) || a.grado - b.grado || a.grupo - b.grupo || porApellidos(a, b));
  save(); guardarYa(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);   // la lista ya va al servidor mientras se lee el aviso
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
  const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
@@ -2903,6 +2973,16 @@ function renderGruposCargados() {
 }
 function grpMarcar(k, on) { if (on) _grpSel.add(k); else _grpSel.delete(k); renderGruposCargados(); }
 function grpSeleccionarTodos(on) { _grpSel = new Set(on ? gruposCargados().map(g => g.k) : []); _grpHtml = ''; renderGruposCargados(); }
+/* Después de borrar grupos todo se vuelve a dibujar solo: tabla, estadísticas, horarios, orientadores, credenciales, lista de grupos
+   cargados y filtros del Lector Fijo; y se avisa a los demás equipos/pestañas para que lo vean enseguida. */
+function refrescarTrasBorrar() {
+ _grpHtml = '';
+ renderTabla();   // también redibuja las estadísticas y la gráfica
+ renderListaHorarios(); renderListaOrientadores(); renderGruposCargados();
+ if (credSel) selCred(credSel.grado, credSel.grupo);
+ sincronizarFiltroLector();
+ try { acelerarSync(); avisarEstado(); } catch (e) {}
+}
 function borrarGruposCargados(todos) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar grupos.'); return; }
  const todosLos = gruposCargados();
@@ -2923,20 +3003,18 @@ function borrarGruposCargados(todos) {
  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
  localStorage.setItem(LS, JSON.stringify(db));
  _grpSel = new Set(); _grpHtml = '';
- renderTabla(); renderListaHorarios(); renderListaOrientadores();
- if (credSel) selCred(credSel.grado, credSel.grupo);
+ refrescarTrasBorrar();
  _postSync('eliminar_listas_grupos', {grupos: elegidos.map(g => ({grado: g.grado, grupo: g.grupo, turno: g.turno})), configuracion: config}, 60000).then(r => {
   if (!r.ok) return Promise.reject();
   ids.forEach(id => _firmasGuardadas.delete(id));
-  alert('Grupos borrados: ' + elegidos.length + ' grupo(s) y ' + nAlum + ' alumno(s) eliminados.');
+  refrescarTrasBorrar();   // sin aviso: ya desapareció de la pantalla y el servidor lo confirmó; los demás equipos lo ven solos
  }).catch(() => {
   const hay = new Set(db.alumnos.map(a => a.id));
   quitados.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
   Object.assign(db.horarios, horariosAntes);
   localStorage.setItem(LS, JSON.stringify(db));
   _grpHtml = '';
-  renderTabla(); renderListaHorarios(); renderListaOrientadores();
-  if (credSel) selCred(credSel.grado, credSel.grupo);
+  refrescarTrasBorrar();
   alert('No se pudieron borrar los grupos en el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
 }
@@ -3295,6 +3373,26 @@ function problemasFrente(m) {
  ['nombre','curp','grado','grupo','turno'].forEach(k => { if (!m.campos[k]) faltan.push('la etiqueta ' + (k === 'nombre' ? 'NOMBRE DEL ESTUDIANTE:' : k.toUpperCase() + ':')); });
  return faltan;
 }
+/* Copia de la vista previa de cada plantilla (imagen chica) guardada en este equipo: al entrar se pinta AL INSTANTE, sin esperar a
+   bajar y leer el Word; cuando la plantilla real termina de leerse se redibuja encima (y la copia se actualiza si cambió). */
+const clavePrevCache = (t, l) => 'sica_prev_' + t + '_' + l;
+function leerPrevCache(t, l) { try { return localStorage.getItem(clavePrevCache(t, l)); } catch (e) { return null; } }
+function guardarPrevCache(cv, t, l) {
+ try { localStorage.setItem(clavePrevCache(t, l), cv.toDataURL('image/jpeg', 0.8)); } catch (e) {}
+}
+function borrarPrevCache(t, l) { try { localStorage.removeItem(clavePrevCache(t, l)); } catch (e) {} }
+function pintarPrevCache(cv, url) {
+ if (cv._sicaCacheUrl === url) { $(cv).show(); igualarAlturaPreviews(); return; }
+ const im = new Image();
+ im.onload = () => {
+  if (cv._sicaModelo) return;   // ya se dibujó la plantilla real: la copia no la pisa
+  cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+  cv.getContext('2d').drawImage(im, 0, 0);
+  cv._sicaCacheUrl = url;
+  $(cv).show(); igualarAlturaPreviews();
+ };
+ im.src = url;
+}
 function refrescarPreviewPlantillaOficial(dibujarOculto) {
  const t = turnoCred || 'Matutino';
  $('#turno-plantilla-actual').text(t);
@@ -3305,14 +3403,16 @@ function refrescarPreviewPlantillaOficial(dibujarOculto) {
   const msg = $('#msg-prev-plantilla-' + l);
   if (m && window.SicaDocx) {
    if ($('#panel-alumno').hasClass('d-none') && !dibujarOculto) return;   // oculto: se dibuja por adelantado en segundo plano (prepararPanelesOcultos)
-   if (cv._sicaModelo !== m) { SicaDocx.dibujar(cv, m, null, {ancho: 900}); cv._sicaModelo = m; }   // ya dibujada: no se repite
+   if (cv._sicaModelo !== m) { SicaDocx.dibujar(cv, m, null, {ancho: 900}); cv._sicaModelo = m; cv._sicaCacheUrl = null; guardarPrevCache(cv, t, l); }   // ya dibujada: no se repite; se guarda la copia para la próxima vez
    $(cv).show();
    const falta = l === 'frente' ? problemasFrente(m) : [];
    msg.toggleClass('text-danger', falta.length > 0).toggleClass('text-muted', !falta.length)
     .text(falta.length ? 'A esta plantilla le falta: ' + falta.join(', ') + '.' : '');
   } else {
-   $(cv).hide();
-   msg.removeClass('text-danger').addClass('text-muted').text(errorPlantilla[t + '-' + l] || 'Cargando plantilla…');
+   const copia = errorPlantilla[t + '-' + l] ? null : leerPrevCache(t, l);
+   if (errorPlantilla[t + '-' + l]) borrarPrevCache(t, l);   // la plantilla ya no existe o no se pudo leer: la copia vieja no se muestra
+   if (copia) { pintarPrevCache(cv, copia); msg.removeClass('text-danger').addClass('text-muted').text(''); }
+   else { $(cv).hide(); msg.removeClass('text-danger').addClass('text-muted').text(errorPlantilla[t + '-' + l] || 'Cargando plantilla…'); }
   }
  });
  igualarAlturaPreviews();
@@ -3516,7 +3616,7 @@ function selCred(grado, grupo) {
  $('#titulo-grupo-credencial').text('Credenciales Digitales - ' + nomGrado[grado] + ' ' + grupo + ' (' + turnoCred + ')');
  $('#badge-plantilla').text('Plantilla ' + turnoCred);
  $('#vista-editar-credencial-individual').addClass('d-none'); $('#resultado-credencial-box').removeClass('d-none');
- $('#tabla-alumnos-credencial').html(alumnosCred().map(a => `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="verCredencial(this.dataset.c)" class="btn btn-vinotinto btn-sm py-1 px-3">Ver Credencial</button> <button data-c="${esc(a.id)}" onclick="eliminarAlumno(this.dataset.c)" class="btn btn-outline-danger btn-sm py-1 px-3" title="Eliminar alumno">Eliminar</button></td></tr>`).join('') || '<tr><td colspan="3" class="text-center text-muted py-3">Este grupo aún no tiene alumnos en este turno. Control Escolar debe subir la lista.</td></tr>');
+ $('#tabla-alumnos-credencial').html(alumnosCred().map(a => `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td class="text-center"><div class="d-grid gap-1 mx-auto" style="min-width:110px;max-width:170px"><button data-c="${esc(a.id)}" onclick="verCredencial(this.dataset.c)" class="btn btn-vinotinto btn-sm py-1 px-3 w-100">Ver Credencial</button><button data-c="${esc(a.id)}" onclick="eliminarAlumno(this.dataset.c)" class="btn btn-outline-danger btn-sm py-1 px-3 w-100" title="Eliminar alumno">Eliminar</button></div></td></tr>`).join('') || '<tr><td colspan="3" class="text-center text-muted py-3">Este grupo aún no tiene alumnos en este turno. Control Escolar debe subir la lista.</td></tr>');
 }
 function verCredencial(id) {
  const a = db.alumnos.find(x => x.id === id); idEditando = id;
@@ -3762,7 +3862,8 @@ function entrarAlSistema(restaurando) {
  //    (escáner y gráficas; Excel y PDF siguen bajando detrás porque solo se usan al descargar) y las pestañas ocultas ya dibujadas. Así al entrar no hay nada "cargando" ni se espera al cambiar de pestaña.
  //    Tope de 5 s para no dejar a nadie atorado si algo no baja (sin internet, servidor lento): entonces abre y lo demás sigue detrás.
  const libs = Promise.resolve(window.SICA_VISTA_LISTA).catch(() => {});   // Excel y PDF NO se esperan: solo se usan al descargar
- const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas, libs]).catch(() => {});
+ const conCopia = $('#rol-select').val() === 'control' && ['frente', 'reverso'].every(l => leerPrevCache(turnoCred, l));   // las vistas previas ya están guardadas: se pintan al instante
+ const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, conCopia ? null : plantillas, libs]).catch(() => {});
  if (restaurando) pantallaCarga(true);   // al recargar la página con la sesión abierta no se ve el login mientras tanto
  return Promise.race([todo, new Promise(r => setTimeout(r, 5000))]).then(() => {
   abrir();
