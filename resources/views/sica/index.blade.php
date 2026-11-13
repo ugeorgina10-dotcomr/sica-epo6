@@ -677,7 +677,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 </div>
 <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
  <button onclick="regresarPanel()" id="btn-regresar-panel" class="btn btn-vinotinto px-4 rounded-pill fw-semibold shadow-sm d-none">Regresar</button>
- <button onclick="salirConfirmando()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
+ <button onclick="cerrarSesion()" class="btn btn-dark px-4 rounded-pill fw-semibold shadow-sm ms-auto">Cerrar Sesión</button>
 </div>
 </div>
 </div>
@@ -1634,7 +1634,6 @@ function recargarSistema(btn) {
  // Último recurso: si por algo no se movió, se fuerza la recarga normal
  setTimeout(() => location.reload(), 5000);
 }
-function salirConfirmando() { if (confirm('¿Cerrar la sesión?\nTendrás que volver a iniciar sesión para entrar al sistema.')) cerrarSesion(); }
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
  // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
