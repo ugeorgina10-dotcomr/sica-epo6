@@ -21,10 +21,10 @@
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
 {{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
      Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
-@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js'] as $lib)
+@foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js', 'chart.umd.min.js', 'html5-qrcode.min.js'] as $lib)
 <link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
-@foreach (['html5-qrcode.min.js', 'chart.umd.min.js', 'xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
+@foreach (['xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
 <link rel="preload" as="script" fetchpriority="low" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
@@ -712,9 +712,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  // Esperan a que termine de cargar la pantalla (CSS, logo, fondo): así el login aparece y responde primero
  // Todo arranca de inmediato y en paralelo (ya están precargados desde la cabecera); solo autotable espera a jsPDF
  window.SICA_DOCX_LISTO = Promise.all(grupos[0].map(x => cargar(x)));
+ // Escáner y gráficas SÍ se ven al entrar (prioridad normal); Excel y PDF solo se usan al descargar (siguen bajando detrás, sin frenar la entrada)
+ window.SICA_VISTA_LISTA = Promise.all([window.SICA_DOCX_LISTO].concat(grupos[1].map(x => cargar(x))));
  const resto = Promise.all([
   window.SICA_DOCX_LISTO,
-  Promise.all(grupos[1].map(x => cargar(x, true))),
+  window.SICA_VISTA_LISTA,
   Promise.all(grupos[2].map(x => cargar(x, true))).then(() => cargar('jspdf.plugin.autotable.min.js', true))   // autotable depende de jsPDF
  ]);
  window.SICA_LIBS_LISTAS = resto.then(() => {
@@ -3068,7 +3070,7 @@ function dibujarGraficaAsistencias(s) {
  if (!libsOk('Chart')) return;
  if (chartAsistencias) { chartAsistencias.data = data; chartAsistencias.options.plugins.title.text = titulo; chartAsistencias.update(); return; }
  chartAsistencias = new Chart(ctx, { type: 'bar', data: data, options: {
- responsive:true, maintainAspectRatio:true,
+ responsive:true, maintainAspectRatio:true, animation:false,
  plugins:{ legend:{position:'bottom'}, title:{display:true, text:titulo, font:{size:13, weight:'bold'}, color:'#800020', padding:{bottom:10}} },
  scales:{y:{beginAtZero:true, ticks:{precision:0}}}
  }});
@@ -3214,13 +3216,23 @@ const existeOriginal = {};   // 'FrenteMatutino.docx' -> true/false (false = ya 
 try { localStorage.removeItem('sica_epo6_plantilla_oficial'); } catch (e) {}   // ya no se guardan imágenes de plantilla en el navegador
 /* Lee y analiza un Word/PDF de plantilla UNA sola vez (url -> promesa). Se usa al iniciar y también por adelantado en la pantalla de login. */
 const _plantillasLeidas = {};
+const _plantillasFirma = {};   // url -> {firma, modelo}: si el archivo no cambió, no se vuelve a analizar (analizar un Word es lo más lento)
+function firmaBuffer(buf) {
+ const u = new Uint8Array(buf); let h = 2166136261;
+ for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 16777619); }
+ return u.length + ':' + (h >>> 0);
+}
 function leerPlantilla(url, forzar) {
- return (!forzar && _plantillasLeidas[url]) || (_plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
+ if (!forzar && _plantillasLeidas[url]) return _plantillasLeidas[url];
+ return _plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
   .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
   .then(buf => {
+   const firma = firmaBuffer(buf), previa = _plantillasFirma[url];
+   if (previa && previa.firma === firma) return previa.modelo;   // mismo archivo: se reutiliza lo ya analizado (y su dibujo)
    const esPdf = new Uint8Array(buf, 0, 5).join() === '37,80,68,70,45';   // "%PDF-": el lector de PDF puede tardar en cargar
-   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf));
-  }).catch(e => { delete _plantillasLeidas[url]; throw e; }));
+   return (esPdf ? (window.SICA_LIBS_LISTAS || Promise.resolve()) : Promise.resolve()).then(() => SicaDocx.cargar(buf))
+    .then(m => { _plantillasFirma[url] = {firma: firma, modelo: m}; return m; });
+  }).catch(e => { delete _plantillasLeidas[url]; delete _plantillasFirma[url]; throw e; });
 }
 /* Deja listos (ya leídos) los Word originales mientras la persona escribe su contraseña: al entrar, las plantillas aparecen al instante. */
 let _tsPrecalentado = 0;   // cuándo se leyeron por adelantado (si pasó mucho rato se vuelven a revisar al entrar)
@@ -3743,12 +3755,12 @@ function entrarAlSistema(restaurando) {
  // 2) Datos: si ya llegaron con el inicio de sesión / la página (o hay copia local) no se espera nada; si no, se descargan
  const datosListos = (db.alumnos.length || Object.keys(db.horarios).length) ? Promise.resolve() : cargarDesdeServidor();
  // 3) El panel se abre cuando TODO lo de cada rol ya está cargado: datos, lector de plantillas + QR, plantillas ya leídas, librerías
- //    (escáner, gráficas, Excel, PDF) y las pestañas ocultas ya dibujadas. Así al entrar no hay nada "cargando" ni se espera al cambiar de pestaña.
- //    Tope de 10 s para no dejar a nadie atorado si algo no baja (sin internet, servidor lento): entonces abre y lo demás sigue detrás.
- const libs = Promise.resolve(window.SICA_LIBS_LISTAS).catch(() => {});
+ //    (escáner y gráficas; Excel y PDF siguen bajando detrás porque solo se usan al descargar) y las pestañas ocultas ya dibujadas. Así al entrar no hay nada "cargando" ni se espera al cambiar de pestaña.
+ //    Tope de 5 s para no dejar a nadie atorado si algo no baja (sin internet, servidor lento): entonces abre y lo demás sigue detrás.
+ const libs = Promise.resolve(window.SICA_VISTA_LISTA).catch(() => {});   // Excel y PDF NO se esperan: solo se usan al descargar
  const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas, libs]).catch(() => {});
  if (restaurando) pantallaCarga(true);   // al recargar la página con la sesión abierta no se ve el login mientras tanto
- return Promise.race([todo, new Promise(r => setTimeout(r, 10000))]).then(() => {
+ return Promise.race([todo, new Promise(r => setTimeout(r, 5000))]).then(() => {
   abrir();
   prepararPanelesOcultos(true);   // estadísticas, gráfica y vista previa de plantillas ya dibujadas antes de mostrar nada
   pantallaCarga(false);
