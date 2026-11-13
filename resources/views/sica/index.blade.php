@@ -2773,10 +2773,19 @@ function elegirGrupoLector(v) {
 function sincronizarFiltroLector() {
  $('#sel-grupo-lector').val(filtro ? filtro.grado + '-' + filtro.grupo : '');
 }
-/* Orden de las listas: el nombre se guarda como "Apellido paterno, Apellido materno, Nombre(s)", así que ordenar el texto
-   completo en español (sin importar mayúsculas ni acentos) acomoda por paterno, luego materno y luego nombre(s). Siempre en automático. */
+/* Orden de las listas: Apellido paterno, luego materno y luego nombre(s), alfabético en español (sin importar mayúsculas ni acentos).
+   Los nombres están guardados como vienen en la lista ("Nombre(s) Apellido paterno Apellido materno"), así que para ordenar se
+   acomodan solo para comparar (con la misma regla que reordena al subir la lista, que respeta "De la", "Del", etc.); lo que se
+   muestra y se imprime en la credencial no cambia. */
 const _cmpNombre = new Intl.Collator('es', {sensitivity: 'base', numeric: true});
-const porApellidos = (a, b) => _cmpNombre.compare(String(a.nombre || '').trim(), String(b.nombre || '').trim());
+const _llaveApellidos = new Map();
+function llaveApellidos(nombre) {
+ const n = String(nombre || '');
+ let k = _llaveApellidos.get(n);
+ if (k === undefined) { k = reordenarNombrePrimero(n); if (_llaveApellidos.size > 5000) _llaveApellidos.clear(); _llaveApellidos.set(n, k); }
+ return k;
+}
+const porApellidos = (a, b) => _cmpNombre.compare(llaveApellidos(a.nombre), llaveApellidos(b.nombre));
 function filtrados() {
  return db.alumnos.filter(a => a.turno === turnoActivo && (!filtro || (a.grado === filtro.grado && a.grupo === filtro.grupo))).sort(porApellidos);
 }
@@ -3516,7 +3525,7 @@ function selCred(grado, grupo) {
  $('#titulo-grupo-credencial').text('Credenciales Digitales - ' + nomGrado[grado] + ' ' + grupo + ' (' + turnoCred + ')');
  $('#badge-plantilla').text('Plantilla ' + turnoCred);
  $('#vista-editar-credencial-individual').addClass('d-none'); $('#resultado-credencial-box').removeClass('d-none');
- $('#tabla-alumnos-credencial').html(alumnosCred().map(a => `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="verCredencial(this.dataset.c)" class="btn btn-vinotinto btn-sm py-1 px-3">Ver Credencial</button> <button data-c="${esc(a.id)}" onclick="eliminarAlumno(this.dataset.c)" class="btn btn-outline-danger btn-sm py-1 px-3" title="Eliminar alumno">Eliminar</button></td></tr>`).join('') || '<tr><td colspan="3" class="text-center text-muted py-3">Este grupo aún no tiene alumnos en este turno. Control Escolar debe subir la lista.</td></tr>');
+ $('#tabla-alumnos-credencial').html(alumnosCred().map(a => `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td class="text-center"><div class="d-grid gap-1 mx-auto" style="min-width:110px;max-width:170px"><button data-c="${esc(a.id)}" onclick="verCredencial(this.dataset.c)" class="btn btn-vinotinto btn-sm py-1 px-3 w-100">Ver Credencial</button><button data-c="${esc(a.id)}" onclick="eliminarAlumno(this.dataset.c)" class="btn btn-outline-danger btn-sm py-1 px-3 w-100" title="Eliminar alumno">Eliminar</button></div></td></tr>`).join('') || '<tr><td colspan="3" class="text-center text-muted py-3">Este grupo aún no tiene alumnos en este turno. Control Escolar debe subir la lista.</td></tr>');
 }
 function verCredencial(id) {
  const a = db.alumnos.find(x => x.id === id); idEditando = id;
