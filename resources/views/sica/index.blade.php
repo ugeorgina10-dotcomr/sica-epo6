@@ -1120,11 +1120,18 @@ function reordenarNombrePrimero(txt) {
  return ap1.concat(ap2, p).join(' ');
 }
 /* fila = renglón del archivo; desde = columna donde empieza el nombre.
- Si vienen 3 columnas (paterno, materno, nombre) las une en ese orden;
- si viene una sola, la reordena o la deja tal cual según el selector. */
+ Si vienen 3 columnas de texto, el selector dice en qué orden están:
+   "reordenar"  -> Nombre(s) | Apellido paterno | Apellido materno  (queda: paterno materno nombre)
+   "tal-cual"   -> Apellido paterno | Apellido materno | Nombre(s)  (queda igual)
+ Si viene una sola columna, la reordena o la deja tal cual según el selector.
+ Una columna con número o una sola letra (grado, grupo, sexo) no se toma como parte del nombre. */
 function armarNombre(fila, desde, modo) {
  const c = [0,1,2].map(i => String(fila[desde + i] == null ? '' : fila[desde + i]).trim());
- if (c[1] && c[2]) return c.join(' ').replace(/\s+/g, ' ').trim();
+ const esTexto = t => t.length > 1 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(t) && !/^\d+$/.test(t);
+ if (esTexto(c[1]) && esTexto(c[2])) {
+  const partes = modo === 'reordenar' ? [c[1], c[2], c[0]] : c;
+  return partes.join(' ').replace(/\s+/g, ' ').trim();
+ }
  const t = c[0].replace(/\s+/g, ' ');
  return modo === 'reordenar' ? reordenarNombrePrimero(t) : t;
 }
@@ -2773,19 +2780,10 @@ function elegirGrupoLector(v) {
 function sincronizarFiltroLector() {
  $('#sel-grupo-lector').val(filtro ? filtro.grado + '-' + filtro.grupo : '');
 }
-/* Orden de las listas: Apellido paterno, luego materno y luego nombre(s), alfabético en español (sin importar mayúsculas ni acentos).
-   Los nombres están guardados como vienen en la lista ("Nombre(s) Apellido paterno Apellido materno"), así que para ordenar se
-   acomodan solo para comparar (con la misma regla que reordena al subir la lista, que respeta "De la", "Del", etc.); lo que se
-   muestra y se imprime en la credencial no cambia. */
+/* Orden de las listas: alfabético en español (sin importar mayúsculas ni acentos) sobre el nombre guardado, que queda como
+   "Apellido paterno, Apellido materno, Nombre(s)" gracias al selector "Orden de los nombres en el archivo" al subir la lista. */
 const _cmpNombre = new Intl.Collator('es', {sensitivity: 'base', numeric: true});
-const _llaveApellidos = new Map();
-function llaveApellidos(nombre) {
- const n = String(nombre || '');
- let k = _llaveApellidos.get(n);
- if (k === undefined) { k = reordenarNombrePrimero(n); if (_llaveApellidos.size > 5000) _llaveApellidos.clear(); _llaveApellidos.set(n, k); }
- return k;
-}
-const porApellidos = (a, b) => _cmpNombre.compare(llaveApellidos(a.nombre), llaveApellidos(b.nombre));
+const porApellidos = (a, b) => _cmpNombre.compare(String(a.nombre || '').trim(), String(b.nombre || '').trim());
 function filtrados() {
  return db.alumnos.filter(a => a.turno === turnoActivo && (!filtro || (a.grado === filtro.grado && a.grupo === filtro.grupo))).sort(porApellidos);
 }
