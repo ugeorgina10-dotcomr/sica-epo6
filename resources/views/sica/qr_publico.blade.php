@@ -13,7 +13,6 @@
         main { padding: 24px; max-width: 420px; }
         img { width: 150px; max-width: 55vw; height: auto; background: #fff; border-radius: 50%; padding: 10px; }
         h1 { font-size: 1.15rem; letter-spacing: .04em; margin: 20px 0 0; text-transform: uppercase; line-height: 1.4; }
-        a { color: #fff; }
         p { font-size: .85rem; margin: 14px 0 0; line-height: 1.7; opacity: .92; }
     </style>
 </head>
@@ -22,10 +21,6 @@
         <img src="{{ asset('img/logo6.png') }}" alt="Logo de la Escuela Preparatoria Oficial Núm. 6">
         <h1>Escuela Preparatoria<br>Oficial Núm. 6</h1>
         <p>C.C.T. 15EBH0008G (Matutino)<br>C.C.T. 15EBH0199N (Vespertino)</p>
-        @if (!empty($ubicacion))
-            <p class="ubic">{{ $ubicacion }}<br>
-                <a href="https://www.google.com/maps/search/?api=1&query={{ urlencode('Escuela Preparatoria Oficial Núm. 6 ' . $ubicacion) }}" rel="noopener">Ver en el mapa</a></p>
-        @endif
     </main>
 </body>
 </html>

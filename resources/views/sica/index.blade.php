@@ -2505,15 +2505,9 @@ function detener(el) {
 /* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
    porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
 const reQr = /SICA([0-9A-F]{16,20})$/;   // 16 = código actual; hasta 20 = versión anterior del QR
-const reQrUrl = /\/E\W{0,3}([0-9A-F]{16})$/;   // QR actual: enlace a la página pública de la escuela + "#" + código
 function claveDeLectura(txt) {
- const u = String(txt).trim().toUpperCase().match(reQrUrl);
- if (u) return 'SICA' + u[1];
  const s = String(txt).toUpperCase().replace(/[^A-Z0-9]/g, ''), m = s.match(reQr);
- if (m) return 'SICA' + m[1].slice(0, 16);
- // Enlace del QR leído con signos cambiados (p. ej. lector USB con otra distribución de teclado): el código son los últimos 16 caracteres
- const l = String(txt).trim().length > 22 && s.match(/([0-9A-F]{16})$/);
- return l ? 'SICA' + l[1] : String(txt).trim().toUpperCase();
+ return m ? 'SICA' + m[1].slice(0, 16) : String(txt).trim().toUpperCase();
 }
 const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
 function procesarQR(curp, modo, el) {
@@ -2578,7 +2572,6 @@ function registrarPorCurp(curp, modo) {
 /* El QR no está en la lista de este equipo (p. ej. Control Escolar lo dio de alta hace un momento):
    se le pregunta al servidor, que busca al alumno por CURP en TODOS los grupos y lo registra en el suyo. */
 function registrarDesconocido(curp, modo) {
- if (String(curp).length > 30) return {ok:false, msg:'QR no reconocido (no es una credencial de la escuela).'};
  if (navigator.onLine === false) return {ok:false, msg:'QR no reconocido: ' + curp + ' (sin internet: no está en la lista de este equipo)'};
  return fetch('/api/sica/sync', {
   method: 'POST',
@@ -3478,7 +3471,7 @@ function _hmacSha256Hex(clave, texto) {
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
 /* Texto del QR: nombre corto de la escuela (lo que ve cualquier otra app de escaneo, sin enlace) y al final el código propio del alumno. Total: 25 caracteres, igual de simple que el QR con la CURP */
-const QR_TEXTO_ESCUELA = 'EPO6 ';   // (versión anterior del QR; ya no se usa para generar)   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
+const QR_TEXTO_ESCUELA = 'EPO6 ';   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
@@ -3490,7 +3483,7 @@ function qrCodigo(curp) {
  _memoQr.set(k, c); return c;
 }
 /* Lo que lleva el QR impreso: datos de la escuela + código del alumno (no la CURP). */
-const qrValorDe = curp => { const c = qrCodigo(curp); return c ? location.origin + '/e#' + c : ''; };
+const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + 'SICA' + c : ''; };
 const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:valor, size:220}).toDataURL();
 const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred);
 /* CAMBIO: al elegir Matutino/Vespertino abajo, la etiqueta del turno y la
