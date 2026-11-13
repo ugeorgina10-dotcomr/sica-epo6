@@ -2773,8 +2773,12 @@ function elegirGrupoLector(v) {
 function sincronizarFiltroLector() {
  $('#sel-grupo-lector').val(filtro ? filtro.grado + '-' + filtro.grupo : '');
 }
+/* Orden de las listas: el nombre se guarda como "Apellido paterno, Apellido materno, Nombre(s)", así que ordenar el texto
+   completo en español (sin importar mayúsculas ni acentos) acomoda por paterno, luego materno y luego nombre(s). Siempre en automático. */
+const _cmpNombre = new Intl.Collator('es', {sensitivity: 'base', numeric: true});
+const porApellidos = (a, b) => _cmpNombre.compare(String(a.nombre || '').trim(), String(b.nombre || '').trim());
 function filtrados() {
- return db.alumnos.filter(a => a.turno === turnoActivo && (!filtro || (a.grado === filtro.grado && a.grupo === filtro.grupo)));
+ return db.alumnos.filter(a => a.turno === turnoActivo && (!filtro || (a.grado === filtro.grado && a.grupo === filtro.grupo))).sort(porApellidos);
 }
 /* Orientador(a) del grupo del alumno: sale solo de la asignación del grupo, así aparece apenas se sube la lista. */
 function nombreOrientadorDe(a) {
@@ -3497,7 +3501,7 @@ function qrCodigo(curp) {
 /* Lo que lleva el QR impreso: datos de la escuela + código del alumno (no la CURP). */
 const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + 'SICA' + c : ''; };
 const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:valor, size:220}).toDataURL();
-const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred);
+const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred).sort(porApellidos);
 /* CAMBIO: al elegir Matutino/Vespertino abajo, la etiqueta del turno y la
  vista previa (frente y reverso) de arriba cambian al mismo turno. */
 function setTurnoCred(t) {
