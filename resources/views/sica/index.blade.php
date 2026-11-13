@@ -474,7 +474,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="row g-3 align-items-end">
  <div class="col-md-3"><label class="form-label small">Grupo seleccionado</label><input type="text" id="lbl-grupo-lista" class="form-control form-control-sm" value="Selecciona grado y grupo arriba" readonly></div>
  <div class="col-md-4"><label class="form-label small" id="lbl-archivo-lista">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): CURP y nombre</label><input type="file" id="archivo-lista" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
- <div class="col-md-5 d-flex gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button><button onclick="borrarListaGrupo()" class="btn btn-outline-danger btn-sm w-100 py-2 fw-semibold" title="Elimina todos los alumnos de este grupo y turno">Borrar Lista</button></div>
+ <div class="col-md-5 d-flex gap-2"><button onclick="subirLista()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold btn-accion-restringida">Subir Lista</button></div>
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
@@ -2910,6 +2910,16 @@ function renderGruposCargados() {
 }
 function grpMarcar(k, on) { if (on) _grpSel.add(k); else _grpSel.delete(k); renderGruposCargados(); }
 function grpSeleccionarTodos(on) { _grpSel = new Set(on ? gruposCargados().map(g => g.k) : []); _grpHtml = ''; renderGruposCargados(); }
+/* Después de borrar grupos todo se vuelve a dibujar solo: tabla, estadísticas, horarios, orientadores, credenciales, lista de grupos
+   cargados y filtros del Lector Fijo; y se avisa a los demás equipos/pestañas para que lo vean enseguida. */
+function refrescarTrasBorrar() {
+ _grpHtml = '';
+ renderTabla();   // también redibuja las estadísticas y la gráfica
+ renderListaHorarios(); renderListaOrientadores(); renderGruposCargados();
+ if (credSel) selCred(credSel.grado, credSel.grupo);
+ sincronizarFiltroLector();
+ try { acelerarSync(); avisarEstado(); } catch (e) {}
+}
 function borrarGruposCargados(todos) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede borrar grupos.'); return; }
  const todosLos = gruposCargados();
@@ -2930,20 +2940,18 @@ function borrarGruposCargados(todos) {
  db.alumnos = db.alumnos.filter(a => !ids.has(a.id));
  localStorage.setItem(LS, JSON.stringify(db));
  _grpSel = new Set(); _grpHtml = '';
- renderTabla(); renderListaHorarios(); renderListaOrientadores();
- if (credSel) selCred(credSel.grado, credSel.grupo);
+ refrescarTrasBorrar();
  _postSync('eliminar_listas_grupos', {grupos: elegidos.map(g => ({grado: g.grado, grupo: g.grupo, turno: g.turno})), configuracion: config}, 60000).then(r => {
   if (!r.ok) return Promise.reject();
   ids.forEach(id => _firmasGuardadas.delete(id));
-  alert('Grupos borrados: ' + elegidos.length + ' grupo(s) y ' + nAlum + ' alumno(s) eliminados.');
+  refrescarTrasBorrar();   // sin aviso: ya desapareció de la pantalla y el servidor lo confirmó; los demás equipos lo ven solos
  }).catch(() => {
   const hay = new Set(db.alumnos.map(a => a.id));
   quitados.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
   Object.assign(db.horarios, horariosAntes);
   localStorage.setItem(LS, JSON.stringify(db));
   _grpHtml = '';
-  renderTabla(); renderListaHorarios(); renderListaOrientadores();
-  if (credSel) selCred(credSel.grado, credSel.grupo);
+  refrescarTrasBorrar();
   alert('No se pudieron borrar los grupos en el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
 }
