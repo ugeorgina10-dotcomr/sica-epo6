@@ -3742,21 +3742,35 @@ function entrarAlSistema(restaurando) {
  const plantillas = precargarPlantillasEntrada();
  // 2) Datos: si ya llegaron con el inicio de sesión / la página (o hay copia local) no se espera nada; si no, se descargan
  const datosListos = (db.alumnos.length || Object.keys(db.horarios).length) ? Promise.resolve() : cargarDesdeServidor();
- // 3) El panel se abre cuando lo que se ve está listo: datos, lector de plantillas + QR y plantillas ya leídas. Las librerías pesadas
- //    (Excel, PDF, gráficas) siguen bajando en segundo plano y la gráfica se dibuja sola en cuanto llegan (así la primera vez no se espera por ellas).
- //    Tope de 2.5 s para no dejar a nadie esperando.
- const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas]).catch(() => {});
- if (window.SICA_LIBS_LISTAS) window.SICA_LIBS_LISTAS.then(() => { if (rolActivo) { renderStats(); prepararPanelesOcultos(); } });
- // El panel NO espera las plantillas de Word ni las librerías: se abre en cuanto hay datos (tope de 1 s) y lo demás sigue cargando detrás.
- const datosParaAbrir = Promise.resolve(datosListos).catch(() => {});
- return Promise.race([datosParaAbrir, new Promise(r => setTimeout(r, 1000))]).then(() => {
+ // 3) El panel se abre cuando TODO lo de cada rol ya está cargado: datos, lector de plantillas + QR, plantillas ya leídas, librerías
+ //    (escáner, gráficas, Excel, PDF) y las pestañas ocultas ya dibujadas. Así al entrar no hay nada "cargando" ni se espera al cambiar de pestaña.
+ //    Tope de 10 s para no dejar a nadie atorado si algo no baja (sin internet, servidor lento): entonces abre y lo demás sigue detrás.
+ const libs = Promise.resolve(window.SICA_LIBS_LISTAS).catch(() => {});
+ const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas, libs]).catch(() => {});
+ if (restaurando) pantallaCarga(true);   // al recargar la página con la sesión abierta no se ve el login mientras tanto
+ return Promise.race([todo, new Promise(r => setTimeout(r, 10000))]).then(() => {
   abrir();
+  prepararPanelesOcultos(true);   // estadísticas, gráfica y vista previa de plantillas ya dibujadas antes de mostrar nada
+  pantallaCarga(false);
+  // Si el tope de 10 s se cumplió antes de que llegara todo, lo que falte se completa solo cuando llegue
+  todo.then(() => { if (rolActivo) prepararPanelesOcultos(true); });
+  if (window.SICA_LIBS_LISTAS) window.SICA_LIBS_LISTAS.then(() => { if (rolActivo) { renderStats(); prepararPanelesOcultos(true); } });
   // Sincroniza con el servidor en segundo plano (primera consulta: 304 si el estado ya venía en el login)
   cargarDesdeServidor();
   // Al recargar, el service worker ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
   if (!restaurando) setTimeout(guardarPaginaOffline, 4000);   // al iniciar sesión sí: así se puede abrir sin internet
-  return todo.then(() => { if (rolActivo) prepararPanelesOcultos(); });
  });
+}
+/* Pantalla de "Cargando…" a todo lo ancho (solo al recargar con la sesión abierta; al iniciar sesión basta el botón "Entrando...") */
+function pantallaCarga(mostrar) {
+ let el = document.getElementById('pantalla-carga-sica');
+ if (!mostrar) { if (el) el.remove(); return; }
+ if (el) return;
+ el = document.createElement('div');
+ el.id = 'pantalla-carga-sica';
+ el.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(244,246,249,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-weight:600;color:#800020';
+ el.innerHTML = '<div class="spinner-border" role="status" style="color:#800020"></div><div>Cargando el sistema…</div>';
+ document.body.appendChild(el);
 }
 /* Empieza a leer las plantillas de Word al entrar (una sola vez) y devuelve la promesa de que ya están listas. */
 let _promesaPlantillas = null;
@@ -3769,7 +3783,7 @@ function precargarPlantillasEntrada() {
 /* Deja dibujado, sin que nadie lo pida, lo que está en las otras pestañas del panel (vista previa de las plantillas
    en el Portal del Alumno, estadísticas y gráfica): al cambiar de pestaña ya está todo ahí. */
 let _preparando = false;
-function prepararPanelesOcultos() {
+function prepararPanelesOcultos(ya) {
  if (_preparando || !rolActivo) return;
  _preparando = true;
  const tarea = () => {
@@ -3779,7 +3793,8 @@ function prepararPanelesOcultos() {
   } catch (e) {}
   _preparando = false;
  };
- if (window.requestIdleCallback) requestIdleCallback(tarea, {timeout: 800}); else setTimeout(tarea, 50);
+ if (ya) tarea();   // al entrar: se dibuja ya, no cuando el navegador tenga un hueco
+ else if (window.requestIdleCallback) requestIdleCallback(tarea, {timeout: 800}); else setTimeout(tarea, 50);
 }
 /* Si al abrir la página ya hay sesión en el servidor, entra directo al sistema (sin volver a pedir contraseña al recargar) */
 function restaurarSesion(S) {
