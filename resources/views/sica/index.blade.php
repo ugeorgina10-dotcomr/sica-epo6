@@ -2627,7 +2627,8 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
   return null;
  }
  // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
- const enCampo = el => !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable) && el.offsetParent !== null;
+ // Solo cuentan los campos donde de verdad se escribe texto: un menú (Grado/Grupo), casilla o botón con el foco NO debe bloquear al lector
+ const enCampo = el => !!el && ((el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color|image)$/i.test(el.type)) || el.isContentEditable) && el.offsetParent !== null;
  function tono(ok) {
   try {
    desbloquearAudio();
