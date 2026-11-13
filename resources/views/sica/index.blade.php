@@ -3373,6 +3373,26 @@ function problemasFrente(m) {
  ['nombre','curp','grado','grupo','turno'].forEach(k => { if (!m.campos[k]) faltan.push('la etiqueta ' + (k === 'nombre' ? 'NOMBRE DEL ESTUDIANTE:' : k.toUpperCase() + ':')); });
  return faltan;
 }
+/* Copia de la vista previa de cada plantilla (imagen chica) guardada en este equipo: al entrar se pinta AL INSTANTE, sin esperar a
+   bajar y leer el Word; cuando la plantilla real termina de leerse se redibuja encima (y la copia se actualiza si cambió). */
+const clavePrevCache = (t, l) => 'sica_prev_' + t + '_' + l;
+function leerPrevCache(t, l) { try { return localStorage.getItem(clavePrevCache(t, l)); } catch (e) { return null; } }
+function guardarPrevCache(cv, t, l) {
+ try { localStorage.setItem(clavePrevCache(t, l), cv.toDataURL('image/jpeg', 0.8)); } catch (e) {}
+}
+function borrarPrevCache(t, l) { try { localStorage.removeItem(clavePrevCache(t, l)); } catch (e) {} }
+function pintarPrevCache(cv, url) {
+ if (cv._sicaCacheUrl === url) { $(cv).show(); igualarAlturaPreviews(); return; }
+ const im = new Image();
+ im.onload = () => {
+  if (cv._sicaModelo) return;   // ya se dibujó la plantilla real: la copia no la pisa
+  cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+  cv.getContext('2d').drawImage(im, 0, 0);
+  cv._sicaCacheUrl = url;
+  $(cv).show(); igualarAlturaPreviews();
+ };
+ im.src = url;
+}
 function refrescarPreviewPlantillaOficial(dibujarOculto) {
  const t = turnoCred || 'Matutino';
  $('#turno-plantilla-actual').text(t);
@@ -3383,14 +3403,16 @@ function refrescarPreviewPlantillaOficial(dibujarOculto) {
   const msg = $('#msg-prev-plantilla-' + l);
   if (m && window.SicaDocx) {
    if ($('#panel-alumno').hasClass('d-none') && !dibujarOculto) return;   // oculto: se dibuja por adelantado en segundo plano (prepararPanelesOcultos)
-   if (cv._sicaModelo !== m) { SicaDocx.dibujar(cv, m, null, {ancho: 900}); cv._sicaModelo = m; }   // ya dibujada: no se repite
+   if (cv._sicaModelo !== m) { SicaDocx.dibujar(cv, m, null, {ancho: 900}); cv._sicaModelo = m; cv._sicaCacheUrl = null; guardarPrevCache(cv, t, l); }   // ya dibujada: no se repite; se guarda la copia para la próxima vez
    $(cv).show();
    const falta = l === 'frente' ? problemasFrente(m) : [];
    msg.toggleClass('text-danger', falta.length > 0).toggleClass('text-muted', !falta.length)
     .text(falta.length ? 'A esta plantilla le falta: ' + falta.join(', ') + '.' : '');
   } else {
-   $(cv).hide();
-   msg.removeClass('text-danger').addClass('text-muted').text(errorPlantilla[t + '-' + l] || 'Cargando plantilla…');
+   const copia = errorPlantilla[t + '-' + l] ? null : leerPrevCache(t, l);
+   if (errorPlantilla[t + '-' + l]) borrarPrevCache(t, l);   // la plantilla ya no existe o no se pudo leer: la copia vieja no se muestra
+   if (copia) { pintarPrevCache(cv, copia); msg.removeClass('text-danger').addClass('text-muted').text(''); }
+   else { $(cv).hide(); msg.removeClass('text-danger').addClass('text-muted').text(errorPlantilla[t + '-' + l] || 'Cargando plantilla…'); }
   }
  });
  igualarAlturaPreviews();
@@ -3840,7 +3862,8 @@ function entrarAlSistema(restaurando) {
  //    (escáner y gráficas; Excel y PDF siguen bajando detrás porque solo se usan al descargar) y las pestañas ocultas ya dibujadas. Así al entrar no hay nada "cargando" ni se espera al cambiar de pestaña.
  //    Tope de 5 s para no dejar a nadie atorado si algo no baja (sin internet, servidor lento): entonces abre y lo demás sigue detrás.
  const libs = Promise.resolve(window.SICA_VISTA_LISTA).catch(() => {});   // Excel y PDF NO se esperan: solo se usan al descargar
- const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, plantillas, libs]).catch(() => {});
+ const conCopia = $('#rol-select').val() === 'control' && ['frente', 'reverso'].every(l => leerPrevCache(turnoCred, l));   // las vistas previas ya están guardadas: se pintan al instante
+ const todo = Promise.all([datosListos, window.SICA_DOCX_LISTO || null, conCopia ? null : plantillas, libs]).catch(() => {});
  if (restaurando) pantallaCarga(true);   // al recargar la página con la sesión abierta no se ve el login mientras tanto
  return Promise.race([todo, new Promise(r => setTimeout(r, 5000))]).then(() => {
   abrir();
