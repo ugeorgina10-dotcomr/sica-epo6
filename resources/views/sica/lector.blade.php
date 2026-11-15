@@ -27,10 +27,11 @@
 
             <!-- Botones de Modo -->
             <div class="flex justify-center gap-4 mb-6">
-                <button id="btnAuto" onclick="setModo('Auto')" class="px-6 py-2.5 bg-[#800020] text-white text-xs font-bold rounded-xl shadow transition">Automático</button>
-                <button id="btnEntrada" onclick="setModo('Entrada')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Forzar Entrada</button>
-                <button id="btnSalida" onclick="setModo('Salida')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Forzar Salida</button>
+                <button id="btnEntrada" onclick="setModo('Entrada')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Entrada</button>
+                <button id="btnSalida" onclick="setModo('Salida')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Salida</button>
             </div>
+
+            <p id="txtModo" class="text-xs font-bold text-green-700 -mt-3 mb-5">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
 
             <!-- Contenedor de la Cámara -->
             <div class="max-w-md mx-auto bg-black rounded-2xl overflow-hidden shadow-inner relative mb-4">
@@ -58,10 +59,17 @@
         const INACTIVO = "px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition";
 
         function setModo(tipo) {
-            modoActual = tipo;
-            document.getElementById('btnAuto').className = tipo === 'Auto' ? ACTIVO : INACTIVO;
-            document.getElementById('btnEntrada').className = tipo === 'Entrada' ? ACTIVO : INACTIVO;
-            document.getElementById('btnSalida').className = tipo === 'Salida' ? ACTIVO : INACTIVO;
+            modoActual = (modoActual === tipo) ? 'Auto' : tipo;   // pulsar otra vez el mismo botón = volver a Automático
+            document.getElementById('btnEntrada').className = modoActual === 'Entrada' ? ACTIVO : INACTIVO;
+            document.getElementById('btnSalida').className = modoActual === 'Salida' ? ACTIVO : INACTIVO;
+            const t = document.getElementById('txtModo');
+            if (modoActual === 'Auto') {
+                t.className = 'text-xs font-bold text-green-700 -mt-3 mb-5';
+                t.innerText = 'Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.';
+            } else {
+                t.className = 'text-xs font-bold text-red-600 -mt-3 mb-5';
+                t.innerText = 'Modo MANUAL: todo escaneo se registra como ' + modoActual.toUpperCase() + '. Vuelve a pulsar «' + modoActual + '» para regresar al modo automático.';
+            }
         }
 
         // Texto del QR de la credencial: termina en "SICA<código de 16 caracteres>"
