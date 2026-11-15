@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Lector Fijo - SICA-EPO6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Librería para lectura de códigos QR desde la cámara -->
@@ -22,13 +23,15 @@
     <main class="max-w-4xl mx-auto p-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-center">
             <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide">Lector Fijo - Control de Entradas y Salidas</h3>
-            <p class="text-xs text-gray-500 mt-1 mb-6">Selecciona el tipo de escaneo (Entrada o Salida) y escanea con la cámara frontal[cite: 8].</p>
+            <p class="text-xs text-gray-500 mt-1 mb-6">El sistema detecta el grupo del alumno y, según el horario del grupo, registra solo si es Entrada o Salida. Escanea con la cámara frontal.</p>
 
             <!-- Botones de Modo -->
             <div class="flex justify-center gap-4 mb-6">
-                <button id="btnEntrada" onclick="setModo('entrada')" class="px-6 py-2.5 bg-[#800020] text-white text-xs font-bold rounded-xl shadow transition">Registrar Entrada</button>
-                <button id="btnSalida" onclick="setModo('salida')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Registrar Salida</button>
+                <button id="btnEntrada" onclick="setModo('Entrada')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Entrada</button>
+                <button id="btnSalida" onclick="setModo('Salida')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Salida</button>
             </div>
+
+            <p id="txtModo" class="text-xs font-bold text-green-700 -mt-3 mb-5">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
 
             <!-- Contenedor de la Cámara -->
             <div class="max-w-md mx-auto bg-black rounded-2xl overflow-hidden shadow-inner relative mb-4">
@@ -51,17 +54,50 @@
 
     <script>
         let html5QrCode;
-        let modoActual = 'entrada';
+        let modoActual = 'Auto';   // Auto = el servidor decide Entrada o Salida por el horario del grupo del alumno
+        const ACTIVO = "px-6 py-2.5 bg-[#800020] text-white text-xs font-bold rounded-xl shadow transition";
+        const INACTIVO = "px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition";
 
         function setModo(tipo) {
-            modoActual = tipo;
-            if(tipo === 'entrada') {
-                document.getElementById('btnEntrada').className = "px-6 py-2.5 bg-[#800020] text-white text-xs font-bold rounded-xl shadow transition";
-                document.getElementById('btnSalida').className = "px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition";
+            modoActual = (modoActual === tipo) ? 'Auto' : tipo;   // pulsar otra vez el mismo botón = volver a Automático
+            document.getElementById('btnEntrada').className = modoActual === 'Entrada' ? ACTIVO : INACTIVO;
+            document.getElementById('btnSalida').className = modoActual === 'Salida' ? ACTIVO : INACTIVO;
+            const t = document.getElementById('txtModo');
+            if (modoActual === 'Auto') {
+                t.className = 'text-xs font-bold text-green-700 -mt-3 mb-5';
+                t.innerText = 'Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.';
             } else {
-                document.getElementById('btnSalida').className = "px-6 py-2.5 bg-[#800020] text-white text-xs font-bold rounded-xl shadow transition";
-                document.getElementById('btnEntrada').className = "px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition";
+                t.className = 'text-xs font-bold text-red-600 -mt-3 mb-5';
+                t.innerText = 'Modo MANUAL: todo escaneo se registra como ' + modoActual.toUpperCase() + '. Vuelve a pulsar «' + modoActual + '» para regresar al modo automático.';
             }
+        }
+
+        // Texto del QR de la credencial: termina en "SICA<código de 16 caracteres>"
+        function datosDeQr(texto) {
+            const limpio = String(texto).toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const m = limpio.match(/SICA([0-9A-F]{16,20})$/);
+            return m ? { qr: m[1].slice(0, 16).toLowerCase() } : { curp: String(texto).trim().toUpperCase() };
+        }
+
+        let ultimoQr = { t: '', ts: 0 };
+        function registrar(decodedText) {
+            if (ultimoQr.t === decodedText && Date.now() - ultimoQr.ts < 4000) return;   // lectura repetida
+            ultimoQr = { t: decodedText, ts: Date.now() };
+            const caja = document.getElementById('resultado'), info = document.getElementById('infoAlumno');
+            caja.classList.remove('hidden');
+            info.innerText = 'Buscando alumno…';
+            fetch('/api/sica/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+                body: JSON.stringify({ accion: 'registrar_asistencia', datos: Object.assign(datosDeQr(decodedText), { modo: modoActual }) })
+            }).then(r => r.json().catch(() => ({})).then(d => {
+                if (r.ok && d.ok) {
+                    const al = d.alumno || {};
+                    info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora + (d.estatus === 'Retardo' ? ' · Retardo' : '');
+                } else {
+                    info.innerText = (d && d.mensaje) || ('No se pudo registrar (error ' + r.status + ').');
+                }
+            })).catch(() => { info.innerText = 'Sin conexión con el servidor. Intenta de nuevo.'; });
         }
 
         function iniciarCamara() {
@@ -72,9 +108,7 @@
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText) => {
                     // Éxito al leer el QR del alumno
-                    document.getElementById('resultado').classList.remove('hidden');
-                    document.getElementById('infoAlumno').innerText = `QR: ${decodedText} | Modo: ${modoActual.toUpperCase()} registrada con éxito.`;
-                    // Aquí se enviaría la petición AJAX al backend de Laravel para guardar asistencia/retardo
+                    registrar(decodedText);
                 },
                 (errorMessage) => {
                     // Errores de escaneo en tiempo real se pueden ignorar

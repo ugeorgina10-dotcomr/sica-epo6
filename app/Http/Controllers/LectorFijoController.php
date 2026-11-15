@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Alumno;
 use App\Models\Asistencia;
+use App\Support\MovimientoAutomatico;
 use Carbon\Carbon;
 
 class LectorFijoController extends Controller
@@ -30,15 +31,16 @@ class LectorFijoController extends Controller
         return view('sica.asistencias', compact('asistencias'));
     }
 
-    // Registra la entrada o salida mediante el lector fijo o escáner
+    // Registra la entrada o salida mediante el lector fijo o escáner.
+    // Sin tipo_movimiento (o con "Auto") el sistema decide solo, según el horario del grupo del alumno.
     public function registrar(Request $request)
     {
         $request->validate([
             'matricula' => 'required|string',
-            'tipo_movimiento' => 'required|in:Entrada,Salida'
+            'tipo_movimiento' => 'nullable|in:Entrada,Salida,Auto'
         ]);
 
-        $alumno = Alumno::where('matricula', $request->matricula)->first();
+        $alumno = Alumno::with('grupo')->where('matricula', $request->matricula)->first();
 
         if (!$alumno) {
             return response()->json([
@@ -48,12 +50,31 @@ class LectorFijoController extends Controller
         }
 
         $ahora = Carbon::now();
+        $grupo = $alumno->grupo;
+        $tipo = $request->input('tipo_movimiento', 'Auto');
+
+        [$minEntrada, $minSalida] = MovimientoAutomatico::horario($grupo->hora_entrada ?? null, $grupo->hora_salida ?? null, $grupo->turno ?? null);
+
+        if ($tipo === 'Auto') {
+            $hoy = Asistencia::where('alumno_id', $alumno->id)->whereDate('fecha_hora', $ahora->toDateString())->get();
+            $entrada = $hoy->first(fn ($x) => $x->estatus !== 'Salida');
+            $salida = $hoy->first(fn ($x) => $x->estatus === 'Salida');
+
+            $tipo = MovimientoAutomatico::resolver((int) $ahora->format('G') * 60 + (int) $ahora->format('i'), $minEntrada, $minSalida, (bool) $entrada, (bool) $salida);
+
+            if ($tipo === 'Completo') {
+                return response()->json(['success' => false, 'message' => "{$alumno->nombre}: la entrada y la salida de hoy ya estaban registradas"], 409);
+            }
+            if ($tipo === 'Salida' && $entrada && $ahora->diffInMinutes(Carbon::parse($entrada->fecha_hora)) < MovimientoAutomatico::REPETIDA_MIN) {
+                return response()->json(['success' => false, 'message' => "{$alumno->nombre}: la entrada ya estaba registrada"], 409);
+            }
+        }
+
         $estatus = 'Asistencia';
 
-        // Lógica de horarios institucionales
-        if ($request->tipo_movimiento == 'Entrada') {
-            $horaLimiteMatutino = Carbon::createFromTime(7, 10, 0);
-            if ($ahora->gt($horaLimiteMatutino)) {
+        // Retardo: se compara contra la hora de entrada del GRUPO del alumno (ya no una hora fija)
+        if ($tipo === 'Entrada') {
+            if ((int) $ahora->format('G') * 60 + (int) $ahora->format('i') > $minEntrada) {
                 $estatus = 'Retardo';
             }
         } else {
@@ -68,9 +89,10 @@ class LectorFijoController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Registro exitoso: {$alumno->nombre} ({$estatus})",
+            'message' => "{$tipo} registrada: {$alumno->nombre} ({$estatus})",
             'alumno' => $alumno->nombre,
-            'estatus' => $estatus
+            'estatus' => $estatus,
+            'tipo' => $tipo
         ]);
     }
 }

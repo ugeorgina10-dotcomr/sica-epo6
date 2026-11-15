@@ -8,6 +8,7 @@ use App\Models\Asistencia;
 use App\Models\Grupo;
 use App\Models\Orientador;
 use App\Models\Permiso;
+use App\Support\MovimientoAutomatico;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -237,7 +238,7 @@ class ControlEscolarController extends Controller
         $v = validator($d, [
             'curp'     => 'required_without:qr|nullable|string|max:30',
             'qr'       => 'required_without:curp|nullable|string|max:40',   // código opaco del QR (sin CURP)
-            'modo'     => 'nullable|in:Entrada,Salida,Auto',
+            'modo'     => 'nullable|in:Entrada,Salida,Auto',   // sin modo = Auto (lo decide el horario del grupo)
             'diferido' => 'nullable|boolean',
             'fecha'    => 'nullable|date_format:Y-m-d',
             'hora'     => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
@@ -271,26 +272,27 @@ class ControlEscolarController extends Controller
 
         $hora      = $ahora->format('H:i');
         $fechaHora = $ahora->format('Y-m-d H:i:00');
-        $grupo     = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada')->find($alumno->grupo_id);
+        $grupo     = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida')->find($alumno->grupo_id);
 
-        $modo = $d['modo'] ?? 'Entrada';
+        $modo = $d['modo'] ?? 'Auto';
 
         if ($modo === 'Auto') {
-            // Lector automático: sin entrada hoy -> Entrada; con entrada y sin salida -> Salida
-            // (si vuelve a pasar la credencial en menos de 5 min, se toma como lectura repetida)
+            // Lector automático: Entrada o Salida según el HORARIO DEL GRUPO del alumno y lo que ya tiene hoy
+            // (ver App\Support\MovimientoAutomatico). Si vuelve a pasar la credencial en menos de 5 min,
+            // se toma como lectura repetida de la entrada.
             $hoy = Asistencia::where('alumno_id', $alumno->id)
                 ->whereDate('fecha_hora', $ahora->toDateString())->orderBy('fecha_hora')->get();
             $entrada = $hoy->first(fn ($x) => $x->estatus !== 'Salida');
             $salida  = $hoy->first(fn ($x) => $x->estatus === 'Salida');
 
-            if (!$entrada) {
-                $modo = 'Entrada';
-            } elseif ($salida) {
+            [$minEntrada, $minSalida] = MovimientoAutomatico::horario($grupo->hora_entrada ?? null, $grupo->hora_salida ?? null, $grupo->turno ?? null);
+            $modo = MovimientoAutomatico::resolver((int) $ahora->format('G') * 60 + (int) $ahora->format('i'), $minEntrada, $minSalida, (bool) $entrada, (bool) $salida);
+
+            if ($modo === 'Completo') {
                 return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada y la salida de hoy ya estaban registradas'], 409);
-            } elseif ($ahora->diffInMinutes(Carbon::parse($entrada->fecha_hora)) < 5) {
+            }
+            if ($modo === 'Salida' && $entrada && $ahora->diffInMinutes(Carbon::parse($entrada->fecha_hora)) < MovimientoAutomatico::REPETIDA_MIN) {
                 return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada ya estaba registrada (' . Carbon::parse($entrada->fecha_hora)->format('H:i') . ')'], 409);
-            } else {
-                $modo = 'Salida';
             }
         }
 
