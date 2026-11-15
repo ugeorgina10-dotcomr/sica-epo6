@@ -394,13 +394,16 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <div id="panel-lector" class="panel-perfil d-none">
  <div class="p-3 bg-light rounded-4 border mb-3 text-center">
  <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Lector Fijo - Control de Entradas y Salidas</h6>
- {{-- El modo (Entrada o Salida) se elige aquí en el sistema y lo usan la cámara y el lector físico. Por defecto: Entrada. --}}
- <div class="d-flex justify-content-center gap-2 mb-3 flex-wrap">
- <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-success px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
+ {{-- Por defecto el modo es AUTOMÁTICO: el sistema detecta el grupo del alumno y, según el horario del grupo, registra Entrada o Salida.
+      Los botones Entrada / Salida quedan solo como forzado manual (excepciones). --}}
+ <div class="d-flex justify-content-center gap-2 mb-1 flex-wrap">
+ <button onclick="setModoEscaneo('Auto')" id="btn-modo-auto" class="btn btn-vinotinto px-3 py-2 fw-semibold shadow-sm small">Automático</button>
+ <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
+ <p class="small text-muted mb-3">Automático: según el horario del grupo del alumno, el sistema registra solo si es entrada o salida.</p>
  <div class="camera-box-ref mb-2 border shadow-sm">
- <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Entrada</span> ] - Cámara apagada</span></div>
+ <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
  <div id="res-cam-fija" class="res-scan mb-2"></div>
@@ -528,10 +531,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-camara-orientador" class="p-3 bg-light rounded-4 border mb-4 text-center">
  <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Cámara de Escaneo (Entradas y Salidas)</h6>
  <!-- CAMBIO: cualquier orientador puede registrar entrada o salida de cualquier alumno -->
- <div class="d-flex justify-content-center gap-2 mb-3 flex-wrap">
- <button onclick="setModoOrient('Entrada')" id="btn-orient-entrada" class="btn btn-success px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
+ <div class="d-flex justify-content-center gap-2 mb-1 flex-wrap">
+ <button onclick="setModoOrient('Auto')" id="btn-orient-auto" class="btn btn-vinotinto px-3 py-2 fw-semibold shadow-sm small">Automático</button>
+ <button onclick="setModoOrient('Entrada')" id="btn-orient-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoOrient('Salida')" id="btn-orient-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
+ <p class="small text-muted mb-3">Automático: el sistema detecta el grupo del alumno y registra entrada o salida según su horario.</p>
  <div class="camera-box-ref mb-2 border shadow-sm">
  <div class="cam-ph text-center text-warning"><span class="d-block small">Escáner apagado</span></div>
  <div id="cam-orient" style="width:100%"></div>
@@ -1038,7 +1043,7 @@ function descargarEstadoServidor() {
   })
   .catch(() => { _descargandoEstado = false; });
 }
-let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Entrada';
+let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Auto';
 let filtro = null, credSel = null, idEditando = null, chartAsistencias = null, gradoSeleccionado = null;
 let turnoCred = 'Matutino'; // turno elegido en el Portal del Alumno (credenciales)
 let orientadorActivo = null; // {id, nombre} cuando el rol activo es 'orientador'
@@ -2559,9 +2564,10 @@ function iniciarScanner(el, modoFn) {
 }
 /* CAMBIO: el orientador elige si la cámara registra Entrada o Salida. Funciona con cualquier alumno,
  sin importar si es de su grupo (el registro busca por CURP en toda la base). */
-let modoOrient = 'Entrada';
+let modoOrient = 'Auto';
 function setModoOrient(m) {
  modoOrient = m;
+ $('#btn-orient-auto').toggleClass('btn-vinotinto', m === 'Auto').toggleClass('btn-outline-dark bg-white', m !== 'Auto');
  $('#btn-orient-entrada').toggleClass('btn-success', m === 'Entrada').toggleClass('btn-outline-dark bg-white', m !== 'Entrada');
  $('#btn-orient-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
 }
@@ -2596,14 +2602,41 @@ function guardarYPintarLuego() {   // varios escaneos seguidos se juntan en un s
  if (_guardarPend) return;
  _guardarPend = setTimeout(() => { _guardarPend = null; save(); renderTabla(); }, 0);
 }
+/* ---- Modo AUTOMÁTICO: Entrada o Salida según el horario del grupo del alumno (misma lógica que App\Support\MovimientoAutomatico en el servidor) ----
+   1. Ya tiene entrada y salida hoy -> no se registra nada más.
+   2. Ya tiene entrada y no salida  -> Salida (también salidas anticipadas con permiso).
+   3. Sin entrada y la hora ya está en el bloque de salida del grupo (30 min antes de su hora de salida) -> Salida.
+   4. Sin entrada en cualquier otro momento (antes del turno, a tiempo o con retardo) -> Entrada. */
+const MOV_AUTO = {salidaAntes: 30, repetida: 5, defecto: {Matutino: [430, 840], Vespertino: [790, 1200]}};
+function horarioAuto(a) {
+ const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)] || {}, ok = v => /^\d{1,2}:\d{2}/.test(v || '');
+ const e = ok(h.entrada) ? toMin(h.entrada) : null, s = ok(h.salida) ? toMin(h.salida) : null;
+ if (e === null || s === null || s <= e) return MOV_AUTO.defecto[a.turno] || MOV_AUTO.defecto.Matutino;
+ return [e, s];
+}
+function resolverMovimiento(a, r) {
+ const [e, s] = horarioAuto(a), ahora = toMin(horaAhora());
+ if (r.entrada && r.salida) return {error: a.nombre + ': la entrada y la salida de hoy ya estaban registradas'};
+ if (r.entrada) {
+  if (ahora - toMin(r.entrada) < MOV_AUTO.repetida) return {error: a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
+  return {modo: 'Salida'};
+ }
+ return {modo: ahora >= Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2)) ? 'Salida' : 'Entrada'};
+}
 function aplicarRegistro(a, modo) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
  const f = hoy(), r = a.reg[f] = a.reg[f] || {};
+ let auto = false;
+ if (modo === 'Auto') {
+  const d = resolverMovimiento(a, r);
+  if (d.error) return {ok:false, msg:d.error};
+  modo = d.modo; auto = true;
+ }
  if (modo === 'Entrada') {
  if (r.entrada) return {ok:false, msg:a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
  r.entrada = horaAhora();
  } else {
- if (!r.entrada) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};
+ if (!r.entrada && !auto) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};   // en automático sí se permite (salió sin haber escaneado la entrada)
  if (r.salida) return {ok:false, msg:a.nombre + ': la salida ya estaba registrada (' + h12(r.salida) + ')'};
  r.salida = horaAhora();
  }
@@ -2661,12 +2694,13 @@ function registrarDesconocido(curp, modo) {
 }
 function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
 /* ============ LECTOR FIJO ============ */
-// El modo (Entrada o Salida) se elige en el sistema con estos botones; lo usan la cámara y el lector físico.
+// Modo Automático (por defecto): Entrada o Salida según el horario del grupo. Los botones Entrada/Salida solo fuerzan el modo a mano.
 function setModoEscaneo(m) {
  modoEscaneo = m;
+ $('#btn-modo-auto').toggleClass('btn-vinotinto', m === 'Auto').toggleClass('btn-outline-dark bg-white', m !== 'Auto');
  $('#btn-modo-entrada').toggleClass('btn-success', m === 'Entrada').toggleClass('btn-outline-dark bg-white', m !== 'Entrada');
  $('#btn-modo-salida').toggleClass('btn-vinotinto', m === 'Salida').toggleClass('btn-outline-dark bg-white', m !== 'Salida');
- $('#lbl-modo').text(m);
+ $('#lbl-modo').text(m === 'Auto' ? 'Automático' : m);
 }
 let camFijaManual = true, camFijaError = 0;   // la cámara solo se enciende cuando alguien pulsa el botón
 function toggleCamaraFija() {
