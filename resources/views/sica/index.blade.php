@@ -329,15 +329,17 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <button onclick="setTurnoCred('Matutino')" id="btn-turno-cred-matutino" class="btn btn-vinotinto px-4 py-2 fw-semibold shadow-sm small">Matutino</button>
  <button onclick="setTurnoCred('Vespertino')" id="btn-turno-cred-vespertino" class="btn btn-outline-dark bg-white px-4 py-2 fw-semibold shadow-sm small">Vespertino</button>
  </div>
- <div class="row g-2 mb-4 justify-content-center">
+ {{-- Un clic abre la lista del grupo; otro clic al mismo grupo cierra la lista y regresa a la vista inicial para elegir otro grupo. --}}
+ <div class="row g-2 mb-2 justify-content-center">
  @foreach(['Primero','Segundo','Tercero'] as $i => $gr)
  @foreach([1,2,3,4] as $n)
  <div class="col-lg-2 col-md-3 col-sm-4">
- <button onclick="selCred({{ $i+1 }},{{ $n }})" class="btn btn-outline-dark w-100 py-2 bg-white fw-semibold border shadow-sm small">{{ $gr }} {{ $n }}</button>
+ <button onclick="clickGrupoCred({{ $i+1 }},{{ $n }})" data-g="{{ $i+1 }}-{{ $n }}" class="btn-grupo-cred btn btn-outline-dark w-100 py-2 bg-white fw-semibold border shadow-sm small">{{ $gr }} {{ $n }}</button>
  </div>
  @endforeach
  @endforeach
  </div>
+ <p id="txt-grupo-cred" class="small text-muted fw-semibold mb-4">Elige un grupo para ver sus alumnos y credenciales.</p>
  <div id="resultado-credencial-box" class="d-none p-4 bg-white rounded-3 border shadow-sm mb-3 col-md-10 mx-auto text-start">
  <div class="d-flex justify-content-between mb-3">
  <h6 class="fw-bold m-0 text-danger" id="titulo-grupo-credencial"></h6>
@@ -3649,8 +3651,26 @@ function setTurnoCred(t) {
  refrescarPreviewPlantillaOficial();    // cambia la vista previa de frente y reverso
  if (credSel) selCred(credSel.grado, credSel.grupo);
 }
+/* Clic en un grupo: abre su lista. Otro clic al MISMO grupo (con la lista abierta) la cierra y regresa a la vista inicial para elegir otro grupo.
+   (selCred, sin toggle, sigue siendo el que refresca la lista cuando cambian los datos.) */
+function clickGrupoCred(grado, grupo) {
+ const mismo = credSel && credSel.grado === grado && credSel.grupo === grupo;
+ if (mismo && !$('#resultado-credencial-box').hasClass('d-none')) cerrarGrupoCred();
+ else selCred(grado, grupo);
+}
+function cerrarGrupoCred() {
+ credSel = null; idEditando = null;
+ $('#resultado-credencial-box, #vista-editar-credencial-individual').addClass('d-none');
+ marcarGrupoCred();
+}
+function marcarGrupoCred() {
+ const k = credSel ? credSel.grado + '-' + credSel.grupo : '';
+ $('.btn-grupo-cred').each(function () { const on = this.dataset.g === k; $(this).toggleClass('btn-vinotinto text-white', on).toggleClass('btn-outline-dark bg-white', !on); });
+ $('#txt-grupo-cred').text(credSel ? 'Grupo abierto: ' + nomGrado[credSel.grado] + ' ' + credSel.grupo + '. Pulsa de nuevo el mismo grupo para cerrar la lista y elegir otro.' : 'Elige un grupo para ver sus alumnos y credenciales.');
+}
 function selCred(grado, grupo) {
  credSel = {grado:grado, grupo:grupo};
+ marcarGrupoCred();
  $('#titulo-grupo-credencial').text('Credenciales Digitales - ' + nomGrado[grado] + ' ' + grupo + ' (' + turnoCred + ')');
  $('#badge-plantilla').text('Plantilla ' + turnoCred);
  $('#vista-editar-credencial-individual').addClass('d-none'); $('#resultado-credencial-box').removeClass('d-none');
