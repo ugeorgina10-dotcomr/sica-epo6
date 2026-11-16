@@ -3535,7 +3535,7 @@ function subirPlantillaOficial(lado) {
   refrescarPreviewPlantillaOficial();
   if (idEditando) actualizarVistaPreviaCredencial();
   caja.removeClass('text-success text-danger').addClass('text-muted').text('Guardando en el servidor…');
-  // Cada turno es una subida; van en cola (pocas a la vez) y se reintentan si falla la red o el servidor
+  // La subida va en cola y se reintenta si falla la red o el servidor
   const subir = t => () => {
    const fd = new FormData();
    fd.append('archivo', envio, envio.name);
@@ -3550,7 +3550,8 @@ function subirPlantillaOficial(lado) {
     throw err;
    }));
   };
-  return SicaCompresion.cola(turnos.map(subir), {simultaneas: 2, reintentos: 2}).then(res => {
+  // Reverso para los dos turnos: el archivo se sube UNA sola vez ("Ambos") y el servidor lo guarda en los dos (antes se subía dos veces)
+  return SicaCompresion.cola([subir(turnos.length > 1 ? 'Ambos' : turnos[0])], {reintentos: 2}).then(res => {
    const fallo = res.find(x => !x.ok);
    if (fallo) throw fallo.error;
   }).then(() => {

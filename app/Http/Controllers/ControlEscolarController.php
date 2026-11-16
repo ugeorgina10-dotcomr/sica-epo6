@@ -64,7 +64,7 @@ class ControlEscolarController extends Controller
 
         $request->validate([
             'archivo' => 'required|file|max:20480|extensions:docx,pdf',
-            'turno'   => 'required|in:Matutino,Vespertino',
+            'turno'   => 'required|in:Matutino,Vespertino,Ambos',   // "Ambos": el reverso para los dos turnos con UNA sola subida
         ], [
             'archivo.extensions' => 'La plantilla debe ser un Word (.docx) o un PDF.',
             'archivo.max'        => 'El archivo pesa demasiado (máximo 20 MB).',
@@ -105,13 +105,22 @@ class ControlEscolarController extends Controller
             return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) ni un PDF válido.'], 422);
         }
 
-        $turno = $request->input('turno');
-        Ajuste::updateOrCreate(
-            ['clave' => self::clavePlantilla($turno, $lado)],
-            ['valor' => base64_encode($contenido)]
-        );
+        $turnos = $request->input('turno') === 'Ambos' ? ['Matutino', 'Vespertino'] : [$request->input('turno')];
+        $valor  = base64_encode($contenido);
+        unset($contenido);   // el archivo puede pesar varios MB: no se tiene en memoria dos veces
+        $ahora  = now();
+
+        foreach ($turnos as $turno) {
+            // Un solo INSERT ... ON CONFLICT/DUPLICATE KEY UPDATE: ya no se lee de la BD la plantilla anterior (varios MB) solo para reemplazarla.
+            // (Un turno por consulta: así cada una pesa lo mismo que antes y no se pasa del límite de tamaño del servidor de BD)
+            DB::table('ajustes')->upsert(
+                [['clave' => self::clavePlantilla($turno, $lado), 'valor' => $valor, 'created_at' => $ahora, 'updated_at' => $ahora]],
+                ['clave'],
+                ['valor', 'updated_at']
+            );
+        }
         // Las plantillas anteriores eran imágenes (.png): ya no se usan
-        Ajuste::where('clave', self::clavePlantillaImagenVieja($turno, $lado))->delete();
+        Ajuste::whereIn('clave', array_map(fn ($t) => self::clavePlantillaImagenVieja($t, $lado), $turnos))->delete();
 
         return response()->json(['ok' => true]);
     }
