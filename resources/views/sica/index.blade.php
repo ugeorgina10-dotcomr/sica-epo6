@@ -315,9 +315,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <button id="btn-restaurar-plantilla" class="btn btn-outline-dark btn-sm" onclick="restaurarPlantillaOficial()">
  Restaurar plantilla original
  </button>
- <button id="btn-eliminar-anterior" class="btn btn-outline-danger btn-sm" onclick="eliminarPlantillaAnterior()" title="Borra para siempre el archivo anterior (solo si ya subiste uno nuevo)">
- Eliminar plantilla anterior
- </button>
+ {{-- Lista de plantillas anteriores del turno elegido: se selecciona una y se elimina (solo aparecen las que ya tienen una nueva en uso) --}}
+ <div class="input-group input-group-sm" style="max-width:430px" title="Borra para siempre el archivo anterior (solo si ya subiste uno nuevo)">
+ <select id="sel-plantilla-anterior" class="form-select" aria-label="Plantilla anterior a eliminar"></select>
+ <button id="btn-eliminar-anterior" class="btn btn-outline-danger" onclick="eliminarPlantillaAnterior()">Eliminar</button>
+ </div>
  </div>
  <div id="resumen-plantilla-oficial" class="mt-2 small fw-semibold"></div>
  </div>
@@ -3477,13 +3479,23 @@ function revisarOriginales() {
    .catch(() => {})                         // sin internet: no se sabe, se deja como estaba
  )).then(actualizarBotonesPlantilla);
 }
+/* Lados (frente / reverso) del turno cuya plantilla anterior se puede eliminar: ya hay una nueva en uso y el Word anterior todavía existe */
+const ladosAnteriores = t => ['frente', 'reverso'].filter(l => origenPlantilla[t + '-' + l] === 'servidor' && existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
 function actualizarBotonesPlantilla() {
  const t = turnoCred || 'Matutino', lados = ['frente', 'reverso'];
  const hayOriginal = lados.some(l => existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
- const hayAnterior = lados.some(l => origenPlantilla[t + '-' + l] === 'servidor' && existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
+ const anteriores = ladosAnteriores(t), hayAnterior = anteriores.length > 0;
  $('#btn-restaurar-plantilla').prop('disabled', !hayOriginal)
   .attr('title', hayOriginal ? '' : 'La plantilla original ya fue eliminada, no se puede restaurar.');
- $('#btn-eliminar-anterior').prop('disabled', !hayAnterior)
+ // Lista de plantillas anteriores: se conserva lo que estaba seleccionado si sigue disponible
+ const sel = $('#sel-plantilla-anterior'), previa = sel.val();
+ const op = (v, txt) => '<option value="' + v + '">' + esc(txt) + '</option>';
+ sel.html(
+  op('', hayAnterior ? 'Selecciona la plantilla anterior…' : 'No hay plantilla anterior para eliminar') +
+  anteriores.map(l => op(l, (l === 'frente' ? 'Frente' : 'Reverso') + ' (' + ARCHIVOS_PLANTILLA[t][l] + ')')).join('') +
+  (anteriores.length > 1 ? op('todas', 'Frente y reverso') : '')
+ ).val(sel.find('option[value="' + previa + '"]').length ? previa : '');
+ sel.add('#btn-eliminar-anterior').prop('disabled', !hayAnterior)
   .attr('title', hayAnterior ? 'Borra para siempre el archivo anterior de este turno.' : 'Disponible cuando ya subiste una plantilla nueva y la anterior todavía existe.');
 }
 /* ============ PLANTILLA OFICIAL EDITABLE (solo Control Escolar) ============
@@ -3523,7 +3535,7 @@ function subirPlantillaOficial(lado) {
   refrescarPreviewPlantillaOficial();
   if (idEditando) actualizarVistaPreviaCredencial();
   caja.removeClass('text-success text-danger').addClass('text-muted').text('Guardando en el servidor…');
-  // Cada turno es una subida; van en cola (pocas a la vez) y se reintentan si falla la red o el servidor
+  // La subida va en cola y se reintenta si falla la red o el servidor
   const subir = t => () => {
    const fd = new FormData();
    fd.append('archivo', envio, envio.name);
@@ -3538,7 +3550,8 @@ function subirPlantillaOficial(lado) {
     throw err;
    }));
   };
-  return SicaCompresion.cola(turnos.map(subir), {simultaneas: 2, reintentos: 2}).then(res => {
+  // Reverso para los dos turnos: el archivo se sube UNA sola vez ("Ambos") y el servidor lo guarda en los dos (antes se subía dos veces)
+  return SicaCompresion.cola([subir(turnos.length > 1 ? 'Ambos' : turnos[0])], {reintentos: 2}).then(res => {
    const fallo = res.find(x => !x.ok);
    if (fallo) throw fallo.error;
   }).then(() => {
@@ -3566,14 +3579,16 @@ function restaurarPlantillaOficial() {
  const cab = {'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''};
  Promise.all(lados.map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers: cab}).catch(() => {})))
   .then(() => { plantillasDefault[t] = {frente: null, reverso: null}; cargarPlantillasDefault(true); });
- $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success').text('Se restauró la plantilla original del turno ' + t + ' en el servidor.');
+ $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success').text('Se restauró la plantilla original del turno ' + t);
 }
 /* Elimina PARA SIEMPRE la plantilla anterior (el Word original del servidor) del turno elegido.
    Solo se puede cuando ya hay una plantilla nueva en uso; la nueva no se toca. */
 function eliminarPlantillaAnterior() {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede eliminar la plantilla anterior.'); return; }
  const t = turnoCred || 'Matutino', caja = $('#resumen-plantilla-oficial');
- const lados = ['frente', 'reverso'].filter(l => origenPlantilla[t + '-' + l] === 'servidor' && existeOriginal[ARCHIVOS_PLANTILLA[t][l]] !== false);
+ const disponibles = ladosAnteriores(t), elegida = $('#sel-plantilla-anterior').val();
+ const lados = elegida === 'todas' ? disponibles : disponibles.filter(l => l === elegida);
+ if (disponibles.length && !lados.length) { alert('Selecciona en la lista cuál plantilla anterior quieres eliminar.'); return; }
  if (!lados.length) {
   const hayNueva = ['frente', 'reverso'].some(l => origenPlantilla[t + '-' + l] === 'servidor');
   alert(hayNueva ? 'La plantilla anterior del turno ' + t + ' ya fue eliminada.'
