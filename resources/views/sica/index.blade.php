@@ -608,7 +608,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <select id="select-rol-permiso" class="form-select form-select-sm">
  <option value="director">Director</option>
  <option value="subdirector">Subdirector</option>
- <option value="orientador">Orientador</option>
  </select>
  </div>
  <div class="col-md-5"><label class="form-label small">Tarea a realizar</label>
@@ -946,7 +945,7 @@ function fusionarServidor(s, inicioConsulta) {
  const oriProtegidos = _oriGuardando > 0 || _oriUltimoCambio > (inicioConsulta || 0);
  if (s.horarios && !oriProtegidos) db.horarios = s.horarios;
  if (s.orientadores && !oriProtegidos) db.orientadores = s.orientadores;
- if (s.permisos) db.permisos = s.permisos;
+ if (s.permisos) db.permisos = Object.assign({}, s.permisos, {orientador: 'editar'});   // el orientador siempre descarga listas y usa la cámara: ya no se configura aquí
  if (s.qrClave) db.qrClave = s.qrClave;
  localStorage.setItem(LS, JSON.stringify(db));
  if (corregidos && rolActivo === 'control' && !ES_MOVIL) setTimeout(guardarYa, 0);   // la corrección de nombres queda guardada en el servidor
@@ -2460,24 +2459,30 @@ let colaEscaneos = [];
 try { colaEscaneos = JSON.parse(localStorage.getItem(LS_COLA) || '[]'); } catch (e) { colaEscaneos = []; }
 if (!Array.isArray(colaEscaneos)) colaEscaneos = [];
 let _vaciandoCola = false;
+let _errCola = '';   // por qué no se están enviando los escaneos pendientes (se muestra en la barra de abajo)
 function guardarCola() {
  try { localStorage.setItem(LS_COLA, JSON.stringify(colaEscaneos)); } catch (e) {}
  pintarIndicadorCola();
 }
+/* Barra de escaneos pendientes: NO aparece en un envío normal. Solo se muestra si el escaneo más antiguo lleva más de
+   ESPERA_AVISO_COLA ms sin llegar al servidor, y dice el motivo. Desaparece sola cuando se envía. */
+const ESPERA_AVISO_COLA = 20000;
 function pintarIndicadorCola() {
  let el = document.getElementById('indicador-cola');
+ const n = colaEscaneos.length, atorado = n > 0 && (Date.now() - (colaEscaneos[0].ts || 0)) > ESPERA_AVISO_COLA;
+ if (!atorado) { if (el) el.style.display = 'none'; return; }
  if (!el) {
   if (!document.body) return;
   el = document.createElement('div'); el.id = 'indicador-cola';
-  el.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2000;padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:600;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;pointer-events:none';
+  el.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2000;max-width:92vw;text-align:center;padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:600;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;pointer-events:none';
   document.body.appendChild(el);
  }
- const n = colaEscaneos.length, sinRed = navigator.onLine === false;
- if (!n && !sinRed) { el.style.display = 'none'; return; }
+ const sinRed = navigator.onLine === false;
  el.style.background = sinRed ? '#b45309' : '#800020';
- el.textContent = (sinRed ? 'Sin conexión' : 'Enviando') + (n ? ' · ' + n + (n === 1 ? ' escaneo pendiente' : ' escaneos pendientes') : '');
+ el.textContent = (sinRed ? 'Sin conexión' : 'Enviando') + ' · ' + n + (n === 1 ? ' escaneo pendiente' : ' escaneos pendientes') + (_errCola && !sinRed ? ' · ' + _errCola : '');
  el.style.display = 'block';
 }
+setInterval(pintarIndicadorCola, 5000);   // revisa si algún escaneo ya lleva demasiado esperando
 function encolarEscaneo(curp, modo, fecha, hora) {
  colaEscaneos.push({id: generarId(), curp: curp, modo: modo, fecha: fecha, hora: hora, ts: Date.now(), diferido: false});
  guardarCola();
@@ -2503,15 +2508,15 @@ function vaciarCola() {
   }, 12000).then(r => {
    if (r.status === 419 && !reintentoCsrf) return refrescarCsrf().then(() => enviar(true, huboExito));
    if (r.status === 401) { terminar(huboExito); sesionExpirada(); return; }   // la cola se conserva hasta volver a iniciar sesión
-   if (r.ok) { colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
-   if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; return terminar(huboExito); }
+   if (r.ok) { _errCola = ''; colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
+   if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; return terminar(huboExito); }
    // 403 / 404 / 422: el servidor lo rechazó de forma definitiva -> se descarta para no atorar la cola
    colaEscaneos.shift(); guardarCola();
    return r.json().catch(() => ({})).then(d => {
     avisoPermiso('Un escaneo pendiente (' + it.curp + ') fue rechazado por el servidor: ' + ((d && d.mensaje) || 'error ' + r.status));
     return enviar(false, huboExito);
    });
-  }).catch(() => { it.diferido = true; terminar(huboExito); });   // sin conexión: se queda en la cola
+  }).catch(() => { it.diferido = true; _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); });   // sin conexión: se queda en la cola
  };
  enviar(false, false);
 }
@@ -3125,7 +3130,7 @@ function descargarReporte(formato) {
  const tp = tituloPeriodo(periodo, ref);
  const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
  const filas = [];
- filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && r.entrada) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:h12(r.entrada), Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
+ filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && (r.entrada || r.salida)) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
  descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */

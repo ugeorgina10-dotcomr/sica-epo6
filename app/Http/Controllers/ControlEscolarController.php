@@ -502,6 +502,7 @@ class ControlEscolarController extends Controller
         foreach (DB::table('permisos')->select('rol', 'tipo')->get() as $p) {
             $permisos[$p->rol] = $p->tipo;
         }
+        $permisos['orientador'] = 'editar';   // el orientador siempre descarga listas y usa la cámara (ya no se configura en Permisos y Roles)
 
         return [
             'qrClave'      => self::claveQr(),
@@ -675,6 +676,9 @@ class ControlEscolarController extends Controller
         }
 
         foreach ($permisos as $rol => $tipo) {
+            if ($rol === 'orientador') {
+                continue;   // siempre 'editar': no se guarda ni se puede cambiar
+            }
             Permiso::updateOrCreate(['rol' => $rol], ['tipo' => $tipo]);
         }
 
