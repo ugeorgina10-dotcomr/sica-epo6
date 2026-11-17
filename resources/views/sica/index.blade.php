@@ -2464,20 +2464,25 @@ function guardarCola() {
  try { localStorage.setItem(LS_COLA, JSON.stringify(colaEscaneos)); } catch (e) {}
  pintarIndicadorCola();
 }
+/* Barra de escaneos pendientes: NO aparece en un envío normal. Solo se muestra si el escaneo más antiguo lleva más de
+   ESPERA_AVISO_COLA ms sin llegar al servidor, y dice el motivo. Desaparece sola cuando se envía. */
+const ESPERA_AVISO_COLA = 20000;
 function pintarIndicadorCola() {
  let el = document.getElementById('indicador-cola');
+ const n = colaEscaneos.length, atorado = n > 0 && (Date.now() - (colaEscaneos[0].ts || 0)) > ESPERA_AVISO_COLA;
+ if (!atorado) { if (el) el.style.display = 'none'; return; }
  if (!el) {
   if (!document.body) return;
   el = document.createElement('div'); el.id = 'indicador-cola';
-  el.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2000;padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:600;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;pointer-events:none';
+  el.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:2000;max-width:92vw;text-align:center;padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:600;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:none;pointer-events:none';
   document.body.appendChild(el);
  }
- const n = colaEscaneos.length, sinRed = navigator.onLine === false;
- if (!n && !sinRed) { el.style.display = 'none'; return; }
+ const sinRed = navigator.onLine === false;
  el.style.background = sinRed ? '#b45309' : '#800020';
- el.textContent = (sinRed ? 'Sin conexión' : 'Enviando') + (n ? ' · ' + n + (n === 1 ? ' escaneo pendiente' : ' escaneos pendientes') : '') + (n && _errCola && !sinRed ? ' · ' + _errCola : '');
+ el.textContent = (sinRed ? 'Sin conexión' : 'Enviando') + ' · ' + n + (n === 1 ? ' escaneo pendiente' : ' escaneos pendientes') + (_errCola && !sinRed ? ' · ' + _errCola : '');
  el.style.display = 'block';
 }
+setInterval(pintarIndicadorCola, 5000);   // revisa si algún escaneo ya lleva demasiado esperando
 function encolarEscaneo(curp, modo, fecha, hora) {
  colaEscaneos.push({id: generarId(), curp: curp, modo: modo, fecha: fecha, hora: hora, ts: Date.now(), diferido: false});
  guardarCola();
