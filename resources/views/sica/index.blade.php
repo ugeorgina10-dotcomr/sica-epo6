@@ -608,7 +608,6 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <select id="select-rol-permiso" class="form-select form-select-sm">
  <option value="director">Director</option>
  <option value="subdirector">Subdirector</option>
- <option value="orientador">Orientador</option>
  </select>
  </div>
  <div class="col-md-5"><label class="form-label small">Tarea a realizar</label>
@@ -946,7 +945,7 @@ function fusionarServidor(s, inicioConsulta) {
  const oriProtegidos = _oriGuardando > 0 || _oriUltimoCambio > (inicioConsulta || 0);
  if (s.horarios && !oriProtegidos) db.horarios = s.horarios;
  if (s.orientadores && !oriProtegidos) db.orientadores = s.orientadores;
- if (s.permisos) db.permisos = s.permisos;
+ if (s.permisos) db.permisos = Object.assign({}, s.permisos, {orientador: 'editar'});   // el orientador siempre descarga listas y usa la cámara: ya no se configura aquí
  if (s.qrClave) db.qrClave = s.qrClave;
  localStorage.setItem(LS, JSON.stringify(db));
  if (corregidos && rolActivo === 'control' && !ES_MOVIL) setTimeout(guardarYa, 0);   // la corrección de nombres queda guardada en el servidor
