@@ -30,6 +30,11 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
 <link rel="prefetch" href="{{ asset('vendor/pdf.worker.min.js') }}">
 <style>
+/* Colores de los retardos: entrada = ámbar, salida = morado (distintos entre sí y del verde de asistencia y el gris de "sin registro") */
+.bg-ret-ent{background:#ffc107 !important;color:#212529 !important}
+.bg-ret-sal{background:#6f42c1 !important;color:#fff !important}
+.txt-ret-ent{color:#b58900;font-weight:700}
+.txt-ret-sal{color:#6f42c1;font-weight:700}
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
 /* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
 .bg-escuela{min-height:100vh;background-color:#757362 !important;background-position:center !important;background-size:cover !important;background-repeat:no-repeat !important;background-attachment:fixed !important;
@@ -524,7 +529,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
  <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
+ <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador, Turno (opcional), ToleranciaEntrada y ToleranciaSalida en minutos (opcionales; si no las pones se conservan las del grupo)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
  <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
  </div>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
@@ -569,7 +574,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <div class="table-responsive bg-white rounded-3 p-2 border shadow-sm mb-4">
  <table class="table table-striped table-hover align-middle mb-0 small">
- <thead class="table-dark"><tr><th>Matrícula / QR</th><th>Alumno</th><th>Grado</th><th>Grupo</th><th>Entrada</th><th>Salida</th><th>Permanencia</th><th>Estatus</th><th>Orientador(a)</th><th class="text-center">Acción</th></tr></thead>
+ <thead class="table-dark"><tr><th>Matrícula / QR</th><th>Alumno</th><th>Grado</th><th>Grupo</th><th>Entrada</th><th>Salida</th><th>Retardo entrada</th><th>Retardo salida</th><th>Estatus</th><th>Orientador(a)</th><th class="text-center">Acción</th></tr></thead>
  <tbody id="tabla-cuerpo-orientador"></tbody>
  </table>
  </div>
@@ -580,7 +585,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="row text-center mb-4 g-3">
  <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">TOTAL ALUMNOS</span><h3 class="fw-bold mb-0" id="st-total">0</h3></div></div>
  <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">ASISTENCIAS DE HOY</span><h3 class="fw-bold text-success mb-0" id="st-asis">0</h3></div></div>
- <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">RETARDOS Y PERMANENCIAS</span><h3 class="fw-bold text-primary mb-0" id="st-ret">0</h3></div></div>
+ <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">RETARDOS (ENTRADA Y SALIDA)</span><h3 class="fw-bold text-primary mb-0" id="st-ret">0</h3></div></div>
  </div>
  <div class="p-4 bg-white rounded-4 border shadow-sm mb-4">
  <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
@@ -767,7 +772,7 @@ const ordenPaneles = ['orientador','lector','alumno'];
 let db = JSON.parse(localStorage.getItem(LS) || 'null') || {
  permisos: {orientador:'editar', director:'ver', subdirector:'ver'},
  plantillas: {}, // claveGrupo -> {frente:{img,fmt}, reverso:{img,fmt}} (override opcional por grupo)
- horarios: {}, // claveGrupo ("Turno-grado-grupo") -> {entrada, salida, orientadorId}
+ horarios: {}, // claveGrupo ("Turno-grado-grupo") -> {entrada, salida, orientadorId, tolEntrada, tolSalida (minutos)}
  orientadores: [], // {id, nombre}
  alumnos: []
 };
@@ -1074,23 +1079,63 @@ const generarId = () => 'id_' + Date.now().toString(36) + Math.random().toString
 const LIM = {Matutino:{retardo:430,fin:840}, Vespertino:{retardo:790,fin:1200}}; // 7:10-14:00 / 13:10-20:00 (por defecto)
 const nomGrado = ['', 'Primero', 'Segundo', 'Tercero'];
 const ROMANOS = ['', 'I', 'II', 'III', 'IV']; // grupo en número romano para la credencial
+/* Tolerancia (minutos) de cada grupo: entrada = después de la hora límite sigue sin ser retardo (0 si no se configura);
+   salida = después de la hora de cierre sigue sin ser retardo (30 si no se configura: se escanea la salida justo después del cierre) */
+const TOL_DEF = {entrada: 0, salida: 30};
+const tolDe = (h, k, def) => (h && h[k] != null && h[k] !== '' && !isNaN(h[k])) ? Math.max(0, Number(h[k])) : def;
+/* retardo = hora límite de entrada + tolerancia de entrada; fin = hora de cierre + tolerancia de salida */
 function limiteDe(a) {
  const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)];
- if (h && h.entrada && h.salida) return {retardo: toMin(h.entrada), fin: toMin(h.salida)};
- return LIM[a.turno];
+ const te = tolDe(h, 'tolEntrada', TOL_DEF.entrada), ts = tolDe(h, 'tolSalida', TOL_DEF.salida);
+ if (h && h.entrada && h.salida) return {retardo: toMin(h.entrada) + te, fin: toMin(h.salida) + ts};
+ const d = LIM[a.turno] || LIM.Matutino;
+ return {retardo: d.retardo + te, fin: d.fin + ts};
+}
+/* Minutos de retraso del alumno ese día: en la entrada (llegó después del límite + tolerancia) y en la salida
+   (salió después del cierre + tolerancia, o hoy todavía no sale y ya pasó ese límite) */
+function retrasosDe(a, r, fecha) {
+ const res = {entrada: 0, salida: 0, sinSalida: false};
+ if (!r || !r.entrada) return res;
+ const l = limiteDe(a);
+ res.entrada = Math.max(0, toMin(r.entrada) - l.retardo);
+ if (r.salida) res.salida = Math.max(0, toMin(r.salida) - l.fin);
+ else if (fecha === hoy() && toMin(horaAhora()) > l.fin) { res.salida = toMin(horaAhora()) - l.fin; res.sinSalida = true; }
+ return res;
+}
+/* Para las estadísticas: cada alumno-día suma en Asistencias (sin ningún retardo) o en Retardo entrada y/o Retardo salida. Sin entrada = no vino. */
+function conteoDe(a, f) {
+ const r = a.reg[f];
+ if (!r || !r.entrada) return {as: 0, re: 0, rs: 0};
+ const t = retrasosDe(a, r, f), re = t.entrada > 0 ? 1 : 0, rs = t.salida > 0 ? 1 : 0;
+ return {as: (re || rs) ? 0 : 1, re: re, rs: rs};
+}
+/* Texto de las columnas "Retardo entrada" y "Retardo salida" (tabla, Excel y PDF). "—" = no vino. */
+function textoRetardo(a, r, f) {
+ if (!r || !r.entrada) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
+ const t = retrasosDe(a, r, f);
+ return {t: t,
+  ent: t.entrada > 0 ? '+' + t.entrada + ' min' : 'Sin retardo',
+  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (+' + t.salida + ' min)' : '+' + t.salida + ' min') : (r.salida ? 'Sin retardo' : 'Pendiente')};
+}
+function celdasRetardo(a, r, f) {
+ const x = textoRetardo(a, r, f);
+ return {ent: '<span class="' + (x.t.entrada > 0 ? 'txt-ret-ent' : 'text-muted small') + '">' + esc(x.ent) + '</span>',
+         sal: '<span class="' + (x.t.salida > 0 ? 'txt-ret-sal' : 'text-muted small') + '">' + esc(x.sal) + '</span>'};
 }
 function estatusDe(a, r, fecha) {
  if (!r || !r.entrada) return 'Sin registro';
- const l = limiteDe(a);
- if (!r.salida && fecha === hoy() && toMin(horaAhora()) > l.fin) return 'Permanencia';
- return toMin(r.entrada) > l.retardo ? 'Retardo' : 'Asistencia';
+ const t = retrasosDe(a, r, fecha);
+ if (t.entrada > 0 && t.salida > 0) return 'Retardo entrada y salida';
+ if (t.salida > 0) return 'Retardo salida';
+ return t.entrada > 0 ? 'Retardo entrada' : 'Asistencia';
 }
-function permDe(r) {
- if (!r || !r.entrada || !r.salida) return 'Pendiente';
- const d = toMin(r.salida) - toMin(r.entrada), h = Math.floor(d/60);
- return (h > 0 ? h+' h ' : '') + (d%60) + ' min';
+const claseEst = {'Asistencia':'bg-success','Retardo entrada':'bg-ret-ent','Retardo salida':'bg-ret-sal','Sin registro':'bg-secondary'};
+/* Insignia(s) del estatus; con retardo en la entrada Y en la salida se muestran las dos */
+function badgesEstatus(e) {
+ return e === 'Retardo entrada y salida'
+  ? '<span class="badge bg-ret-ent">Retardo entrada</span> <span class="badge bg-ret-sal">Retardo salida</span>'
+  : '<span class="badge ' + claseEst[e] + '">' + e + '</span>';
 }
-const claseEst = {'Asistencia':'bg-success','Retardo':'bg-warning text-dark','Permanencia':'bg-danger','Sin registro':'bg-secondary'};
 function diasDePeriodo(periodo, ref) {
  ref = ref || hoy();
  const d = new Date(ref + 'T12:00:00');
@@ -1446,12 +1491,14 @@ function renderListaHorarios() {
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
-   '<div class="col-md-5"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
+   '<div class="col-12 col-md-4"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
    '<div class="col-6 col-md-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
    '<div class="col-6 col-md-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
-   '<div class="col-md-3 d-flex flex-wrap gap-1">' +
+   '<div class="col-6 col-md-2"><label class="small text-muted d-block" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-6 col-md-2"><label class="small text-muted d-block" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-12 d-flex flex-wrap gap-1">' +
    '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
-   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
+   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
    '</div></div></div></div>';
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios del turno ' + esc(turnoActivo) + ' por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
@@ -1462,20 +1509,24 @@ function cargarHorarioInline(sel) {
  const it = $(sel).closest('.ori-hor'), h = db.horarios[sel.value] || {};
  _horSel[it.attr('data-o')] = sel.value;
  it.find('.hor-ent').val(h.entrada || ''); it.find('.hor-sal').val(h.salida || '');
+ it.find('.hor-tol-ent').val(tolDe(h, 'tolEntrada', TOL_DEF.entrada)); it.find('.hor-tol-sal').val(tolDe(h, 'tolSalida', TOL_DEF.salida));
 }
 /* Guarda la hora del grupo elegido en el renglón del orientador(a) */
 function guardarHorarioInline(btn) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede cambiar horarios.'); return; }
  const it = $(btn).closest('.ori-hor'), k = it.find('select').val();
  const e = it.find('.hor-ent').val(), s = it.find('.hor-sal').val();
+ const num = (v, d) => String(v).trim() === '' ? d : Number(v);   // vacío = valor por defecto
+ const te = num(it.find('.hor-tol-ent').val(), TOL_DEF.entrada), ts = num(it.find('.hor-tol-sal').val(), TOL_DEF.salida);
  if (!k || !db.horarios[k]) return;
+ if (![te, ts].every(v => Number.isInteger(v) && v >= 0 && v <= 180)) { alert('La tolerancia debe ser un número entero de minutos, de 0 a 180.'); return; }
  if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
  if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
- { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' y cierre a las ' + h12(s) + '.')) return; }
- db.horarios[k].entrada = e; db.horarios[k].salida = s;
+ { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' (tolerancia ' + te + ' min) y cierre a las ' + h12(s) + ' (tolerancia ' + ts + ' min).')) return; }
+ db.horarios[k].entrada = e; db.horarios[k].salida = s; db.horarios[k].tolEntrada = te; db.horarios[k].tolSalida = ts;
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
- $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + '.');
+ $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + ' · tolerancia de entrada ' + te + ' min, de salida ' + ts + ' min.');
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -1483,7 +1534,7 @@ function quitarHorarioGrupo(k) {
  const h = db.horarios[k]; if (!h) return;
  const c = parseClave(k);
  if (!confirm('¿Quitar el horario del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Volverá a usar el horario predeterminado. El orientador(a) no se modifica.')) return;
- h.entrada = ''; h.salida = '';
+ h.entrada = ''; h.salida = ''; h.tolEntrada = TOL_DEF.entrada; h.tolSalida = TOL_DEF.salida;
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
 }
 /* Quita a un orientador de UN grupo (conserva el horario del grupo y sus demás grupos). */
@@ -2523,13 +2574,13 @@ function vaciarCola() {
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
 const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
-/* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (en la salida, también la permanencia) */
+/* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (y el retardo de entrada o de salida, si lo hubo) */
 function detalleRegistro(tipo, a, hora, extra) {
  // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
  let ori = '';
  try { const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null; ori = o ? o.nombre : ''; } catch (e) {}
  return tipo + ' registrada: ' + a.nombre + ' · ' + (nomGrado[a.grado] || a.grado) + ' grado · Grupo ' + (ROMANOS[a.grupo] || a.grupo) +
-  ' · ' + a.turno + (ori ? ' · Orientador(a): ' + ori : '') + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · Permanencia: ' + extra : '');
+  ' · ' + a.turno + (ori ? ' · Orientador(a): ' + ori : '') + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · ' + extra : '');
 }
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
@@ -2657,7 +2708,9 @@ function aplicarRegistro(a, modo) {
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
  guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
- return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), modo === 'Salida' ? permDe(r) : '') +
+ const tr = retrasosDe(a, r, f);
+ const extraRet = modo === 'Entrada' ? (tr.entrada > 0 ? 'Retardo de entrada: ' + tr.entrada + ' min' : '') : (tr.salida > 0 ? 'Retardo de salida: ' + tr.salida + ' min' : '');
+ return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), extraRet) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 /* Índice código-del-QR -> alumno. Antes, cada lectura calculaba el código (un hash) de los alumnos uno por uno hasta dar con el correcto;
@@ -2808,7 +2861,7 @@ function actualizarTextosTurno() {
  $('.txt-turno-activo').text(t);
  $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa ' + t + ')');
  $('#lbl-archivo-lista').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): CURP y nombre');
- $('#lbl-archivo-horarios').text('Archivo de horarios del turno ' + t + ' (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa ' + t + ')');
+ $('#lbl-archivo-horarios').text('Archivo de horarios del turno ' + t + ' (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador, Turno (opcional; si no lo pones se usa ' + t + '), ToleranciaEntrada y ToleranciaSalida en minutos (opcionales)');
 }
 function pintarBotonesTurno() {
  const t = turnoActivo;
@@ -2903,9 +2956,9 @@ function nombreOrientadorDe(a) {
 function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
- const r = a.reg[f] || {}, e = estatusDe(a, r, f), dis = (!r.entrada || r.salida || f !== hoy()) ? 'disabled' : '';
- return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${permDe(r)}</td><td><span class="badge ${claseEst[e]}">${e}</span></td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
- }).join('') || '<tr><td colspan="10" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
+ const r = a.reg[f] || {}, e = estatusDe(a, r, f), rt = celdasRetardo(a, r, f), dis = (!r.entrada || r.salida || f !== hoy()) ? 'disabled' : '';
+ return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
+ }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
  renderStats();
@@ -3073,7 +3126,7 @@ function subirHorarios() {
  leerFilasVarios(inp, ['xlsx', 'xls', 'csv'], r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
   rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
   if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
-  if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador y Turno (opcional).'); return; }
+  if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador, Turno (opcional), ToleranciaEntrada y ToleranciaSalida (opcionales).'); return; }
   let aplicados = 0, orientadoresNuevos = 0;
   const porTurno = {Matutino: 0, Vespertino: 0};
   const avisos = [];
@@ -3083,6 +3136,8 @@ function subirHorarios() {
    const entrada = horaDe(r[2]), salida = horaDe(r[3]);
    const nombreO = r[4] == null ? '' : String(r[4]).replace(/\s+/g, ' ').trim();
    const turnoTxt = r[5] == null ? '' : String(r[5]).trim();
+   const tolDeCelda = v => { if (v == null || String(v).trim() === '') return null; const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? null : Math.min(180, n); };
+   const tolE = tolDeCelda(r[6]), tolS = tolDeCelda(r[7]);   // opcionales: sin valor se conserva la tolerancia que ya tenía el grupo
    if (grado < 1 || grado > 3 || grupo < 1 || grupo > 4) { avisos.push(etq + ': grado o grupo no válido (grado 1 a 3, grupo 1 a 4); se omitió.'); return; }
    if (!entrada || !salida) { avisos.push(etq + ': hora de entrada o de salida no válida (usa por ejemplo 07:10 o 1:10 PM); se omitió.'); return; }
    if (toMin(salida) <= toMin(entrada)) { avisos.push(etq + ': la hora de cierre debe ser posterior a la de entrada; se omitió.'); return; }
@@ -3097,7 +3152,8 @@ function subirHorarios() {
    turnos.forEach(turno => {
     const clave = claveGrupo(grado, grupo, turno), previo = db.horarios[clave] || {};
     // si el archivo no trae orientador(a), se conserva el que ya tenía el grupo
-    db.horarios[clave] = {entrada: entrada, salida: salida, orientadorId: orientadorId || previo.orientadorId || ''};
+    db.horarios[clave] = {entrada: entrada, salida: salida, orientadorId: orientadorId || previo.orientadorId || '',
+     tolEntrada: tolE !== null ? tolE : tolDe(previo, 'tolEntrada', TOL_DEF.entrada), tolSalida: tolS !== null ? tolS : tolDe(previo, 'tolSalida', TOL_DEF.salida)};
     aplicados++; porTurno[turno]++;
    });
   });
@@ -3130,7 +3186,7 @@ function descargarReporte(formato) {
  const tp = tituloPeriodo(periodo, ref);
  const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
  const filas = [];
- filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && (r.entrada || r.salida)) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
+ filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && (r.entrada || r.salida)) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', 'Retardo entrada':textoRetardo(a, r, f).ent, 'Retardo salida':textoRetardo(a, r, f).sal, Estatus:estatusDe(a, r, f)}); }));
  descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
@@ -3139,11 +3195,11 @@ function statsGrados(periodo) {
  const dias = diasDePeriodo(periodo);
  return [1,2,3].map(g => {
  const l = db.alumnos.filter(a => a.grado === g);
- let as = 0, re = 0, pe = 0;
- l.forEach(a => dias.forEach(f => { const e = estatusDe(a, a.reg[f], f); if (e === 'Asistencia') as++; else if (e === 'Retardo') re++; else if (e === 'Permanencia') pe++; }));
+ let as = 0, re = 0, rs = 0;
+ l.forEach(a => dias.forEach(f => { const x = conteoDe(a, f); as += x.as; re += x.re; rs += x.rs; }));
  const base = l.length * dias.length;
  const p = n => base ? Math.round(n*100/base) : 0;
- return {Grado:g + '° grado', gradoNum:g, Alumnos:l.length, Asistencias:as, '% Asistencias':p(as), Retardos:re, '% Retardos':p(re), Permanencias:pe};
+ return {Grado:g + '° grado', gradoNum:g, Alumnos:l.length, Asistencias:as, '% Asistencias':p(as), 'Retardo entrada':re, '% Retardo entrada':p(re), 'Retardo salida':rs, '% Retardo salida':p(rs)};
  });
 }
 /* Comparativa por grupo de un grado. Incluye los grupos de ambos turnos
@@ -3154,11 +3210,11 @@ function statsPorGrupo(grado, periodo) {
  ['Matutino','Vespertino'].forEach(turno => [1,2,3,4].forEach(grupo => {
  const l = db.alumnos.filter(a => a.grado === grado && a.grupo === grupo && a.turno === turno);
  if (!l.length && turno === 'Vespertino') return;
- let as = 0, re = 0, pe = 0;
- l.forEach(a => dias.forEach(f => { const e = estatusDe(a, a.reg[f], f); if (e === 'Asistencia') as++; else if (e === 'Retardo') re++; else if (e === 'Permanencia') pe++; }));
+ let as = 0, re = 0, rs = 0;
+ l.forEach(a => dias.forEach(f => { const x = conteoDe(a, f); as += x.as; re += x.re; rs += x.rs; }));
  const h = db.horarios[claveGrupo(grado, grupo, turno)] || {};
  const orientadorNombre = h.orientadorId ? ((db.orientadores.find(o => o.id === h.orientadorId) || {}).nombre || 'Sin asignar') : 'Sin asignar';
- res.push({turno:turno, grupo:grupo, asistencias:as, retardos:re, permanencias:pe, alumnos:l.length, orientador: orientadorNombre});
+ res.push({turno:turno, grupo:grupo, asistencias:as, retardosEntrada:re, retardosSalida:rs, alumnos:l.length, orientador: orientadorNombre});
  }));
  return res;
 }
@@ -3168,12 +3224,12 @@ function renderStats() {
  const s = statsGrados(periodo), sum = k => s.reduce((t, x) => t + x[k], 0), tot = sum('Alumnos');
  $('#st-total').text(tot);
  $('#st-asis').text(sum('Asistencias') + ' (' + (tot ? Math.round(sum('Asistencias')*100/tot) : 0) + '%)');
- $('#st-ret').text((sum('Retardos') + sum('Permanencias')) + ' (' + (tot ? Math.round((sum('Retardos') + sum('Permanencias'))*100/tot) : 0) + '%)');
+ $('#st-ret').text((sum('Retardo entrada') + sum('Retardo salida')) + ' (' + (tot ? Math.round((sum('Retardo entrada') + sum('Retardo salida'))*100/tot) : 0) + '%)');
  $('#stats-grados').html(s.map(x => `<div class="col-md-4"><button id="btn-grado-${x.gradoNum}" onclick="seleccionarGrado(${x.gradoNum})" class="btn tarjeta-grado p-3 border rounded-3 bg-light w-100 text-center" title="Selecciona este grado y usa Excel o PDF (arriba) para descargar su comparativa">
  <span class="fw-bold small d-block text-secondary">${x.Grado}</span>
  <span class="text-success fw-bold d-block">Asistencias: ${x['% Asistencias']}% (${x.Asistencias} de ${x.Alumnos})</span>
- <span class="text-warning fw-bold d-block">Retardos: ${x['% Retardos']}% (${x.Retardos})</span>
- <span class="text-danger fw-bold d-block">Permanencia: ${x.Permanencias} alumnos</span>
+ <span class="fw-bold d-block" style="color:#b58900">Retardo entrada: ${x['% Retardo entrada']}% (${x['Retardo entrada']})</span>
+ <span class="fw-bold d-block" style="color:#6f42c1">Retardo salida: ${x['% Retardo salida']}% (${x['Retardo salida']})</span>
  </button></div>`).join(''));
  actualizarBotonesGrado();
  dibujarGraficaAsistencias(s);
@@ -3192,8 +3248,8 @@ function dibujarGraficaAsistencias(s) {
  if (!ctx || typeof Chart === 'undefined') return;
  const data = { labels: s.map(x => x.Grado), datasets: [
  {label:'Asistencias', data: s.map(x => x.Asistencias), backgroundColor:'#198754'},
- {label:'Retardos', data: s.map(x => x.Retardos), backgroundColor:'#ffc107'},
- {label:'Permanencias', data: s.map(x => x.Permanencias), backgroundColor:'#dc3545'}
+ {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#ffc107'},
+ {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#6f42c1'}
  ]};
  const titulo = 'Estadísticas de asistencia - ' + tituloPeriodo($('#sel-periodo-stats').val() || 'hoy');
  if (!libsOk('Chart')) return;
@@ -3221,14 +3277,14 @@ function cfgGraficaGeneral(s, titulo) {
  return {type:'bar',
  data:{labels: s.map(x => x.Grado), datasets:[
  {label:'Asistencias', data: s.map(x => x.Asistencias), backgroundColor:'#198754'},
- {label:'Retardos', data: s.map(x => x.Retardos), backgroundColor:'#ffc107'},
- {label:'Permanencias', data: s.map(x => x.Permanencias), backgroundColor:'#dc3545'}]},
+ {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#ffc107'},
+ {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#6f42c1'}]},
  options:{ plugins:{ legend:{position:'bottom'}, title:{display:true, text:titulo, font:{size:15, weight:'bold'}, color:'#800020'} },
  scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
 }
 function cfgGraficaGrupo(grado, g) {
  return {type:'bar',
- data:{ labels:['Asistencias','Retardos','Permanencias'], datasets:[{ data:[g.asistencias,g.retardos,g.permanencias], backgroundColor:['#198754','#ffc107','#dc3545'] }] },
+ data:{ labels:['Asistencias','Retardo entrada','Retardo salida'], datasets:[{ data:[g.asistencias,g.retardosEntrada,g.retardosSalida], backgroundColor:['#198754','#ffc107','#6f42c1'] }] },
  options:{ plugins:{ legend:{display:false}, title:{display:true, text:nomGrado[grado]+' '+g.grupo+' ('+g.turno+') — Orientador(a): '+g.orientador, font:{size:15, weight:'bold'}, color:'#800020'} },
  scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
 }
@@ -3271,7 +3327,7 @@ async function descargarGraficas(formato) {
  const tp = tituloPeriodo(periodo);
  if (formato === 'Excel') {
  if (!libsOk('Chart')) return;
- const filas = s.map(x => ({Grado:x.Grado, Alumnos:x.Alumnos, Asistencias:x.Asistencias, '% Asistencias':x['% Asistencias'], Retardos:x.Retardos, '% Retardos':x['% Retardos'], Permanencias:x.Permanencias}));
+ const filas = s.map(x => ({Grado:x.Grado, Alumnos:x.Alumnos, Asistencias:x.Asistencias, '% Asistencias':x['% Asistencias'], 'Retardo entrada':x['Retardo entrada'], '% Retardo entrada':x['% Retardo entrada'], 'Retardo salida':x['Retardo salida'], '% Retardo salida':x['% Retardo salida']}));
  const im = imagenDeGrafica(cfgGraficaGeneral(s, 'Estadísticas de asistencia - ' + tp), 800, 420);
  await descargarExcelConGraficas('estadisticas_' + hoy(), 'Estadísticas de asistencia - ' + tp, filas, [im]);
  return;
@@ -3287,14 +3343,14 @@ async function descargarGraficas(formato) {
  d.addImage(img, 'PNG', 14, 22, imgW, imgH);
  startY = 22 + imgH + 8;
  }
- const k = ['Grado','Alumnos','Asistencias','% Asistencias','Retardos','% Retardos','Permanencias'];
+ const k = ['Grado','Alumnos','Asistencias','% Asistencias','Retardo entrada','% Retardo entrada','Retardo salida','% Retardo salida'];
  d.autoTable({head:[k], body: s.map(o => k.map(x => o[x])), startY: startY, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]}});
  d.save('estadisticas_' + hoy() + '.pdf');
  } catch (e) { console.error(e); alert('No se pudo generar el archivo: ' + (e && e.message ? e.message : e)); }
 }
 /* Tabla de la comparativa de un grado (las mismas columnas en el Excel y en el PDF) */
 function filasComparativaGrado(grado, datos) {
- return datos.map(g => ({Grupo: nomGrado[grado] + ' ' + g.grupo, Turno: g.turno, 'Orientador(a)': g.orientador, Alumnos: g.alumnos, Asistencias: g.asistencias, Retardos: g.retardos, Permanencias: g.permanencias}));
+ return datos.map(g => ({Grupo: nomGrado[grado] + ' ' + g.grupo, Turno: g.turno, 'Orientador(a)': g.orientador, Alumnos: g.alumnos, Asistencias: g.asistencias, 'Retardo entrada': g.retardosEntrada, 'Retardo salida': g.retardosSalida}));
 }
 function descargarComparativaGradoPDF(grado) {
  if (!libsOk('Chart')) return;
@@ -4021,12 +4077,13 @@ function programarConsulta() {
 var _canalEstado = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_estado') : null;
 function avisarEstado() { try { if (_canalEstado) _canalEstado.postMessage(Date.now()); } catch (e) {} }
 if (_canalEstado) _canalEstado.onmessage = () => { if (rolActivo) { acelerarSync(); cargarDesdeServidor(); } };
-/* "Permanencia": un alumno sin salida pasa a ese estatus cuando LLEGA la hora de fin de su grupo, aunque no entre ningún dato nuevo.
-   Cada 20 s se revisa si se cruzó alguna hora de fin y, solo entonces, se vuelve a dibujar la tabla. */
+/* "Retardo salida": un alumno sin salida pasa a ese estatus cuando se pasa la hora de cierre de su grupo MÁS su tolerancia de salida, aunque no entre ningún dato nuevo.
+   Cada 20 s se revisa si se cruzó alguna de esas horas y, solo entonces, se vuelve a dibujar la tabla. */
 var _minutoPerm = null;
 function horasFinDeHoy() {
- const f = new Set(Object.values(LIM).map(x => x.fin));
- Object.values(db.horarios || {}).forEach(h => { if (h && h.entrada && h.salida) f.add(toMin(h.salida)); });
+ // +1: el retardo de salida empieza UN minuto después del límite (cierre + tolerancia)
+ const f = new Set(Object.values(LIM).map(x => x.fin + TOL_DEF.salida + 1));
+ Object.values(db.horarios || {}).forEach(h => { if (h && h.entrada && h.salida) f.add(toMin(h.salida) + tolDe(h, 'tolSalida', TOL_DEF.salida) + 1); });
  return f;
 }
 function cruzoHoraFin(antes, ahora, fines) { for (const m of fines) if (antes < m && ahora >= m) return true; return false; }

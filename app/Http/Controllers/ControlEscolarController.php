@@ -281,7 +281,7 @@ class ControlEscolarController extends Controller
 
         $hora      = $ahora->format('H:i');
         $fechaHora = $ahora->format('Y-m-d H:i:00');
-        $grupo     = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida')->find($alumno->grupo_id);
+        $grupo     = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada')->find($alumno->grupo_id);
 
         $modo = $d['modo'] ?? 'Auto';
 
@@ -309,8 +309,9 @@ class ControlEscolarController extends Controller
             $estatus = 'Salida';
         } else {
             // El retardo se calcula con el horario del grupo DEL ALUMNO
-            $estatus = ($grupo && $grupo->hora_entrada && $hora > substr($grupo->hora_entrada, 0, 5))
-                ? 'Retardo' : 'Asistencia';
+            // (hora límite de entrada + tolerancia de entrada del grupo)
+            $limite  = $grupo ? $grupo->limiteEntrada() : null;
+            $estatus = ($limite && $hora > $limite) ? 'Retardo' : 'Asistencia';
         }
 
         // Una salida en el mismo minuto que la entrada no debe pisarla: se anota un minuto después
@@ -440,7 +441,7 @@ class ControlEscolarController extends Controller
     private function construirEstado(): array
     {
         $grupos = DB::table('grupos')
-            ->select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'orientador_id')
+            ->select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida', 'orientador_id')
             ->get()->keyBy('id');
 
         // Entrada (la más temprana) y salida (la más tardía) por alumno y día.
@@ -475,6 +476,8 @@ class ControlEscolarController extends Controller
                 'entrada'      => $g->hora_entrada ? substr($g->hora_entrada, 0, 5) : '',
                 'salida'       => $g->hora_salida ? substr($g->hora_salida, 0, 5) : '',
                 'orientadorId' => $g->orientador_id ? (string) $g->orientador_id : '',
+                'tolEntrada'   => (int) $g->tolerancia_entrada,
+                'tolSalida'    => (int) $g->tolerancia_salida,
             ];
         }
 
@@ -765,7 +768,7 @@ class ControlEscolarController extends Controller
     private function guardarHorarios(array $horarios, array $mapaOrientadores): void
     {
         // Todos los grupos en una sola consulta, sin las plantillas (son imágenes pesadas)
-        $existentes = Grupo::select('id', 'grado', 'nombre', 'turno', 'hora_entrada', 'hora_salida', 'orientador_id')->get()->keyBy(fn ($g) => $g->grado . '|' . $g->nombre . '|' . $g->turno);
+        $existentes = Grupo::select('id', 'grado', 'nombre', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida', 'orientador_id')->get()->keyBy(fn ($g) => $g->grado . '|' . $g->nombre . '|' . $g->turno);
 
         foreach ($horarios as $clave => $h) {
             [$grado, , $nombre, $turno] = $this->datosDeClave($clave);
@@ -775,6 +778,13 @@ class ControlEscolarController extends Controller
             // Un grupo puede tener orientador sin horario todavía: la hora vacía se guarda como NULL
             $grupo->hora_entrada = $this->horaValida($h['entrada'] ?? null);
             $grupo->hora_salida = $this->horaValida($h['salida'] ?? null);
+            // Solo si el navegador las manda (una copia vieja guardada en el equipo no debe borrar la tolerancia ya configurada)
+            if (array_key_exists('tolEntrada', $h)) {
+                $grupo->tolerancia_entrada = $this->toleranciaValida($h['tolEntrada'], 0);
+            }
+            if (array_key_exists('tolSalida', $h)) {
+                $grupo->tolerancia_salida = $this->toleranciaValida($h['tolSalida'], 30);
+            }
             $grupo->orientador_id = (!empty($h['orientadorId']) && isset($mapaOrientadores[$h['orientadorId']]))
                 ? $mapaOrientadores[$h['orientadorId']]
                 : null;
@@ -795,6 +805,16 @@ class ControlEscolarController extends Controller
         }
 
         return trim($hora);
+    }
+
+    /** Tolerancia en minutos: entero de 0 a 180; si viene vacía o inválida se usa el valor por defecto */
+    private function toleranciaValida(mixed $min, int $defecto): int
+    {
+        if ($min === null || $min === '' || !is_numeric($min)) {
+            return $defecto;
+        }
+
+        return max(0, min(180, (int) $min));
     }
 
     /** Plantillas (frente/reverso) propias de cada grupo (opcional, ya casi no se usa) */
@@ -865,7 +885,7 @@ class ControlEscolarController extends Controller
             $k           = $turno . '|' . $nombreGrupo;
 
             // El grupo se identifica por grado + nombre + TURNO; se busca/crea una sola vez por grupo
-            $gruposCache[$k] ??= Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada')
+            $gruposCache[$k] ??= Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'tolerancia_entrada')
                 ->firstOrCreate(['grado' => $grado, 'nombre' => $nombreGrupo, 'turno' => $turno]);
             $grupo  = $gruposCache[$k];
             $nombre = mb_substr((string) ($a['nombre'] ?? ''), 0, 150);
@@ -984,7 +1004,7 @@ class ControlEscolarController extends Controller
 
         $existentes = Alumno::whereIn('matricula', $curps)->get(['id', 'matricula', 'grupo_id'])->keyBy('matricula');
         $porClave   = Alumno::whereIn('client_key', $claves)->get(['id', 'client_key', 'grupo_id'])->keyBy('client_key');
-        $grupos     = Grupo::select('id', 'hora_entrada')
+        $grupos     = Grupo::select('id', 'hora_entrada', 'tolerancia_entrada')
             ->whereIn('id', $existentes->pluck('grupo_id')->merge($porClave->pluck('grupo_id'))->unique())->get()->keyBy('id');
 
         $pares = [];
@@ -1019,7 +1039,7 @@ class ControlEscolarController extends Controller
             if (!is_array($reg)) {
                 continue;
             }
-            $horaLimite = ($grupo && $grupo->hora_entrada) ? substr($grupo->hora_entrada, 0, 5) : null;
+            $horaLimite = $grupo ? $grupo->limiteEntrada() : null;   // hora límite + tolerancia de entrada
 
             foreach ($reg as $fecha => $r) {
                 if (!$esFecha($fecha) || !is_array($r)) {
