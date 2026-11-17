@@ -3130,7 +3130,7 @@ function descargarReporte(formato) {
  const tp = tituloPeriodo(periodo, ref);
  const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
  const filas = [];
- filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && r.entrada) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:h12(r.entrada), Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
+ filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && (r.entrada || r.salida)) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
  descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
