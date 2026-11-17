@@ -2459,6 +2459,7 @@ let colaEscaneos = [];
 try { colaEscaneos = JSON.parse(localStorage.getItem(LS_COLA) || '[]'); } catch (e) { colaEscaneos = []; }
 if (!Array.isArray(colaEscaneos)) colaEscaneos = [];
 let _vaciandoCola = false;
+let _errCola = '';   // por qué no se están enviando los escaneos pendientes (se muestra en la barra de abajo)
 function guardarCola() {
  try { localStorage.setItem(LS_COLA, JSON.stringify(colaEscaneos)); } catch (e) {}
  pintarIndicadorCola();
@@ -2474,7 +2475,7 @@ function pintarIndicadorCola() {
  const n = colaEscaneos.length, sinRed = navigator.onLine === false;
  if (!n && !sinRed) { el.style.display = 'none'; return; }
  el.style.background = sinRed ? '#b45309' : '#800020';
- el.textContent = (sinRed ? 'Sin conexión' : 'Enviando') + (n ? ' · ' + n + (n === 1 ? ' escaneo pendiente' : ' escaneos pendientes') : '');
+ el.textContent = (sinRed ? 'Sin conexión' : 'Enviando') + (n ? ' · ' + n + (n === 1 ? ' escaneo pendiente' : ' escaneos pendientes') : '') + (n && _errCola && !sinRed ? ' · ' + _errCola : '');
  el.style.display = 'block';
 }
 function encolarEscaneo(curp, modo, fecha, hora) {
@@ -2502,15 +2503,15 @@ function vaciarCola() {
   }, 12000).then(r => {
    if (r.status === 419 && !reintentoCsrf) return refrescarCsrf().then(() => enviar(true, huboExito));
    if (r.status === 401) { terminar(huboExito); sesionExpirada(); return; }   // la cola se conserva hasta volver a iniciar sesión
-   if (r.ok) { colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
-   if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; return terminar(huboExito); }
+   if (r.ok) { _errCola = ''; colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
+   if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; return terminar(huboExito); }
    // 403 / 404 / 422: el servidor lo rechazó de forma definitiva -> se descarta para no atorar la cola
    colaEscaneos.shift(); guardarCola();
    return r.json().catch(() => ({})).then(d => {
     avisoPermiso('Un escaneo pendiente (' + it.curp + ') fue rechazado por el servidor: ' + ((d && d.mensaje) || 'error ' + r.status));
     return enviar(false, huboExito);
    });
-  }).catch(() => { it.diferido = true; terminar(huboExito); });   // sin conexión: se queda en la cola
+  }).catch(() => { it.diferido = true; _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); });   // sin conexión: se queda en la cola
  };
  enviar(false, false);
 }

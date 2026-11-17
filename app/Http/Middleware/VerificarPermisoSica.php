@@ -55,8 +55,11 @@ class VerificarPermisoSica
             return $this->denegar('Acción no permitida.');
         }
 
-        $tipo = Permiso::where('rol', $usuario->rol)->value('tipo')
-            ?? (self::PERMISO_DEFAULT[$usuario->rol] ?? 'ver');
+        // El orientador siempre puede escanear y descargar listas (ya no se configura en Permisos y Roles):
+        // así un permiso 'ver' viejo guardado en la base de datos no le bloquea los registros.
+        $tipo = $usuario->rol === 'orientador'
+            ? 'editar'
+            : (Permiso::where('rol', $usuario->rol)->value('tipo') ?? (self::PERMISO_DEFAULT[$usuario->rol] ?? 'ver'));
 
         if ($tipo !== 'editar') {
             return $this->denegar('Tu rol solo tiene permiso de visualización.');
