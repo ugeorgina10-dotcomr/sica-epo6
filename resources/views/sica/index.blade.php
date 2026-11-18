@@ -551,7 +551,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
  <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
+ <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno, en cualquier orden (el turno es opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
  <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
  </div>
  <div id="resumen-orientadores" class="small text-muted"></div>
@@ -1421,13 +1421,43 @@ const turnoDe = v => /ambos|ambas|mixto/i.test(String(v)) ? 'Ambos' : /vesp/i.te
 /* Una fila del archivo -> {nombre, grado, grupo, turno}.
    Excel/CSV: columnas Nombre | Grado | Grupo | Turno (opcional).
    PDF o una sola columna: "Nombre ... 1 2 Matutino" al final de la línea (el turno es opcional). */
-function leerFilaOrientador(r) {
- let nombre = String(r[0] == null ? '' : r[0]).trim(), grado = 0, grupo = 0, turno = '';
- const hayMasColumnas = r.slice(1).some(x => x != null && String(x).trim() !== '');
- if (hayMasColumnas) {
-  grado = numeroDe(r[1]); grupo = numeroDe(r[2]);
-  if (r[3] != null && String(r[3]).trim()) turno = turnoDe(r[3]);
+/* Las columnas pueden venir en CUALQUIER orden (Grado | Grupo | Nombre, Nombre | Grado | Grupo, etc.):
+   - si el archivo trae encabezados (Grado, Grupo, Turno), se usan para saber cuál es cuál;
+   - si no, cada celda se reconoce por lo que contiene: "Matutino/Vespertino/Ambos" es el turno, un número (1, 2°, Primero) es grado o grupo
+     (el primer número es el grado y el segundo el grupo) y el texto con letras es el nombre (si viene en varias columnas, se unen en orden). */
+const ORI_ES_NUM = t => /^\d{1,2}\s*[°º.]?$/.test(t) || /^(primer[o]?|segund[o]|tercer[o]?)(\s+grado)?$/.test(norm(t));
+const ORI_ES_TURNO = t => /^(matutino|vespertino|ambos(\s+turnos)?|ambas|mixto)$/.test(norm(t));
+const ORI_CEL = r => (r || []).slice(0, 8).map(x => x == null ? '' : String(x).trim());
+function esEncabezadoOri(r) {
+ const c = ORI_CEL(r).filter(Boolean);
+ return c.some(t => /nombre|orientador|apellido|grado|grupo|turno/.test(norm(t))) && !c.some(t => ORI_ES_NUM(t) || ORI_ES_TURNO(t));
+}
+function mapaEncabezadoOri(r) {
+ const m = {grado: -1, grupo: -1, turno: -1};
+ ORI_CEL(r).forEach((x, i) => { const t = norm(x); if (/grado/.test(t) && m.grado < 0) m.grado = i; else if (/grupo/.test(t) && m.grupo < 0) m.grupo = i; else if (/turno/.test(t) && m.turno < 0) m.turno = i; });
+ return m;
+}
+function leerFilaOrientador(r, mapa) {
+ const cel = ORI_CEL(r);
+ let nombre = cel[0], grado = 0, grupo = 0, turno = '';
+ if (cel.filter(Boolean).length > 1) {
+  const usadas = new Set(), nums = [], nom = [];
+  if (mapa) {
+   if (mapa.grado > -1) { grado = numeroDe(cel[mapa.grado]); usadas.add(mapa.grado); }
+   if (mapa.grupo > -1) { grupo = numeroDe(cel[mapa.grupo]); usadas.add(mapa.grupo); }
+   if (mapa.turno > -1) { if (cel[mapa.turno]) turno = turnoDe(cel[mapa.turno]); usadas.add(mapa.turno); }
+  }
+  cel.forEach((t, i) => {
+   if (!t || usadas.has(i)) return;
+   if (ORI_ES_TURNO(t)) { if (!turno) turno = turnoDe(t); }
+   else if (ORI_ES_NUM(t)) nums.push(numeroDe(t));
+   else nom.push(t);
+  });
+  if (!grado) grado = nums.shift() || 0;
+  if (!grupo) grupo = nums.shift() || 0;
+  nombre = nom.join(' ');
  } else {
+  nombre = cel.find(Boolean) || '';
   const m = nombre.replace(/\s+/g, ' ').match(/^(.*?)[\s,;|\-]+([1-9])[\s,;|\-°º]*([1-9])(?:[\s,;|\-]+(matutino|vespertino|ambos(?:\s+turnos)?))?\s*$/i);
   if (m) { nombre = m[1].trim(); grado = Number(m[2]); grupo = Number(m[3]); if (m[4]) turno = turnoDe(m[4]); }
  }
@@ -1438,14 +1468,16 @@ function subirOrientadores() {
  const inp = $('#archivo-orientadores')[0];
  if (!inp.files.length) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
  if (!confirm('¿Subir ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' con orientadores?\nSe darán de alta los que falten y se asignarán a sus grupos.')) return;
- leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /nombre|orientador/i.test(String(r[0] == null ? '' : r[0])), rows => {
-  rows = rows.filter(r => r[0] && String(r[0]).trim());
-  if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
-  if (!rows.length) { alert('El archivo no trae orientadores. Revisa que el nombre esté en la primera columna.'); return; }
+ let mapaEnc = null;   // columnas según el encabezado del archivo (si lo trae); si no, se reconocen por su contenido, en cualquier orden
+ const esEnc = r => { if (!esEncabezadoOri(r)) return false; if (!mapaEnc) mapaEnc = mapaEncabezadoOri(r); return true; };
+ leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], esEnc, rows => {
+  rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
+  if (rows.length && esEnc(rows[0])) rows.shift();
+  if (!rows.length) { alert('El archivo no trae orientadores. Pon el nombre, el grado y el grupo en columnas (en cualquier orden).'); return; }
   let nuevos = 0, existentes = 0, asignados = 0, iguales = 0;
   const avisos = [];
   rows.forEach(r => {
-   const f = leerFilaOrientador(r);
+   const f = leerFilaOrientador(r, mapaEnc);
    if (!f.nombre) return;
    let o = db.orientadores.find(x => norm(x.nombre) === norm(f.nombre));
    if (o) existentes++; else { o = {id: generarId(), nombre: f.nombre}; db.orientadores.push(o); nuevos++; }
@@ -2913,7 +2945,7 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
 function actualizarTextosTurno() {
  const t = turnoActivo;
  $('.txt-turno-activo').text(t);
- $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa ' + t + ')');
+ $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno, en cualquier orden (el turno es opcional; si no lo pones se usa ' + t + ')');
  $('#lbl-archivo-lista').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): CURP y nombre');
 }
 function pintarBotonesTurno() {
@@ -3049,10 +3081,10 @@ function subirLista() {
  if (k > -1) {
  curp = cel[k].toUpperCase();
  const antes = cel.slice(0, k);
- while (antes.length && /^\d{1,4}$/.test(antes[0])) antes.shift();   // columna de No. de lista
+ while (antes.length && (/^\d{1,4}$/.test(antes[0]) || ORI_ES_NUM(antes[0]) || ORI_ES_TURNO(antes[0]))) antes.shift();   // columnas de No. de lista, grado, grupo o turno antes del nombre
  const hayNombreAntes = antes.some(c => c.length > 1 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(c));
  if (hayNombreAntes) { fila = antes; desde = 0; }   // Excel: Nombre y luego CURP
- else { fila = r; desde = k + 1; }                   // Excel: CURP y luego Nombre (con o sin No. de lista antes)
+ else { fila = r; desde = k + 1; while (desde < 8 && cel[desde] && (ORI_ES_NUM(cel[desde]) || ORI_ES_TURNO(cel[desde]))) desde++; }   // Excel: CURP y luego Nombre (se saltan columnas de grado/grupo)
  } else {
  const m = cel[0].match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/), m2 = cel[0].match(/^(.+?)\s+([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)$/);
  if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; }          // PDF: "CURP Nombre"
