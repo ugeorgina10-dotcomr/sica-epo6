@@ -105,11 +105,23 @@ h5.fw-bold{font-size:1.05rem}
 @media (max-width:400px){
 .institution-logo{width:70px;height:70px}
 h2.fw-bold{font-size:1.15rem}
-.btn{font-size:.8rem}
+.btn{font-size:.9rem}
 }
 canvas#grafica-asistencias{max-width:100%;height:auto !important}
 /* Botones: texto siempre centrado y del mismo alto, sin importar el ancho de la ventana (pantalla dividida incluida) */
-#vista-sistema .btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;white-space:normal}
+#vista-sistema .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;text-align:center;line-height:1.25;white-space:normal;font-size:.95rem;font-weight:600;padding:.5rem 1rem;max-width:100%;overflow-wrap:break-word}
+#vista-sistema td .btn,#vista-sistema th .btn,#vista-sistema .table .btn{white-space:nowrap;overflow-wrap:normal;flex-shrink:0}
+#vista-sistema .btn.btn-sm{font-size:.875rem;padding:.4rem .8rem;min-height:38px}
+#vista-sistema .btn.small{font-size:.9rem}
+#vista-sistema .btn .fa,#vista-sistema .btn .fas,#vista-sistema .btn i{flex:0 0 auto}
+/* Celular y pantalla dividida: el botón que va solo en su columna ocupa todo el ancho, con la misma letra que los demás */
+@media (max-width:767.98px){
+ #vista-sistema .row>[class*="col-"]>.btn:only-child,#vista-sistema .row>[class*="col-"]>button.btn{width:100%}
+ #vista-sistema .btn{font-size:.95rem;min-height:44px}
+ #vista-sistema .btn.btn-sm{font-size:.9rem;min-height:40px}
+ .btn-cuenta{white-space:normal;text-align:left}
+ .ori-hor .btn,.ori-hor .btn.btn-sm{flex:1 1 140px}
+}
 .grupo-botones{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 .grupo-botones .btn{min-width:130px}
 .grupo-botones .form-select{width:auto}
@@ -121,6 +133,7 @@ canvas#grafica-asistencias{max-width:100%;height:auto !important}
  #stats-grados>div{flex:0 0 100%;max-width:100%}
  #panel-control .row.text-center>div{flex:0 0 100%;max-width:100%}
 }
+#panel-control .row.text-center>[class*="col-"]>div{height:100%}   /* tarjetas de arriba del mismo alto */
 /* Tabla de asistencia: columnas de datos en una línea; el nombre puede bajar de renglón */
 #bloque-tabla-orientador th,#bloque-tabla-orientador td{white-space:nowrap;vertical-align:middle}
 #bloque-tabla-orientador td:nth-child(2){white-space:normal;min-width:170px}
@@ -1513,10 +1526,10 @@ function renderListaHorarios() {
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
    '<div class="col-12 col-xl-4"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
-   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
-   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
-   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block text-truncate" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
-   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block text-truncate" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
    '<div class="col-12 d-flex flex-wrap gap-1">' +
    '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
    '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
