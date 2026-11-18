@@ -530,10 +530,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <!-- SOLO CONTROL ESCOLAR: horario de entrada/salida y orientador del grupo -->
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
- <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador, Turno (opcional), ToleranciaEntrada y ToleranciaSalida en minutos (opcionales; si no las pones se conservan las del grupo)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
- <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
- </div>
+ <p class="small text-muted mb-0">Ajusta aquí el horario y las tolerancias de cada grupo. El lector fijo y el teléfono los leen solos al escanear el QR y deciden si es entrada o salida.</p>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
  <div id="lista-horarios-actual" class="small mt-3"></div>
  </div>
@@ -1116,8 +1113,8 @@ function textoRetardo(a, r, f) {
  if (!r || !r.entrada) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
  const t = retrasosDe(a, r, f);
  return {t: t,
-  ent: t.entrada > 0 ? '+' + t.entrada + ' min' : 'Sin retardo',
-  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (+' + t.salida + ' min)' : '+' + t.salida + ' min') : (r.salida ? 'Sin retardo' : 'Pendiente')};
+  ent: t.entrada > 0 ? t.entrada + ' min' : 'Sin retardo',
+  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (' + t.salida + ' min)' : t.salida + ' min') : (r.salida ? 'Sin retardo' : 'Pendiente')};
 }
 function celdasRetardo(a, r, f) {
  const x = textoRetardo(a, r, f);
@@ -2703,7 +2700,7 @@ function resolverMovimiento(a, r) {
  }
  return {modo: ahora >= Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2)) ? 'Salida' : 'Entrada'};
 }
-function aplicarRegistro(a, modo) {
+function aplicarRegistro(a, modo, sinEntradaOk) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
  const f = hoy(), r = a.reg[f] = a.reg[f] || {};
  let auto = false;
@@ -2716,7 +2713,7 @@ function aplicarRegistro(a, modo) {
  if (r.entrada) return {ok:false, msg:a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
  r.entrada = horaAhora();
  } else {
- if (!r.entrada && !auto) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};   // en automático sí se permite (salió sin haber escaneado la entrada)
+ if (!r.entrada && !auto && !sinEntradaOk) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};   // en automático sí se permite (salió sin haber escaneado la entrada)
  if (r.salida) return {ok:false, msg:a.nombre + ': la salida ya estaba registrada (' + h12(r.salida) + ')'};
  r.salida = horaAhora();
  }
@@ -2774,7 +2771,7 @@ function registrarDesconocido(curp, modo) {
   return {ok:false, msg:'No se pudo registrar (error ' + r.status + '). Escanea de nuevo.'};
  })).catch(() => ({ok:false, msg:'QR no reconocido: ' + curp + ' (sin conexión con el servidor)'}));
 }
-function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
+function registrarPorId(id, modo, sinEntradaOk) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo, sinEntradaOk); }
 /* ============ LECTOR FIJO ============ */
 // Modo Automático (por defecto): Entrada o Salida según el horario del grupo. Entrada/Salida fuerzan el modo a mano; pulsar el mismo botón otra vez regresa a Automático.
 function setModoEscaneo(m) {
@@ -2877,7 +2874,6 @@ function actualizarTextosTurno() {
  $('.txt-turno-activo').text(t);
  $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa ' + t + ')');
  $('#lbl-archivo-lista').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): CURP y nombre');
- $('#lbl-archivo-horarios').text('Archivo de horarios del turno ' + t + ' (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador, Turno (opcional; si no lo pones se usa ' + t + '), ToleranciaEntrada y ToleranciaSalida en minutos (opcionales)');
 }
 function pintarBotonesTurno() {
  const t = turnoActivo;
@@ -2972,7 +2968,7 @@ function nombreOrientadorDe(a) {
 function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
- const r = a.reg[f] || {}, e = estatusDe(a, r, f), rt = celdasRetardo(a, r, f), dis = (!r.entrada || r.salida || f !== hoy()) ? 'disabled' : '';
+ const r = a.reg[f] || {}, e = estatusDe(a, r, f), rt = celdasRetardo(a, r, f), dis = (r.salida || f !== hoy()) ? 'disabled' : '';
  return `<tr${e === 'Sin registro' ? ' class="fila-sin-reg"' : ''}><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
  }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
@@ -2987,7 +2983,7 @@ function aplicarPermisosSolo() {
  bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
 }
-function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
+function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida', true); if (!r.ok) alert(r.msg); }
 function subirLista() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
@@ -3134,53 +3130,6 @@ function borrarGruposCargados(todos) {
   alert('No se pudieron borrar los grupos en el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
 }
-function subirHorarios() {
- if (!permisoPermite()) return;
- const inp = $('#archivo-horarios')[0];
- if (!inp.files.length) { alert('Selecciona un archivo de horarios.'); return; }
- if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' de horarios del turno ' + turnoActivo + '?\nSe cambiarán el horario y el orientador de los grupos que traiga el archivo.')) return;
- leerFilasVarios(inp, ['xlsx', 'xls', 'csv'], r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
-  rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
-  if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
-  if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador, Turno (opcional), ToleranciaEntrada y ToleranciaSalida (opcionales).'); return; }
-  let aplicados = 0, orientadoresNuevos = 0;
-  const porTurno = {Matutino: 0, Vespertino: 0};
-  const avisos = [];
-  rows.forEach(r => {
-   const etq = 'Grado ' + (r[0] == null ? '' : r[0]) + ', grupo ' + (r[1] == null ? '' : r[1]);
-   const grado = numeroDe(r[0]), grupo = numeroDe(r[1]);
-   const entrada = horaDe(r[2]), salida = horaDe(r[3]);
-   const nombreO = r[4] == null ? '' : String(r[4]).replace(/\s+/g, ' ').trim();
-   const turnoTxt = r[5] == null ? '' : String(r[5]).trim();
-   const tolDeCelda = v => { if (v == null || String(v).trim() === '') return null; const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10); return isNaN(n) ? null : Math.min(180, n); };
-   const tolE = tolDeCelda(r[6]), tolS = tolDeCelda(r[7]);   // opcionales: sin valor se conserva la tolerancia que ya tenía el grupo
-   if (grado < 1 || grado > 3 || grupo < 1 || grupo > 4) { avisos.push(etq + ': grado o grupo no válido (grado 1 a 3, grupo 1 a 4); se omitió.'); return; }
-   if (!entrada || !salida) { avisos.push(etq + ': hora de entrada o de salida no válida (usa por ejemplo 07:10 o 1:10 PM); se omitió.'); return; }
-   if (toMin(salida) <= toMin(entrada)) { avisos.push(etq + ': la hora de cierre debe ser posterior a la de entrada; se omitió.'); return; }
-   const tn = turnoTxt ? turnoDe(turnoTxt) : turnoActivo;
-   const turnos = tn === 'Ambos' ? ['Matutino', 'Vespertino'] : [tn];
-   let orientadorId = '';
-   if (nombreO) {
-    let o = db.orientadores.find(x => norm(x.nombre) === norm(nombreO));
-    if (!o) { o = {id: generarId(), nombre: nombreO}; db.orientadores.push(o); orientadoresNuevos++; }
-    orientadorId = o.id;
-   }
-   turnos.forEach(turno => {
-    const clave = claveGrupo(grado, grupo, turno), previo = db.horarios[clave] || {};
-    // si el archivo no trae orientador(a), se conserva el que ya tenía el grupo
-    db.horarios[clave] = {entrada: entrada, salida: salida, orientadorId: orientadorId || previo.orientadorId || '',
-     tolEntrada: tolE !== null ? tolE : tolDe(previo, 'tolEntrada', TOL_DEF.entrada), tolSalida: tolS !== null ? tolS : tolDe(previo, 'tolSalida', TOL_DEF.salida)};
-    aplicados++; porTurno[turno]++;
-   });
-  });
-  if (aplicados) { guardarOrientadoresServidor(); renderTabla();renderListaOrientadores(); refrescarHorarioForm(); }
-  let html = 'Horarios aplicados: ' + aplicados + ' (Matutino: ' + porTurno.Matutino + ', Vespertino: ' + porTurno.Vespertino + ')' + (orientadoresNuevos ? '. Orientadores nuevos: ' + orientadoresNuevos : '') + '.';
-  if (avisos.length) html += '<div class="text-danger mt-1"><b>Revisa:</b><br>' + avisos.map(esc).join('<br>') + '</div>';
-  $('#resumen-horario-grupo').html(html);
-  alert(aplicados ? 'Horarios cargados para ' + aplicados + ' grupo(s).' + (avisos.length ? ' Hubo ' + avisos.length + ' fila(s) omitidas: revisa el aviso debajo.' : '') : 'No se cargó ningún horario: revisa el aviso debajo.');
-  $('#archivo-horarios').val('');
- }, msg => alert(msg));
-}
 /* Descargas (Excel / PDF reales) */
 /* Colores de las listas descargadas: retardo en rojo, sin registro en ámbar */
 const COLOR_DESCARGA = {
@@ -3190,8 +3139,8 @@ const COLOR_DESCARGA = {
 function colorDeCelda(o, k) {
  const est = String(o.Estatus || '');
  if (est === 'Sin registro') return COLOR_DESCARGA.sinRegistro;
- if (k === 'Retardo entrada' && /^\+/.test(String(o[k])) ) return COLOR_DESCARGA.retardo;
- if (k === 'Retardo salida' && /\+\d/.test(String(o[k])) ) return COLOR_DESCARGA.retardo;
+ if (k === 'Retardo entrada' && /\d/.test(String(o[k]))) return COLOR_DESCARGA.retardo;
+ if (k === 'Retardo salida' && /\d/.test(String(o[k]))) return COLOR_DESCARGA.retardo;
  if (k === 'Estatus' && /^Retardo/.test(est)) return COLOR_DESCARGA.retardo;
  return null;
 }
