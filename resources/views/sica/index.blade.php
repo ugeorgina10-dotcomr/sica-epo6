@@ -107,7 +107,26 @@ h5.fw-bold{font-size:1.05rem}
 h2.fw-bold{font-size:1.15rem}
 .btn{font-size:.8rem}
 }
-canvas#grafica-asistencias{max-width:100%;height:auto !important}
+canvas#grafica-asistencias{max-width:100%;height:auto !important;display:block;margin:0 auto}
+.grafica-centrada{max-width:640px;width:100%;margin-left:auto;margin-right:auto;position:relative}
+/* Botones: texto siempre centrado y del mismo alto, sin importar el ancho de la ventana (pantalla dividida incluida) */
+#vista-sistema .btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;white-space:normal}
+.grupo-botones{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.grupo-botones .btn{min-width:130px}
+.grupo-botones .form-select{width:auto}
+@media (max-width:991.98px){
+ .cab-centrable{justify-content:center !important;text-align:center}
+ .cab-centrable>*{justify-content:center}
+ .grupo-botones{justify-content:center;width:100%}
+ .grupo-botones .btn{flex:1 1 130px;max-width:240px}
+ #stats-grados>div{flex:0 0 100%;max-width:100%}
+ #panel-control .row.text-center>div{flex:0 0 100%;max-width:100%}
+}
+/* Tabla de asistencia: columnas de datos en una línea; el nombre puede bajar de renglón */
+#bloque-tabla-orientador th,#bloque-tabla-orientador td{white-space:nowrap;vertical-align:middle}
+#bloque-tabla-orientador td:nth-child(2){white-space:normal;min-width:170px}
+#bloque-tabla-orientador td .badge{white-space:nowrap}
+.ori-hor .input-group-text{padding:.25rem .5rem}
 /* ===== Ajuste al ancho de la pantalla (teléfonos): nada se sale ni se corta a los lados ===== */
 html,body{max-width:100%}
 .main-card,.login-card,#vista-sistema{min-width:0;max-width:100%}
@@ -564,9 +583,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  <div id="bloque-tabla-orientador">
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 cab-centrable">
  <h6 class="fw-bold m-0" id="titulo-tabla-orientador">Turno Matutino</h6>
- <div class="d-flex gap-2 flex-wrap">
+ <div class="d-flex gap-2 flex-wrap grupo-botones">
  <button onclick="descargarReporte('Excel')" class="btn btn-success px-4 py-2 fw-semibold shadow-sm small btn-accion-restringida">Descargar Excel</button>
  <button onclick="descargarReporte('PDF')" class="btn btn-danger px-4 py-2 fw-semibold shadow-sm small btn-accion-restringida">Descargar PDF</button>
  </div>
@@ -587,9 +606,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">RETARDOS (ENTRADA Y SALIDA)</span><h3 class="fw-bold text-primary mb-0" id="st-ret">0</h3></div></div>
  </div>
  <div class="p-4 bg-white rounded-4 border shadow-sm mb-4">
- <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+ <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2 cab-centrable">
  <h6 class="fw-bold m-0" style="color:#800020">Gráficas Comparativas y Estadísticas</h6>
- <div class="d-flex align-items-center gap-2 flex-wrap">
+ <div class="d-flex align-items-center gap-2 flex-wrap grupo-botones">
  <select id="sel-periodo-stats" class="form-select form-select-sm" style="width:auto" onchange="renderStats()">
  <option value="hoy" selected>Hoy</option>
  <option value="semana">Semana</option>
@@ -601,7 +620,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <p class="text-muted small mb-2" id="subtitulo-periodo-stats">Estadísticas de asistencia -Hoy</p>
  <p class="small mb-2"><span class="fw-semibold" style="color:#800020">Se descargará:</span> <span id="lbl-descarga-seleccion" class="fw-semibold">Estadísticas generales (todos los grados)</span></p>
- <div class="mb-3" style="max-width:640px;margin:0 auto"><canvas id="grafica-asistencias" height="220"></canvas></div>
+ <div class="mb-3 grafica-centrada"><canvas id="grafica-asistencias" height="220"></canvas></div>
  <div class="row text-center g-3" id="stats-grados"></div>
  </div>
 
@@ -1471,14 +1490,18 @@ function renderListaHorarios() {
  if (foco && caja[0].contains(foco) && /^(INPUT|SELECT)$/.test(foco.tagName)) return;   // no pisa lo que se está escribiendo
  const abierta = caja.find('details').prop('open');
  const idsOri = new Set(db.orientadores.map(o => o.id));
- const grupos = Object.entries(db.horarios).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
-  .filter(x => x.c.turno === turnoActivo && x.h && (x.h.entrada || x.h.salida || x.h.orientadorId))
+ // Salen los grupos con horario u orientador asignado Y todos los que ya tienen alumnos (así no hace falta subir ningún archivo para ponerles horario)
+ const porClave = {};
+ Object.entries(db.horarios).forEach(([k, h]) => { if (h && (h.entrada || h.salida || h.orientadorId)) porClave[k] = h; });
+ (db.alumnos || []).forEach(a => { if (a.turno === turnoActivo && a.grado && a.grupo) { const k = claveGrupo(a.grado, a.grupo, a.turno); if (!porClave[k]) porClave[k] = db.horarios[k] || {}; } });
+ const grupos = Object.entries(porClave).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
+  .filter(x => x.c.turno === turnoActivo)
   .sort((a, b) => a.c.grado - b.c.grado || a.c.grupo - b.c.grupo);
  const porOri = db.orientadores.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   .map(o => ({id: o.id, nombre: o.nombre, gr: grupos.filter(x => x.h.orientadorId === o.id)}));
  porOri.push({id: '', nombre: 'Sin orientador(a)', gr: grupos.filter(x => !x.h.orientadorId || !idsOri.has(x.h.orientadorId))});
  const items = porOri.filter(o => o.gr.length);
- if (!items.length) { caja.html('<span class="text-muted">Aún no hay horarios ni orientadores asignados a grupos del turno ' + esc(turnoActivo) + '.</span>'); return; }
+ if (!items.length) { caja.html('<span class="text-muted">Aún no hay grupos con alumnos en el turno ' + esc(turnoActivo) + '. Sube la lista de un grupo y aparecerá aquí para ponerle su horario.</span>'); return; }
  const filas = items.map(o => {
   const llaves = o.gr.map(x => x.k);
   let sel = _horSel[o.id];
@@ -1490,11 +1513,11 @@ function renderListaHorarios() {
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
-   '<div class="col-12 col-md-4"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-12 col-xl-4"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
+   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
+   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
+   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block text-truncate" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-6 col-sm-3 col-xl-2"><label class="small text-muted d-block text-truncate" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
    '<div class="col-12 d-flex flex-wrap gap-1">' +
    '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
    '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
@@ -2675,9 +2698,11 @@ function procesarQR(curp, modo, el) {
  } else mostrar(r);
 }
 let _guardarPend = null;
-function guardarYPintarLuego() {   // varios escaneos seguidos se juntan en un solo guardado
+/* Varios escaneos seguidos se juntan: como máximo cada 300 ms se guarda una copia local y se repinta la tabla.
+   NO se manda toda la base al servidor en cada escaneo (eso era lo lento): cada escaneo ya viaja por la cola de envío, en lotes. */
+function guardarYPintarLuego() {
  if (_guardarPend) return;
- _guardarPend = setTimeout(() => { _guardarPend = null; save(); renderTabla(); }, 0);
+ _guardarPend = setTimeout(() => { _guardarPend = null; try { localStorage.setItem(LS, JSON.stringify(db)); } catch (e) {} renderTabla(); }, 300);
 }
 /* ---- Modo AUTOMÁTICO: Entrada o Salida según el horario del grupo del alumno (misma lógica que App\Support\MovimientoAutomatico en el servidor) ----
    1. Ya tiene entrada y salida hoy -> no se registra nada más.
