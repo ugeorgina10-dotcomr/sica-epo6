@@ -777,6 +777,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  });
  window.libsOk = function (global) {
   if (typeof window[global] !== 'undefined') return true;
+  if (window.__libsSilencio) { (window.__libsFalta = window.__libsFalta || []).push(global); return false; }   // lo atiende el envoltorio de abajo: espera la librería y continúa solo
   alert('Todavía se está cargando una herramienta del sistema. Espera unos segundos e inténtalo de nuevo.');
   return false;
  };
@@ -4254,42 +4255,39 @@ $(function () {
 });
 </script>
 <script>
-/* Descargas (Excel, PDF, gráficas, credenciales) y lectura de archivos: si la librería que necesitan todavía no llegó,
-   el sistema la espera (y la vuelve a pedir si falló) y luego continúa SOLO; ya no hay que pulsar otra vez. */
+/* Descargas (Excel, PDF, gráficas, credenciales) y lectura de archivos: se ejecutan igual que siempre; SOLO si la librería que
+   esa acción necesita todavía no llegó, el sistema la espera (y la vuelve a pedir si falló) y luego continúa SOLO. */
 (function(){
  const LIBS = {XLSX:['xlsx.full.min.js'], ExcelJS:['exceljs.min.js'], jspdf:['jspdf.umd.min.js','jspdf.plugin.autotable.min.js'], pdfjsLib:['pdf.min.js'], Chart:['chart.umd.min.js'], JSZip:['jszip.min.js'], SicaDocx:['jszip.min.js','sica-docx.js'], QRious:['qrious.min.js']};
- const faltan = () => Object.keys(LIBS).filter(k => typeof window[k] === 'undefined');
  let aviso = null;
  const mostrar = t => {
   if (!aviso) { aviso = document.createElement('div'); aviso.setAttribute('role', 'status'); aviso.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:99999;background:#800020;color:#fff;padding:10px 18px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-size:14px;max-width:90vw;text-align:center'; document.body.appendChild(aviso); }
   aviso.textContent = t; aviso.style.display = 'block';
  };
  const ocultar = () => { if (aviso) aviso.style.display = 'none'; };
- let _preparando = null;
- function preparar() {
-  if (_preparando) return _preparando;
-  _preparando = Promise.resolve(window.SICA_LIBS_LISTAS).catch(() => {}).then(async () => {
-   for (let intento = 0; intento < 3 && faltan().length; intento++) {
-    const archivos = []; faltan().forEach(k => LIBS[k].forEach(a => { if (archivos.indexOf(a) === -1) archivos.push(a); }));
-    for (const a of archivos) await window.SICA_CARGAR_LIB(a);
-   }
-   if (window.pdfjsLib && window.SICA_VENDOR_BASE) pdfjsLib.GlobalWorkerOptions.workerSrc = window.SICA_VENDOR_BASE + 'pdf.worker.min.js';
-  }).then(() => { _preparando = null; return faltan(); });
-  return _preparando;
+ async function conseguir(faltan) {
+  await Promise.resolve(window.SICA_LIBS_LISTAS).catch(() => {});   // primero se espera la carga normal
+  for (let intento = 0; intento < 3; intento++) {
+   const pend = faltan.filter(k => typeof window[k] === 'undefined');
+   if (!pend.length) break;
+   const archivos = []; pend.forEach(k => (LIBS[k] || []).forEach(a => { if (archivos.indexOf(a) === -1) archivos.push(a); }));
+   for (const a of archivos) await window.SICA_CARGAR_LIB(a);
+  }
+  if (window.pdfjsLib && window.SICA_VENDOR_BASE) pdfjsLib.GlobalWorkerOptions.workerSrc = window.SICA_VENDOR_BASE + 'pdf.worker.min.js';
  }
- const NOMBRES = ['descargar', 'descargarGraficas', 'descargarComparativaGradoPDF', 'descargarComparativaGradoExcel', 'generarPDFCredenciales', 'subirPlantillaOficial', 'subirLista', 'subirOrientadores', 'descargarExcelConGraficas'];
+ const NOMBRES = ['descargar', 'descargarGraficas', 'descargarComparativaGradoPDF', 'descargarComparativaGradoExcel', 'generarPDFCredenciales', 'subirPlantillaOficial', 'subirLista', 'subirOrientadores'];
  NOMBRES.forEach(n => {
   const orig = window[n];
   if (typeof orig !== 'function') return;
   window[n] = function () {
    const args = arguments, yo = this;
-   if (!faltan().length) return orig.apply(yo, args);
+   window.__libsSilencio = true; window.__libsFalta = [];
+   let r;
+   try { r = orig.apply(yo, args); } finally { window.__libsSilencio = false; }
+   const faltan = Array.from(new Set(window.__libsFalta)); window.__libsFalta = [];
+   if (!faltan.length) return r;   // todo estaba listo: se comporta exactamente como antes
    mostrar('Preparando la herramienta… un momento, tu acción continúa sola.');
-   return preparar().then(f => {
-    ocultar();
-    if (f.length) { alert('No se pudo cargar una herramienta del sistema (' + f.join(', ') + '). Revisa tu conexión a internet, recarga la página con Ctrl + F5 y vuelve a intentarlo.'); return; }
-    return orig.apply(yo, args);
-   });
+   return conseguir(faltan).then(() => { ocultar(); return orig.apply(yo, args); });   // si aún falta, libsOk muestra su aviso normal
   };
  });
 })();
