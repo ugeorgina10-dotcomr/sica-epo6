@@ -522,7 +522,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
- <option value="tal-cual" selected>Ya vienen como Apellido paterno, materno y nombre (no cambiar)</option>
+ <option value="auto" selected>Detectar solo (si ya trae un orden se respeta; si no, se acomoda con la CURP o se deja como viene)</option>
+ <option value="tal-cual">Ya vienen como Apellido paterno, materno y nombre (no cambiar)</option>
  <option value="reordenar">Vienen como Nombre(s) + Apellidos (reordenar a Apellido paterno, materno y nombre)</option>
  </select>
  </div>
@@ -1140,13 +1141,20 @@ function conteoDe(a, f) {
  const t = retrasosDe(a, r, f), re = t.entrada > 0 ? 1 : 0, rs = t.salida > 0 ? 1 : 0;
  return {as: (re || rs) ? 0 : 1, re: re, rs: rs};
 }
+/* Duración legible: menos de una hora "45 min"; de una hora en adelante "1 h 43 min" (nunca "103 min"); horas exactas "2 h" */
+function durMin(n) {
+ n = Math.max(0, Math.round(Number(n) || 0));
+ if (n < 60) return n + ' min';
+ const h = Math.floor(n / 60), m = n % 60;
+ return h + ' h' + (m ? ' ' + m + ' min' : '');
+}
 /* Texto de las columnas "Retardo entrada" y "Retardo salida" (tabla, Excel y PDF). "—" = no vino. */
 function textoRetardo(a, r, f) {
  if (!r || !r.entrada) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
  const t = retrasosDe(a, r, f);
  return {t: t,
-  ent: t.entrada > 0 ? t.entrada + ' min' : 'Sin retardo',
-  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (' + t.salida + ' min)' : t.salida + ' min') : (r.salida ? 'Sin retardo' : 'Pendiente')};
+  ent: t.entrada > 0 ? durMin(t.entrada) : 'Sin retardo',
+  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (' + durMin(t.salida) + ')' : durMin(t.salida)) : (r.salida ? 'Sin retardo' : 'Pendiente')};
 }
 function celdasRetardo(a, r, f) {
  const x = textoRetardo(a, r, f);
@@ -2795,7 +2803,7 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
  guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
  const tr = retrasosDe(a, r, f);
- const extraRet = modo === 'Entrada' ? (tr.entrada > 0 ? 'Retardo de entrada: ' + tr.entrada + ' min' : '') : (tr.salida > 0 ? 'Retardo de salida: ' + tr.salida + ' min' : '');
+ const extraRet = modo === 'Entrada' ? (tr.entrada > 0 ? 'Retardo de entrada: ' + durMin(tr.entrada) : '') : (tr.salida > 0 ? 'Retardo de salida: ' + durMin(tr.salida) : '');
  return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), extraRet) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
@@ -3063,7 +3071,7 @@ function subirLista() {
  const inp = $('#archivo-lista')[0];
  if (!inp.files.length) { alert('Selecciona un archivo para la lista.'); return; }
  if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' en el ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + ')?\nSe agregan los alumnos nuevos y se actualizan los que ya existan.')) return;
- const modo = $('#orden-nombre-lista').val();
+ const modo = $('#orden-nombre-lista').val() || 'auto';   // auto = no hace falta elegir el orden: se respeta el del archivo y, si trae CURP, se acomoda solo
  const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
  // Encabezado: alguna de las primeras celdas dice CURP / Nombre / Apellido... (y la fila no trae ya una CURP real)
  const esEncabezado = r => !!r && !r.slice(0, 8).some(x => RX_CURP.test(String(x == null ? '' : x).trim())) && r.slice(0, 8).some(x => /curp|matr|nombre|apellido|paterno|materno/i.test(String(x == null ? '' : x)));
@@ -3096,7 +3104,7 @@ function subirLista() {
  }
  let nombre = armarNombre(fila, desde, modo);
  if (!nombre) return;
- if (curp && modo === 'reordenar') nombre = acomodarConCurp(nombre, curp);   // solo si se eligió reordenar: con la CURP se sabe cuál es paterno, materno y nombre. Con "no cambiar" el nombre queda tal cual viene
+ if (curp && modo !== 'tal-cual') nombre = acomodarConCurp(nombre, curp);   // en automático o reordenar: con la CURP se sabe cuál es paterno, materno y nombre (si ya está bien no se mueve; si no cuadra, queda como viene). Con "no cambiar" el nombre queda tal cual viene
  let a = curp ? db.alumnos.find(x => x.curp === curp) : null;
  if (!a) a = db.alumnos.find(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && (!curp ? true : !x.curp) && norm(x.nombre) === norm(nombre));
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
