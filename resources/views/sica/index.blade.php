@@ -1143,12 +1143,12 @@ function conteoDe(a, f) {
  const t = retrasosDe(a, r, f), re = t.entrada > 0 ? 1 : 0, rs = t.salida > 0 ? 1 : 0;
  return {as: (re || rs) ? 0 : 1, re: re, rs: rs};
 }
-/* Duración legible: menos de una hora "45 min"; de una hora en adelante "1 hr 43 min" / "2 hrs" (nunca "103 min") */
+/* Duración abreviada con una sola unidad: menos de una hora en minutos ("13 min"); de una hora en adelante solo horas completas ("1 hr", "2 hrs") */
 function durMin(n) {
  n = Math.max(0, Math.round(Number(n) || 0));
  if (n < 60) return n + ' min';
- const h = Math.floor(n / 60), m = n % 60;
- return h + (h === 1 ? ' hr' : ' hrs') + (m ? ' ' + m + ' min' : '');
+ const h = Math.floor(n / 60);
+ return h + (h === 1 ? ' hr' : ' hrs');
 }
 /* Texto de las columnas "Retardo entrada" y "Retardo salida" (tabla, Excel y PDF). "—" = no vino. */
 function textoRetardo(a, r, f) {
