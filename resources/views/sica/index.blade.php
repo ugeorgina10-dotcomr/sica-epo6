@@ -31,10 +31,12 @@
 <link rel="prefetch" href="{{ asset('vendor/pdf.worker.min.js') }}">
 <style>
 /* Colores de los retardos: entrada = ámbar, salida = morado (distintos entre sí y del verde de asistencia y el gris de "sin registro") */
-.bg-ret-ent{background:#ffc107 !important;color:#212529 !important}
-.bg-ret-sal{background:#6f42c1 !important;color:#fff !important}
-.txt-ret-ent{color:#b58900;font-weight:700}
-.txt-ret-sal{color:#6f42c1;font-weight:700}
+.bg-ret-ent{background:#dc3545 !important;color:#fff !important}
+.bg-ret-sal{background:#a71d2a !important;color:#fff !important}
+.txt-ret-ent{color:#dc3545;font-weight:700}
+.txt-ret-sal{color:#a71d2a;font-weight:700}
+.bg-sin-reg{background:#ffc107 !important;color:#212529 !important}
+tr.fila-sin-reg>td{background:#fff3cd !important}
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
 /* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
 .bg-escuela{min-height:100vh;background-color:#757362 !important;background-position:center !important;background-size:cover !important;background-repeat:no-repeat !important;background-attachment:fixed !important;
@@ -1129,7 +1131,7 @@ function estatusDe(a, r, fecha) {
  if (t.salida > 0) return 'Retardo salida';
  return t.entrada > 0 ? 'Retardo entrada' : 'Asistencia';
 }
-const claseEst = {'Asistencia':'bg-success','Retardo entrada':'bg-ret-ent','Retardo salida':'bg-ret-sal','Sin registro':'bg-secondary'};
+const claseEst = {'Asistencia':'bg-success','Retardo entrada':'bg-ret-ent','Retardo salida':'bg-ret-sal','Sin registro':'bg-sin-reg'};
 /* Insignia(s) del estatus; con retardo en la entrada Y en la salida se muestran las dos */
 function badgesEstatus(e) {
  return e === 'Retardo entrada y salida'
@@ -2971,7 +2973,7 @@ function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
  const r = a.reg[f] || {}, e = estatusDe(a, r, f), rt = celdasRetardo(a, r, f), dis = (!r.entrada || r.salida || f !== hoy()) ? 'disabled' : '';
- return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
+ return `<tr${e === 'Sin registro' ? ' class="fila-sin-reg"' : ''}><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
  }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
@@ -3180,16 +3182,48 @@ function subirHorarios() {
  }, msg => alert(msg));
 }
 /* Descargas (Excel / PDF reales) */
-function descargar(nombre, filas, formato, titulo) {
+/* Colores de las listas descargadas: retardo en rojo, sin registro en ámbar */
+const COLOR_DESCARGA = {
+ sinRegistro: {fondo: 'FFFFF3CD', texto: 'FF664D03', rgbFondo: [255,243,205], rgbTexto: [102,77,3]},
+ retardo: {fondo: 'FFF8D7DA', texto: 'FFB02A37', rgbFondo: [248,215,218], rgbTexto: [176,42,55]}
+};
+function colorDeCelda(o, k) {
+ const est = String(o.Estatus || '');
+ if (est === 'Sin registro') return COLOR_DESCARGA.sinRegistro;
+ if (k === 'Retardo entrada' && /^\+/.test(String(o[k])) ) return COLOR_DESCARGA.retardo;
+ if (k === 'Retardo salida' && /\+\d/.test(String(o[k])) ) return COLOR_DESCARGA.retardo;
+ if (k === 'Estatus' && /^Retardo/.test(est)) return COLOR_DESCARGA.retardo;
+ return null;
+}
+async function descargar(nombre, filas, formato, titulo) {
  if (!filas.length) { alert('No hay datos para descargar.'); return; }
- if (!libsOk(formato === 'Excel' ? 'XLSX' : 'jspdf')) return;
+ if (!libsOk(formato === 'Excel' ? 'ExcelJS' : 'jspdf')) return;
+ const k = Object.keys(filas[0]);
  if (formato === 'Excel') {
- const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Reporte'); XLSX.writeFile(wb, nombre + '.xlsx');
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Reporte');
+  const enc = ws.addRow(k);
+  enc.eachCell(c => { c.font = {bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF800020'}}; c.alignment = {horizontal:'center'}; });
+  filas.forEach(o => {
+   const fila = ws.addRow(k.map(x => o[x]));
+   k.forEach((x, i) => { const c = colorDeCelda(o, x); if (c) { const cel = fila.getCell(i + 1); cel.fill = {type:'pattern', pattern:'solid', fgColor:{argb:c.fondo}}; cel.font = {color:{argb:c.texto}, bold:true}; } });
+  });
+  k.forEach((x, i) => { ws.getColumn(i + 1).width = Math.min(Math.max(Math.max(String(x).length, ...filas.map(o => String(o[x] == null ? '' : o[x]).length)) + 3, 12), 40); });
+  ws.views = [{state:'frozen', ySplit:1}];
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre + '.xlsx';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
  } else {
- const d = new window.jspdf.jsPDF({orientation:'landscape'}), k = Object.keys(filas[0]);
- d.setFontSize(13); d.text(titulo, 14, 14);
- d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY:20, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]}});
- d.save(nombre + '.pdf');
+  const d = new window.jspdf.jsPDF({orientation:'landscape'});
+  d.setFontSize(13); d.text(titulo, 14, 14);
+  d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY:20, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]},
+   didParseCell: data => {
+    if (data.section !== 'body') return;
+    const c = colorDeCelda(filas[data.row.index], k[data.column.index]);
+    if (c) { data.cell.styles.fillColor = c.rgbFondo; data.cell.styles.textColor = c.rgbTexto; data.cell.styles.fontStyle = 'bold'; }
+   }});
+  d.save(nombre + '.pdf');
  }
 }
 function descargarReporte(formato) {
@@ -3200,7 +3234,16 @@ function descargarReporte(formato) {
  const tp = tituloPeriodo(periodo, ref);
  const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
  const filas = [];
- filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && (r.entrada || r.salida)) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', 'Retardo entrada':textoRetardo(a, r, f).ent, 'Retardo salida':textoRetardo(a, r, f).sal, Estatus:estatusDe(a, r, f)}); }));
+ const lista = filtrados(), hoyF = hoy();
+ // Los alumnos sin registro también salen en la lista (en otro color), pero solo en días de clases que ya pasaron y en los que alguien del grupo sí vino
+ const diaConClase = {};
+ dias.forEach(f => { const d = new Date(f + 'T12:00:00').getDay(); diaConClase[f] = f <= hoyF && d !== 0 && d !== 6 && lista.some(a => a.reg[f] && (a.reg[f].entrada || a.reg[f].salida)); });
+ lista.forEach(a => dias.forEach(f => {
+  const r = a.reg[f], base = {Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno};
+  if (r && (r.entrada || r.salida)) filas.push(Object.assign(base, {Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', 'Retardo entrada':textoRetardo(a, r, f).ent, 'Retardo salida':textoRetardo(a, r, f).sal, Estatus:estatusDe(a, r, f)}));
+  else if (diaConClase[f]) filas.push(Object.assign(base, {Entrada:'—', Salida:'—', 'Retardo entrada':'—', 'Retardo salida':'—', Estatus:'Sin registro'}));
+ }));
+ filas.sort((x, y) => x.Fecha < y.Fecha ? -1 : x.Fecha > y.Fecha ? 1 : 0);   // (el orden alfabético de alumnos se conserva dentro de cada fecha)
  descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
@@ -3242,8 +3285,8 @@ function renderStats() {
  $('#stats-grados').html(s.map(x => `<div class="col-md-4"><button id="btn-grado-${x.gradoNum}" onclick="seleccionarGrado(${x.gradoNum})" class="btn tarjeta-grado p-3 border rounded-3 bg-light w-100 text-center" title="Selecciona este grado y usa Excel o PDF (arriba) para descargar su comparativa">
  <span class="fw-bold small d-block text-secondary">${x.Grado}</span>
  <span class="text-success fw-bold d-block">Asistencias: ${x['% Asistencias']}% (${x.Asistencias} de ${x.Alumnos})</span>
- <span class="fw-bold d-block" style="color:#b58900">Retardo entrada: ${x['% Retardo entrada']}% (${x['Retardo entrada']})</span>
- <span class="fw-bold d-block" style="color:#6f42c1">Retardo salida: ${x['% Retardo salida']}% (${x['Retardo salida']})</span>
+ <span class="fw-bold d-block" style="color:#dc3545">Retardo entrada: ${x['% Retardo entrada']}% (${x['Retardo entrada']})</span>
+ <span class="fw-bold d-block" style="color:#a71d2a">Retardo salida: ${x['% Retardo salida']}% (${x['Retardo salida']})</span>
  </button></div>`).join(''));
  actualizarBotonesGrado();
  dibujarGraficaAsistencias(s);
@@ -3262,8 +3305,8 @@ function dibujarGraficaAsistencias(s) {
  if (!ctx || typeof Chart === 'undefined') return;
  const data = { labels: s.map(x => x.Grado), datasets: [
  {label:'Asistencias', data: s.map(x => x.Asistencias), backgroundColor:'#198754'},
- {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#ffc107'},
- {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#6f42c1'}
+ {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#dc3545'},
+ {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#a71d2a'}
  ]};
  const titulo = 'Estadísticas de asistencia - ' + tituloPeriodo($('#sel-periodo-stats').val() || 'hoy');
  if (!libsOk('Chart')) return;
@@ -3291,14 +3334,14 @@ function cfgGraficaGeneral(s, titulo) {
  return {type:'bar',
  data:{labels: s.map(x => x.Grado), datasets:[
  {label:'Asistencias', data: s.map(x => x.Asistencias), backgroundColor:'#198754'},
- {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#ffc107'},
- {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#6f42c1'}]},
+ {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#dc3545'},
+ {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#a71d2a'}]},
  options:{ plugins:{ legend:{position:'bottom'}, title:{display:true, text:titulo, font:{size:15, weight:'bold'}, color:'#800020'} },
  scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
 }
 function cfgGraficaGrupo(grado, g) {
  return {type:'bar',
- data:{ labels:['Asistencias','Retardo entrada','Retardo salida'], datasets:[{ data:[g.asistencias,g.retardosEntrada,g.retardosSalida], backgroundColor:['#198754','#ffc107','#6f42c1'] }] },
+ data:{ labels:['Asistencias','Retardo entrada','Retardo salida'], datasets:[{ data:[g.asistencias,g.retardosEntrada,g.retardosSalida], backgroundColor:['#198754','#dc3545','#a71d2a'] }] },
  options:{ plugins:{ legend:{display:false}, title:{display:true, text:nomGrado[grado]+' '+g.grupo+' ('+g.turno+') — Orientador(a): '+g.orientador, font:{size:15, weight:'bold'}, color:'#800020'} },
  scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
 }
