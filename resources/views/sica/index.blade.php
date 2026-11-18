@@ -30,6 +30,13 @@
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
 <link rel="prefetch" href="{{ asset('vendor/pdf.worker.min.js') }}">
 <style>
+/* Colores de los retardos: entrada = ámbar, salida = morado (distintos entre sí y del verde de asistencia y el gris de "sin registro") */
+.bg-ret-ent{background:#dc3545 !important;color:#fff !important}
+.bg-ret-sal{background:#a71d2a !important;color:#fff !important}
+.txt-ret-ent{color:#dc3545;font-weight:700}
+.txt-ret-sal{color:#a71d2a;font-weight:700}
+.bg-sin-reg{background:#ffc107 !important;color:#212529 !important}
+tr.fila-sin-reg>td{background:#fff3cd !important}
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
 /* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
 .bg-escuela{min-height:100vh;background-color:#757362 !important;background-position:center !important;background-size:cover !important;background-repeat:no-repeat !important;background-attachment:fixed !important;
@@ -98,9 +105,40 @@ h5.fw-bold{font-size:1.05rem}
 @media (max-width:400px){
 .institution-logo{width:70px;height:70px}
 h2.fw-bold{font-size:1.15rem}
-.btn{font-size:.8rem}
+.btn{font-size:.9rem}
 }
 canvas#grafica-asistencias{max-width:100%;height:auto !important}
+/* Botones: texto siempre centrado y del mismo alto, sin importar el ancho de la ventana (pantalla dividida incluida) */
+#vista-sistema .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;text-align:center;line-height:1.25;white-space:normal;font-size:.95rem;font-weight:600;padding:.5rem 1rem;max-width:100%;overflow-wrap:break-word}
+#vista-sistema td .btn,#vista-sistema th .btn,#vista-sistema .table .btn{white-space:nowrap;overflow-wrap:normal;flex-shrink:0}
+#vista-sistema .btn.btn-sm{font-size:.875rem;padding:.4rem .8rem;min-height:38px}
+#vista-sistema .btn.small{font-size:.9rem}
+#vista-sistema .btn .fa,#vista-sistema .btn .fas,#vista-sistema .btn i{flex:0 0 auto}
+/* Celular y pantalla dividida: el botón que va solo en su columna ocupa todo el ancho, con la misma letra que los demás */
+@media (max-width:767.98px){
+ #vista-sistema .row>[class*="col-"]>.btn:only-child,#vista-sistema .row>[class*="col-"]>button.btn{width:100%}
+ #vista-sistema .btn{font-size:.95rem;min-height:44px}
+ #vista-sistema .btn.btn-sm{font-size:.9rem;min-height:40px}
+ .btn-cuenta{white-space:normal;text-align:left}
+ .ori-hor .btn,.ori-hor .btn.btn-sm{flex:1 1 140px}
+}
+.grupo-botones{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.grupo-botones .btn{min-width:130px}
+.grupo-botones .form-select{width:auto}
+@media (max-width:991.98px){
+ .cab-centrable{justify-content:center !important;text-align:center}
+ .cab-centrable>*{justify-content:center}
+ .grupo-botones{justify-content:center;width:100%}
+ .grupo-botones .btn{flex:1 1 130px;max-width:240px}
+ #stats-grados>div{flex:0 0 100%;max-width:100%}
+ #panel-control .row.text-center>div{flex:0 0 100%;max-width:100%}
+}
+#panel-control .row.text-center>[class*="col-"]>div{height:100%}   /* tarjetas de arriba del mismo alto */
+/* Tabla de asistencia: columnas de datos en una línea; el nombre puede bajar de renglón */
+#bloque-tabla-orientador th,#bloque-tabla-orientador td{white-space:nowrap;vertical-align:middle}
+#bloque-tabla-orientador td:nth-child(2){white-space:normal;min-width:170px}
+#bloque-tabla-orientador td .badge{white-space:nowrap}
+.ori-hor .input-group-text{padding:.25rem .5rem}
 /* ===== Ajuste al ancho de la pantalla (teléfonos): nada se sale ni se corta a los lados ===== */
 html,body{max-width:100%}
 .main-card,.login-card,#vista-sistema{min-width:0;max-width:100%}
@@ -173,7 +211,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .dd-item .etq.mal{background:#dc3545;color:#fff}
 .dd-item .etq.bien{background:#d1e7dd;color:#0f5132}
 .burbujas-claves{position:fixed;top:14px;right:14px;z-index:1900;display:flex;flex-direction:column;gap:10px;max-width:340px;width:calc(100% - 28px)}
-.burbuja{position:relative;background:#800020;color:#fff;border-radius:1.1rem 1.1rem .3rem 1.1rem;padding:.8rem 2rem .8rem 1rem;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:.9rem;animation:burbujaEntra .35s ease-out}
+.burbuja{position:relative;background:#800020;color:#fff;border-radius:1.1rem 1.1rem .3rem 1.1rem;padding:.8rem 2rem .8rem 1rem;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:.9rem;animation:burbujaEntra .15s ease-out}
 .burbuja-x{position:absolute;top:4px;right:10px;border:0;background:transparent;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;opacity:.8}
 .burbuja .burbuja-acciones{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
 .burbuja .burbuja-acciones .mt-2{margin-top:0!important}
@@ -523,10 +561,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <!-- SOLO CONTROL ESCOLAR: horario de entrada/salida y orientador del grupo -->
  <div id="bloque-horario-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Horario y Orientador(a) del Grupo <span class="badge bg-secondary ms-2 align-middle txt-turno-activo">Matutino</span></h6>
- <div class="row g-3 align-items-end">
- <div class="col-md-6"><label class="form-label small" id="lbl-archivo-horarios">Archivo de horarios del turno Matutino (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-horarios" class="form-control form-control-sm" accept=".xlsx,.xls,.csv" multiple></div>
- <div class="col-md-3"><button onclick="subirHorarios()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Horarios</button></div>
- </div>
+ <p class="small text-muted mb-0">Ajusta aquí el horario y las tolerancias de cada grupo. El lector fijo y el teléfono los leen solos al escanear el QR y deciden si es entrada o salida.</p>
  <div id="resumen-horario-grupo" class="mt-2 small text-muted"></div>
  <div id="lista-horarios-actual" class="small mt-3"></div>
  </div>
@@ -560,16 +595,16 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  </div>
  <div id="bloque-tabla-orientador">
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 cab-centrable">
  <h6 class="fw-bold m-0" id="titulo-tabla-orientador">Turno Matutino</h6>
- <div class="d-flex gap-2 flex-wrap">
+ <div class="d-flex gap-2 flex-wrap grupo-botones">
  <button onclick="descargarReporte('Excel')" class="btn btn-success px-4 py-2 fw-semibold shadow-sm small btn-accion-restringida">Descargar Excel</button>
  <button onclick="descargarReporte('PDF')" class="btn btn-danger px-4 py-2 fw-semibold shadow-sm small btn-accion-restringida">Descargar PDF</button>
  </div>
  </div>
  <div class="table-responsive bg-white rounded-3 p-2 border shadow-sm mb-4">
  <table class="table table-striped table-hover align-middle mb-0 small">
- <thead class="table-dark"><tr><th>Matrícula / QR</th><th>Alumno</th><th>Grado</th><th>Grupo</th><th>Entrada</th><th>Salida</th><th>Permanencia</th><th>Estatus</th><th>Orientador(a)</th><th class="text-center">Acción</th></tr></thead>
+ <thead class="table-dark"><tr><th>Matrícula / QR</th><th>Alumno</th><th>Grado</th><th>Grupo</th><th>Entrada</th><th>Salida</th><th>Retardo entrada</th><th>Retardo salida</th><th>Estatus</th><th>Orientador(a)</th><th class="text-center">Acción</th></tr></thead>
  <tbody id="tabla-cuerpo-orientador"></tbody>
  </table>
  </div>
@@ -580,12 +615,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="row text-center mb-4 g-3">
  <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">TOTAL ALUMNOS</span><h3 class="fw-bold mb-0" id="st-total">0</h3></div></div>
  <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">ASISTENCIAS DE HOY</span><h3 class="fw-bold text-success mb-0" id="st-asis">0</h3></div></div>
- <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">RETARDOS Y PERMANENCIAS</span><h3 class="fw-bold text-primary mb-0" id="st-ret">0</h3></div></div>
+ <div class="col-md-4"><div class="p-3 bg-white rounded-4 border shadow-sm"><span class="text-muted d-block fw-bold small mb-1">RETARDOS (ENTRADA Y SALIDA)</span><h3 class="fw-bold text-primary mb-0" id="st-ret">0</h3></div></div>
  </div>
  <div class="p-4 bg-white rounded-4 border shadow-sm mb-4">
- <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+ <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2 cab-centrable">
  <h6 class="fw-bold m-0" style="color:#800020">Gráficas Comparativas y Estadísticas</h6>
- <div class="d-flex align-items-center gap-2 flex-wrap">
+ <div class="d-flex align-items-center gap-2 flex-wrap grupo-botones">
  <select id="sel-periodo-stats" class="form-select form-select-sm" style="width:auto" onchange="renderStats()">
  <option value="hoy" selected>Hoy</option>
  <option value="semana">Semana</option>
@@ -767,7 +802,7 @@ const ordenPaneles = ['orientador','lector','alumno'];
 let db = JSON.parse(localStorage.getItem(LS) || 'null') || {
  permisos: {orientador:'editar', director:'ver', subdirector:'ver'},
  plantillas: {}, // claveGrupo -> {frente:{img,fmt}, reverso:{img,fmt}} (override opcional por grupo)
- horarios: {}, // claveGrupo ("Turno-grado-grupo") -> {entrada, salida, orientadorId}
+ horarios: {}, // claveGrupo ("Turno-grado-grupo") -> {entrada, salida, orientadorId, tolEntrada, tolSalida (minutos)}
  orientadores: [], // {id, nombre}
  alumnos: []
 };
@@ -1074,23 +1109,63 @@ const generarId = () => 'id_' + Date.now().toString(36) + Math.random().toString
 const LIM = {Matutino:{retardo:430,fin:840}, Vespertino:{retardo:790,fin:1200}}; // 7:10-14:00 / 13:10-20:00 (por defecto)
 const nomGrado = ['', 'Primero', 'Segundo', 'Tercero'];
 const ROMANOS = ['', 'I', 'II', 'III', 'IV']; // grupo en número romano para la credencial
+/* Tolerancia (minutos) de cada grupo: entrada = después de la hora límite sigue sin ser retardo (0 si no se configura);
+   salida = después de la hora de cierre sigue sin ser retardo (30 si no se configura: se escanea la salida justo después del cierre) */
+const TOL_DEF = {entrada: 0, salida: 30};
+const tolDe = (h, k, def) => (h && h[k] != null && h[k] !== '' && !isNaN(h[k])) ? Math.max(0, Number(h[k])) : def;
+/* retardo = hora límite de entrada + tolerancia de entrada; fin = hora de cierre + tolerancia de salida */
 function limiteDe(a) {
  const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)];
- if (h && h.entrada && h.salida) return {retardo: toMin(h.entrada), fin: toMin(h.salida)};
- return LIM[a.turno];
+ const te = tolDe(h, 'tolEntrada', TOL_DEF.entrada), ts = tolDe(h, 'tolSalida', TOL_DEF.salida);
+ if (h && h.entrada && h.salida) return {retardo: toMin(h.entrada) + te, fin: toMin(h.salida) + ts};
+ const d = LIM[a.turno] || LIM.Matutino;
+ return {retardo: d.retardo + te, fin: d.fin + ts};
+}
+/* Minutos de retraso del alumno ese día: en la entrada (llegó después del límite + tolerancia) y en la salida
+   (salió después del cierre + tolerancia, o hoy todavía no sale y ya pasó ese límite) */
+function retrasosDe(a, r, fecha) {
+ const res = {entrada: 0, salida: 0, sinSalida: false};
+ if (!r || !r.entrada) return res;
+ const l = limiteDe(a);
+ res.entrada = Math.max(0, toMin(r.entrada) - l.retardo);
+ if (r.salida) res.salida = Math.max(0, toMin(r.salida) - l.fin);
+ else if (fecha === hoy() && toMin(horaAhora()) > l.fin) { res.salida = toMin(horaAhora()) - l.fin; res.sinSalida = true; }
+ return res;
+}
+/* Para las estadísticas: cada alumno-día suma en Asistencias (sin ningún retardo) o en Retardo entrada y/o Retardo salida. Sin entrada = no vino. */
+function conteoDe(a, f) {
+ const r = a.reg[f];
+ if (!r || !r.entrada) return {as: 0, re: 0, rs: 0};
+ const t = retrasosDe(a, r, f), re = t.entrada > 0 ? 1 : 0, rs = t.salida > 0 ? 1 : 0;
+ return {as: (re || rs) ? 0 : 1, re: re, rs: rs};
+}
+/* Texto de las columnas "Retardo entrada" y "Retardo salida" (tabla, Excel y PDF). "—" = no vino. */
+function textoRetardo(a, r, f) {
+ if (!r || !r.entrada) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
+ const t = retrasosDe(a, r, f);
+ return {t: t,
+  ent: t.entrada > 0 ? t.entrada + ' min' : 'Sin retardo',
+  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (' + t.salida + ' min)' : t.salida + ' min') : (r.salida ? 'Sin retardo' : 'Pendiente')};
+}
+function celdasRetardo(a, r, f) {
+ const x = textoRetardo(a, r, f);
+ return {ent: '<span class="' + (x.t.entrada > 0 ? 'txt-ret-ent' : 'text-muted small') + '">' + esc(x.ent) + '</span>',
+         sal: '<span class="' + (x.t.salida > 0 ? 'txt-ret-sal' : 'text-muted small') + '">' + esc(x.sal) + '</span>'};
 }
 function estatusDe(a, r, fecha) {
  if (!r || !r.entrada) return 'Sin registro';
- const l = limiteDe(a);
- if (!r.salida && fecha === hoy() && toMin(horaAhora()) > l.fin) return 'Permanencia';
- return toMin(r.entrada) > l.retardo ? 'Retardo' : 'Asistencia';
+ const t = retrasosDe(a, r, fecha);
+ if (t.entrada > 0 && t.salida > 0) return 'Retardo entrada y salida';
+ if (t.salida > 0) return 'Retardo salida';
+ return t.entrada > 0 ? 'Retardo entrada' : 'Asistencia';
 }
-function permDe(r) {
- if (!r || !r.entrada || !r.salida) return 'Pendiente';
- const d = toMin(r.salida) - toMin(r.entrada), h = Math.floor(d/60);
- return (h > 0 ? h+' h ' : '') + (d%60) + ' min';
+const claseEst = {'Asistencia':'bg-success','Retardo entrada':'bg-ret-ent','Retardo salida':'bg-ret-sal','Sin registro':'bg-sin-reg'};
+/* Insignia(s) del estatus; con retardo en la entrada Y en la salida se muestran las dos */
+function badgesEstatus(e) {
+ return e === 'Retardo entrada y salida'
+  ? '<span class="badge bg-ret-ent">Retardo entrada</span> <span class="badge bg-ret-sal">Retardo salida</span>'
+  : '<span class="badge ' + claseEst[e] + '">' + e + '</span>';
 }
-const claseEst = {'Asistencia':'bg-success','Retardo':'bg-warning text-dark','Permanencia':'bg-danger','Sin registro':'bg-secondary'};
 function diasDePeriodo(periodo, ref) {
  ref = ref || hoy();
  const d = new Date(ref + 'T12:00:00');
@@ -1427,14 +1502,18 @@ function renderListaHorarios() {
  if (foco && caja[0].contains(foco) && /^(INPUT|SELECT)$/.test(foco.tagName)) return;   // no pisa lo que se está escribiendo
  const abierta = caja.find('details').prop('open');
  const idsOri = new Set(db.orientadores.map(o => o.id));
- const grupos = Object.entries(db.horarios).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
-  .filter(x => x.c.turno === turnoActivo && x.h && (x.h.entrada || x.h.salida || x.h.orientadorId))
+ // Salen los grupos con horario u orientador asignado Y todos los que ya tienen alumnos (así no hace falta subir ningún archivo para ponerles horario)
+ const porClave = {};
+ Object.entries(db.horarios).forEach(([k, h]) => { if (h && (h.entrada || h.salida || h.orientadorId)) porClave[k] = h; });
+ (db.alumnos || []).forEach(a => { if (a.turno === turnoActivo && a.grado && a.grupo) { const k = claveGrupo(a.grado, a.grupo, a.turno); if (!porClave[k]) porClave[k] = db.horarios[k] || {}; } });
+ const grupos = Object.entries(porClave).map(([k, h]) => ({k: k, h: h, c: parseClave(k)}))
+  .filter(x => x.c.turno === turnoActivo)
   .sort((a, b) => a.c.grado - b.c.grado || a.c.grupo - b.c.grupo);
  const porOri = db.orientadores.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   .map(o => ({id: o.id, nombre: o.nombre, gr: grupos.filter(x => x.h.orientadorId === o.id)}));
  porOri.push({id: '', nombre: 'Sin orientador(a)', gr: grupos.filter(x => !x.h.orientadorId || !idsOri.has(x.h.orientadorId))});
  const items = porOri.filter(o => o.gr.length);
- if (!items.length) { caja.html('<span class="text-muted">Aún no hay horarios ni orientadores asignados a grupos del turno ' + esc(turnoActivo) + '.</span>'); return; }
+ if (!items.length) { caja.html('<span class="text-muted">Aún no hay grupos con alumnos en el turno ' + esc(turnoActivo) + '. Sube la lista de un grupo y aparecerá aquí para ponerle su horario.</span>'); return; }
  const filas = items.map(o => {
   const llaves = o.gr.map(x => x.k);
   let sel = _horSel[o.id];
@@ -1446,12 +1525,14 @@ function renderListaHorarios() {
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
-   '<div class="col-md-5"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
-   '<div class="col-6 col-md-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
-   '<div class="col-md-3 d-flex flex-wrap gap-1">' +
+   '<div class="col-12 col-xl-4"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-12 d-flex flex-wrap gap-1">' +
    '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
-   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo la hora de entrada y de cierre de este grupo">Quitar horario</button>' +
+   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
    '</div></div></div></div>';
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios del turno ' + esc(turnoActivo) + ' por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
@@ -1462,20 +1543,24 @@ function cargarHorarioInline(sel) {
  const it = $(sel).closest('.ori-hor'), h = db.horarios[sel.value] || {};
  _horSel[it.attr('data-o')] = sel.value;
  it.find('.hor-ent').val(h.entrada || ''); it.find('.hor-sal').val(h.salida || '');
+ it.find('.hor-tol-ent').val(tolDe(h, 'tolEntrada', TOL_DEF.entrada)); it.find('.hor-tol-sal').val(tolDe(h, 'tolSalida', TOL_DEF.salida));
 }
 /* Guarda la hora del grupo elegido en el renglón del orientador(a) */
 function guardarHorarioInline(btn) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede cambiar horarios.'); return; }
  const it = $(btn).closest('.ori-hor'), k = it.find('select').val();
  const e = it.find('.hor-ent').val(), s = it.find('.hor-sal').val();
+ const num = (v, d) => String(v).trim() === '' ? d : Number(v);   // vacío = valor por defecto
+ const te = num(it.find('.hor-tol-ent').val(), TOL_DEF.entrada), ts = num(it.find('.hor-tol-sal').val(), TOL_DEF.salida);
  if (!k || !db.horarios[k]) return;
+ if (![te, ts].every(v => Number.isInteger(v) && v >= 0 && v <= 180)) { alert('La tolerancia debe ser un número entero de minutos, de 0 a 180.'); return; }
  if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
  if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
- { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' y cierre a las ' + h12(s) + '.')) return; }
- db.horarios[k].entrada = e; db.horarios[k].salida = s;
+ { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' (tolerancia ' + te + ' min) y cierre a las ' + h12(s) + ' (tolerancia ' + ts + ' min).')) return; }
+ db.horarios[k].entrada = e; db.horarios[k].salida = s; db.horarios[k].tolEntrada = te; db.horarios[k].tolSalida = ts;
  const c = parseClave(k);
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
- $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + '.');
+ $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + ' · tolerancia de entrada ' + te + ' min, de salida ' + ts + ' min.');
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -1483,7 +1568,7 @@ function quitarHorarioGrupo(k) {
  const h = db.horarios[k]; if (!h) return;
  const c = parseClave(k);
  if (!confirm('¿Quitar el horario del ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ')? Volverá a usar el horario predeterminado. El orientador(a) no se modifica.')) return;
- h.entrada = ''; h.salida = '';
+ h.entrada = ''; h.salida = ''; h.tolEntrada = TOL_DEF.entrada; h.tolSalida = TOL_DEF.salida;
  guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
 }
 /* Quita a un orientador de UN grupo (conserva el horario del grupo y sus demás grupos). */
@@ -1785,7 +1870,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 700);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -2488,6 +2573,9 @@ function encolarEscaneo(curp, modo, fecha, hora) {
  guardarCola();
  vaciarCola();
 }
+let _demoraCola = 1500;   // si un envío falla, se reintenta pronto (1.5 s, luego 3, 6 y hasta 10 s) en vez de esperar al chequeo de cada 15 s
+function reintentarColaPronto() { setTimeout(vaciarCola, _demoraCola); _demoraCola = Math.min(_demoraCola * 2, 10000); }
+const LOTE_COLA = 100;   // escaneos que se mandan juntos en una sola petición
 function vaciarCola() {
  if (_vaciandoCola || !colaEscaneos.length) return;
  _vaciandoCola = true;
@@ -2497,39 +2585,52 @@ function vaciarCola() {
   if (huboExito) cargarDesdeServidor();   // trae lo que escanearon los demás dispositivos
  };
  const enviar = (reintentoCsrf, huboExito) => {
-  const it = colaEscaneos[0];
-  if (!it) return terminar(huboExito);
+  const lote = colaEscaneos.slice(0, LOTE_COLA);
+  if (!lote.length) return terminar(huboExito);
   // Si el escaneo ya esperó (sin internet o en cola), el servidor usa la hora en que se escaneó de verdad
-  const diferido = !!it.diferido || (Date.now() - (it.ts || 0) > 60000);
+  const items = lote.map(it => ({curp: it.curp, modo: it.modo, fecha: it.fecha, hora: it.hora, diferido: !!it.diferido || (Date.now() - (it.ts || 0) > 60000)}));
   fetchT('/api/sica/sync', {
    method: 'POST',
    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
-   body: JSON.stringify({ accion: 'registrar_asistencia', datos: {curp: it.curp, modo: it.modo, fecha: it.fecha, hora: it.hora, diferido: diferido} })
-  }, 12000).then(r => {
+   body: JSON.stringify({ accion: 'registrar_asistencias', datos: {items: items} })
+  }, 30000).then(r => {
    if (r.status === 419 && !reintentoCsrf) return refrescarCsrf().then(() => enviar(true, huboExito));
    if (r.status === 401) { terminar(huboExito); sesionExpirada(); return; }   // la cola se conserva hasta volver a iniciar sesión
-   if (r.ok) { _errCola = ''; colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
-   if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; return terminar(huboExito); }
-   // 403 / 404 / 422: el servidor lo rechazó de forma definitiva -> se descarta para no atorar la cola
-   colaEscaneos.shift(); guardarCola();
+   if (r.ok) {
+    return r.json().catch(() => ({})).then(d => {
+     const res = (d && d.resultados) || [];
+     if (res.length !== lote.length) { lote.forEach(it => { it.diferido = true; }); _errCola = 'respuesta incompleta del servidor, reintentando'; terminar(huboExito); return reintentarColaPronto(); }
+     // Cada escaneo sale de la cola cuando el servidor lo atendió; los rechazados de forma definitiva (403/404/409/422) se descartan para no atorarla
+     const ids = new Set(lote.map(it => it.id));
+     colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id));
+     _errCola = ''; _demoraCola = 1500;
+     guardarCola(); acelerarSync(); avisarEstado();
+     res.forEach((x, i) => { if (x.status >= 400) avisoPermiso('Un escaneo pendiente (' + lote[i].curp + ') fue rechazado por el servidor: ' + (x.mensaje || 'error ' + x.status)); });
+     return enviar(false, true);
+    });
+   }
+   if (r.status >= 500 || r.status === 429) { lote.forEach(it => { it.diferido = true; }); _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; terminar(huboExito); return reintentarColaPronto(); }
+   // 403 / 404 / 422 de toda la petición: se descarta el lote para no atorar la cola
+   const ids = new Set(lote.map(it => it.id));
+   colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id)); guardarCola();
    return r.json().catch(() => ({})).then(d => {
-    avisoPermiso('Un escaneo pendiente (' + it.curp + ') fue rechazado por el servidor: ' + ((d && d.mensaje) || 'error ' + r.status));
+    avisoPermiso('Escaneos pendientes rechazados por el servidor: ' + ((d && d.mensaje) || 'error ' + r.status));
     return enviar(false, huboExito);
    });
-  }).catch(() => { it.diferido = true; _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); });   // sin conexión: se queda en la cola
+  }).catch(() => { lote.forEach(it => { it.diferido = true; }); _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); reintentarColaPronto(); });   // sin conexión: se quedan en la cola
  };
  enviar(false, false);
 }
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
 const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
-/* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (en la salida, también la permanencia) */
+/* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (y el retardo de entrada o de salida, si lo hubo) */
 function detalleRegistro(tipo, a, hora, extra) {
  // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
  let ori = '';
  try { const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)], o = h && h.orientadorId ? db.orientadores.find(x => x.id === h.orientadorId) : null; ori = o ? o.nombre : ''; } catch (e) {}
  return tipo + ' registrada: ' + a.nombre + ' · ' + (nomGrado[a.grado] || a.grado) + ' grado · Grupo ' + (ROMANOS[a.grupo] || a.grupo) +
-  ' · ' + a.turno + (ori ? ' · Orientador(a): ' + ori : '') + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · Permanencia: ' + extra : '');
+  ' · ' + a.turno + (ori ? ' · Orientador(a): ' + ori : '') + ' · CURP: ' + (a.curp || '') + ' · ' + h12(hora) + (extra ? ' · ' + extra : '');
 }
 /* ============ ESCÁNER QR (cámara) ============ */
 function iniciarScanner(el, modoFn) {
@@ -2542,7 +2643,7 @@ function iniciarScanner(el, modoFn) {
  $('#' + el).siblings('.cam-ph').hide();
  // Teléfono: cámara trasera ('environment'). Computadora: la que haya ('user').
  // Sin recuadro: se analiza TODA la imagen, así el QR se lee de cerca o de lejos y en cualquier parte de la pantalla
- const cfg = {fps:20, disableFlip:true};
+ const cfg = {fps:30, disableFlip:true};
  const alLeer = txt => procesarQR(claveDeLectura(txt), modoFn(), el);
  const fallo = e => {
  delete scanners[el]; $('#' + el).siblings('.cam-ph').show();
@@ -2611,16 +2712,18 @@ function procesarQR(curp, modo, el) {
  } else mostrar(r);
 }
 let _guardarPend = null;
-function guardarYPintarLuego() {   // varios escaneos seguidos se juntan en un solo guardado
+/* Varios escaneos seguidos se juntan: como máximo cada 300 ms se guarda una copia local y se repinta la tabla.
+   NO se manda toda la base al servidor en cada escaneo (eso era lo lento): cada escaneo ya viaja por la cola de envío, en lotes. */
+function guardarYPintarLuego() {
  if (_guardarPend) return;
- _guardarPend = setTimeout(() => { _guardarPend = null; save(); renderTabla(); }, 0);
+ _guardarPend = setTimeout(() => { _guardarPend = null; try { localStorage.setItem(LS, JSON.stringify(db)); } catch (e) {} renderTabla(); }, 300);
 }
 /* ---- Modo AUTOMÁTICO: Entrada o Salida según el horario del grupo del alumno (misma lógica que App\Support\MovimientoAutomatico en el servidor) ----
    1. Ya tiene entrada y salida hoy -> no se registra nada más.
    2. Ya tiene entrada y no salida  -> Salida (también salidas anticipadas con permiso).
    3. Sin entrada y la hora ya está en el bloque de salida del grupo (30 min antes de su hora de salida) -> Salida.
    4. Sin entrada en cualquier otro momento (antes del turno, a tiempo o con retardo) -> Entrada. */
-const MOV_AUTO = {salidaAntes: 30, repetida: 5, defecto: {Matutino: [430, 840], Vespertino: [790, 1200]}};
+const MOV_AUTO = {salidaAntes: 30, defecto: {Matutino: [430, 840], Vespertino: [790, 1200]}};
 function horarioAuto(a) {
  const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)] || {}, ok = v => /^\d{1,2}:\d{2}/.test(v || '');
  const e = ok(h.entrada) ? toMin(h.entrada) : null, s = ok(h.salida) ? toMin(h.salida) : null;
@@ -2629,14 +2732,15 @@ function horarioAuto(a) {
 }
 function resolverMovimiento(a, r) {
  const [e, s] = horarioAuto(a), ahora = toMin(horaAhora());
- if (r.entrada && r.salida) return {error: a.nombre + ': la entrada y la salida de hoy ya estaban registradas'};
+ if (r.entrada && r.salida) return {error: a.nombre + ': ya tiene entrada (' + h12(r.entrada) + ') y salida (' + h12(r.salida) + ') de hoy'};
  if (r.entrada) {
-  if (ahora - toMin(r.entrada) < MOV_AUTO.repetida) return {error: a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
+  if (ahora < Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2))) return {error: a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
   return {modo: 'Salida'};
  }
- return {modo: ahora >= Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2)) ? 'Salida' : 'Entrada'};
+ // Sin entrada: es ENTRADA hasta que llegue la hora de salida del grupo (aunque ya pasaron la hora de entrada y su tolerancia: solo lleva retardo); desde la hora de salida es SALIDA
+ return {modo: ahora >= s ? 'Salida' : 'Entrada'};
 }
-function aplicarRegistro(a, modo) {
+function aplicarRegistro(a, modo, sinEntradaOk) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
  const f = hoy(), r = a.reg[f] = a.reg[f] || {};
  let auto = false;
@@ -2649,7 +2753,7 @@ function aplicarRegistro(a, modo) {
  if (r.entrada) return {ok:false, msg:a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
  r.entrada = horaAhora();
  } else {
- if (!r.entrada && !auto) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};   // en automático sí se permite (salió sin haber escaneado la entrada)
+ if (!r.entrada && !auto && !sinEntradaOk) return {ok:false, msg:a.nombre + ': no tiene entrada registrada hoy'};   // en automático sí se permite (salió sin haber escaneado la entrada)
  if (r.salida) return {ok:false, msg:a.nombre + ': la salida ya estaba registrada (' + h12(r.salida) + ')'};
  r.salida = horaAhora();
  }
@@ -2657,7 +2761,9 @@ function aplicarRegistro(a, modo) {
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
  guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
- return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), modo === 'Salida' ? permDe(r) : '') +
+ const tr = retrasosDe(a, r, f);
+ const extraRet = modo === 'Entrada' ? (tr.entrada > 0 ? 'Retardo de entrada: ' + tr.entrada + ' min' : '') : (tr.salida > 0 ? 'Retardo de salida: ' + tr.salida + ' min' : '');
+ return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), extraRet) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 /* Índice código-del-QR -> alumno. Antes, cada lectura calculaba el código (un hash) de los alumnos uno por uno hasta dar con el correcto;
@@ -2705,7 +2811,7 @@ function registrarDesconocido(curp, modo) {
   return {ok:false, msg:'No se pudo registrar (error ' + r.status + '). Escanea de nuevo.'};
  })).catch(() => ({ok:false, msg:'QR no reconocido: ' + curp + ' (sin conexión con el servidor)'}));
 }
-function registrarPorId(id, modo) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo); }
+function registrarPorId(id, modo, sinEntradaOk) { const a = db.alumnos.find(x => x.id === id); return aplicarRegistro(a, modo, sinEntradaOk); }
 /* ============ LECTOR FIJO ============ */
 // Modo Automático (por defecto): Entrada o Salida según el horario del grupo. Entrada/Salida fuerzan el modo a mano; pulsar el mismo botón otra vez regresa a Automático.
 function setModoEscaneo(m) {
@@ -2808,7 +2914,6 @@ function actualizarTextosTurno() {
  $('.txt-turno-activo').text(t);
  $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa ' + t + ')');
  $('#lbl-archivo-lista').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): CURP y nombre');
- $('#lbl-archivo-horarios').text('Archivo de horarios del turno ' + t + ' (.xlsx/.xls/.csv): Grado, Grupo, HoraEntrada, HoraSalida, Orientador y Turno (opcional; si no lo pones se usa ' + t + ')');
 }
 function pintarBotonesTurno() {
  const t = turnoActivo;
@@ -2903,12 +3008,12 @@ function nombreOrientadorDe(a) {
 function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
- const r = a.reg[f] || {}, e = estatusDe(a, r, f), dis = (!r.entrada || r.salida || f !== hoy()) ? 'disabled' : '';
- return `<tr><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${permDe(r)}</td><td><span class="badge ${claseEst[e]}">${e}</span></td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
- }).join('') || '<tr><td colspan="10" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
+ const r = a.reg[f] || {}, e = estatusDe(a, r, f), rt = celdasRetardo(a, r, f), dis = (r.salida || f !== hoy()) ? 'disabled' : '';
+ return `<tr${e === 'Sin registro' ? ' class="fila-sin-reg"' : ''}><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
+ }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
- renderStats();
+ if (!$('#panel-control').hasClass('d-none')) renderStats();   // las estadísticas solo se redibujan si se están viendo (al abrir ese panel se dibujan)
 }
 let _temporizadorTabla = null;
 function renderTablaPronto() { clearTimeout(_temporizadorTabla); _temporizadorTabla = setTimeout(renderTabla, 150); }
@@ -2918,7 +3023,7 @@ function aplicarPermisosSolo() {
  bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
 }
-function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida'); if (!r.ok) alert(r.msg); }
+function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida', true); if (!r.ok) alert(r.msg); }
 function subirLista() {
  if (!permisoPermite()) return;
  if (!filtro) { alert('Primero selecciona el grado y el grupo arriba (Visualizar Grupo).'); return; }
@@ -3065,61 +3170,49 @@ function borrarGruposCargados(todos) {
   alert('No se pudieron borrar los grupos en el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
 }
-function subirHorarios() {
- if (!permisoPermite()) return;
- const inp = $('#archivo-horarios')[0];
- if (!inp.files.length) { alert('Selecciona un archivo de horarios.'); return; }
- if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' de horarios del turno ' + turnoActivo + '?\nSe cambiarán el horario y el orientador de los grupos que traiga el archivo.')) return;
- leerFilasVarios(inp, ['xlsx', 'xls', 'csv'], r => /grado/i.test(String(r[0] == null ? '' : r[0])), rows => {
-  rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
-  if (rows.length && /grado/i.test(String(rows[0][0] == null ? '' : rows[0][0]))) rows.shift();
-  if (!rows.length) { alert('El archivo no trae horarios. Columnas: Grado, Grupo, HoraEntrada, HoraSalida, NombreOrientador y Turno (opcional).'); return; }
-  let aplicados = 0, orientadoresNuevos = 0;
-  const porTurno = {Matutino: 0, Vespertino: 0};
-  const avisos = [];
-  rows.forEach(r => {
-   const etq = 'Grado ' + (r[0] == null ? '' : r[0]) + ', grupo ' + (r[1] == null ? '' : r[1]);
-   const grado = numeroDe(r[0]), grupo = numeroDe(r[1]);
-   const entrada = horaDe(r[2]), salida = horaDe(r[3]);
-   const nombreO = r[4] == null ? '' : String(r[4]).replace(/\s+/g, ' ').trim();
-   const turnoTxt = r[5] == null ? '' : String(r[5]).trim();
-   if (grado < 1 || grado > 3 || grupo < 1 || grupo > 4) { avisos.push(etq + ': grado o grupo no válido (grado 1 a 3, grupo 1 a 4); se omitió.'); return; }
-   if (!entrada || !salida) { avisos.push(etq + ': hora de entrada o de salida no válida (usa por ejemplo 07:10 o 1:10 PM); se omitió.'); return; }
-   if (toMin(salida) <= toMin(entrada)) { avisos.push(etq + ': la hora de cierre debe ser posterior a la de entrada; se omitió.'); return; }
-   const tn = turnoTxt ? turnoDe(turnoTxt) : turnoActivo;
-   const turnos = tn === 'Ambos' ? ['Matutino', 'Vespertino'] : [tn];
-   let orientadorId = '';
-   if (nombreO) {
-    let o = db.orientadores.find(x => norm(x.nombre) === norm(nombreO));
-    if (!o) { o = {id: generarId(), nombre: nombreO}; db.orientadores.push(o); orientadoresNuevos++; }
-    orientadorId = o.id;
-   }
-   turnos.forEach(turno => {
-    const clave = claveGrupo(grado, grupo, turno), previo = db.horarios[clave] || {};
-    // si el archivo no trae orientador(a), se conserva el que ya tenía el grupo
-    db.horarios[clave] = {entrada: entrada, salida: salida, orientadorId: orientadorId || previo.orientadorId || ''};
-    aplicados++; porTurno[turno]++;
-   });
-  });
-  if (aplicados) { guardarOrientadoresServidor(); renderTabla();renderListaOrientadores(); refrescarHorarioForm(); }
-  let html = 'Horarios aplicados: ' + aplicados + ' (Matutino: ' + porTurno.Matutino + ', Vespertino: ' + porTurno.Vespertino + ')' + (orientadoresNuevos ? '. Orientadores nuevos: ' + orientadoresNuevos : '') + '.';
-  if (avisos.length) html += '<div class="text-danger mt-1"><b>Revisa:</b><br>' + avisos.map(esc).join('<br>') + '</div>';
-  $('#resumen-horario-grupo').html(html);
-  alert(aplicados ? 'Horarios cargados para ' + aplicados + ' grupo(s).' + (avisos.length ? ' Hubo ' + avisos.length + ' fila(s) omitidas: revisa el aviso debajo.' : '') : 'No se cargó ningún horario: revisa el aviso debajo.');
-  $('#archivo-horarios').val('');
- }, msg => alert(msg));
-}
 /* Descargas (Excel / PDF reales) */
-function descargar(nombre, filas, formato, titulo) {
+/* Colores de las listas descargadas: retardo en rojo, sin registro en ámbar */
+const COLOR_DESCARGA = {
+ sinRegistro: {fondo: 'FFFFF3CD', texto: 'FF664D03', rgbFondo: [255,243,205], rgbTexto: [102,77,3]},
+ retardo: {fondo: 'FFF8D7DA', texto: 'FFB02A37', rgbFondo: [248,215,218], rgbTexto: [176,42,55]}
+};
+function colorDeCelda(o, k) {
+ const est = String(o.Estatus || '');
+ if (est === 'Sin registro') return COLOR_DESCARGA.sinRegistro;
+ if (k === 'Retardo entrada' && /\d/.test(String(o[k]))) return COLOR_DESCARGA.retardo;
+ if (k === 'Retardo salida' && /\d/.test(String(o[k]))) return COLOR_DESCARGA.retardo;
+ if (k === 'Estatus' && /^Retardo/.test(est)) return COLOR_DESCARGA.retardo;
+ return null;
+}
+async function descargar(nombre, filas, formato, titulo) {
  if (!filas.length) { alert('No hay datos para descargar.'); return; }
- if (!libsOk(formato === 'Excel' ? 'XLSX' : 'jspdf')) return;
+ if (!libsOk(formato === 'Excel' ? 'ExcelJS' : 'jspdf')) return;
+ const k = Object.keys(filas[0]);
  if (formato === 'Excel') {
- const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), 'Reporte'); XLSX.writeFile(wb, nombre + '.xlsx');
+  const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Reporte');
+  const enc = ws.addRow(k);
+  enc.eachCell(c => { c.font = {bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF800020'}}; c.alignment = {horizontal:'center'}; });
+  filas.forEach(o => {
+   const fila = ws.addRow(k.map(x => o[x]));
+   k.forEach((x, i) => { const c = colorDeCelda(o, x); if (c) { const cel = fila.getCell(i + 1); cel.fill = {type:'pattern', pattern:'solid', fgColor:{argb:c.fondo}}; cel.font = {color:{argb:c.texto}, bold:true}; } });
+  });
+  k.forEach((x, i) => { ws.getColumn(i + 1).width = Math.min(Math.max(Math.max(String(x).length, ...filas.map(o => String(o[x] == null ? '' : o[x]).length)) + 3, 12), 40); });
+  ws.views = [{state:'frozen', ySplit:1}];
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre + '.xlsx';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
  } else {
- const d = new window.jspdf.jsPDF({orientation:'landscape'}), k = Object.keys(filas[0]);
- d.setFontSize(13); d.text(titulo, 14, 14);
- d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY:20, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]}});
- d.save(nombre + '.pdf');
+  const d = new window.jspdf.jsPDF({orientation:'landscape'});
+  d.setFontSize(13); d.text(titulo, 14, 14);
+  d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY:20, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]},
+   didParseCell: data => {
+    if (data.section !== 'body') return;
+    const c = colorDeCelda(filas[data.row.index], k[data.column.index]);
+    if (c) { data.cell.styles.fillColor = c.rgbFondo; data.cell.styles.textColor = c.rgbTexto; data.cell.styles.fontStyle = 'bold'; }
+   }});
+  d.save(nombre + '.pdf');
  }
 }
 function descargarReporte(formato) {
@@ -3130,7 +3223,16 @@ function descargarReporte(formato) {
  const tp = tituloPeriodo(periodo, ref);
  const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
  const filas = [];
- filtrados().forEach(a => dias.forEach(f => { const r = a.reg[f]; if (r && (r.entrada || r.salida)) filas.push({Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno, Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', Permanencia:permDe(r), Estatus:estatusDe(a, r, f)}); }));
+ const lista = filtrados(), hoyF = hoy();
+ // Los alumnos sin registro también salen en la lista (en otro color), pero solo en días de clases que ya pasaron y en los que alguien del grupo sí vino
+ const diaConClase = {};
+ dias.forEach(f => { const d = new Date(f + 'T12:00:00').getDay(); diaConClase[f] = f <= hoyF && d !== 0 && d !== 6 && lista.some(a => a.reg[f] && (a.reg[f].entrada || a.reg[f].salida)); });
+ lista.forEach(a => dias.forEach(f => {
+  const r = a.reg[f], base = {Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno};
+  if (r && (r.entrada || r.salida)) filas.push(Object.assign(base, {Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', 'Retardo entrada':textoRetardo(a, r, f).ent, 'Retardo salida':textoRetardo(a, r, f).sal, Estatus:estatusDe(a, r, f)}));
+  else if (diaConClase[f]) filas.push(Object.assign(base, {Entrada:'—', Salida:'—', 'Retardo entrada':'—', 'Retardo salida':'—', Estatus:'Sin registro'}));
+ }));
+ filas.sort((x, y) => x.Fecha < y.Fecha ? -1 : x.Fecha > y.Fecha ? 1 : 0);   // (el orden alfabético de alumnos se conserva dentro de cada fecha)
  descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
@@ -3139,11 +3241,11 @@ function statsGrados(periodo) {
  const dias = diasDePeriodo(periodo);
  return [1,2,3].map(g => {
  const l = db.alumnos.filter(a => a.grado === g);
- let as = 0, re = 0, pe = 0;
- l.forEach(a => dias.forEach(f => { const e = estatusDe(a, a.reg[f], f); if (e === 'Asistencia') as++; else if (e === 'Retardo') re++; else if (e === 'Permanencia') pe++; }));
+ let as = 0, re = 0, rs = 0;
+ l.forEach(a => dias.forEach(f => { const x = conteoDe(a, f); as += x.as; re += x.re; rs += x.rs; }));
  const base = l.length * dias.length;
  const p = n => base ? Math.round(n*100/base) : 0;
- return {Grado:g + '° grado', gradoNum:g, Alumnos:l.length, Asistencias:as, '% Asistencias':p(as), Retardos:re, '% Retardos':p(re), Permanencias:pe};
+ return {Grado:g + '° grado', gradoNum:g, Alumnos:l.length, Asistencias:as, '% Asistencias':p(as), 'Retardo entrada':re, '% Retardo entrada':p(re), 'Retardo salida':rs, '% Retardo salida':p(rs)};
  });
 }
 /* Comparativa por grupo de un grado. Incluye los grupos de ambos turnos
@@ -3154,11 +3256,11 @@ function statsPorGrupo(grado, periodo) {
  ['Matutino','Vespertino'].forEach(turno => [1,2,3,4].forEach(grupo => {
  const l = db.alumnos.filter(a => a.grado === grado && a.grupo === grupo && a.turno === turno);
  if (!l.length && turno === 'Vespertino') return;
- let as = 0, re = 0, pe = 0;
- l.forEach(a => dias.forEach(f => { const e = estatusDe(a, a.reg[f], f); if (e === 'Asistencia') as++; else if (e === 'Retardo') re++; else if (e === 'Permanencia') pe++; }));
+ let as = 0, re = 0, rs = 0;
+ l.forEach(a => dias.forEach(f => { const x = conteoDe(a, f); as += x.as; re += x.re; rs += x.rs; }));
  const h = db.horarios[claveGrupo(grado, grupo, turno)] || {};
  const orientadorNombre = h.orientadorId ? ((db.orientadores.find(o => o.id === h.orientadorId) || {}).nombre || 'Sin asignar') : 'Sin asignar';
- res.push({turno:turno, grupo:grupo, asistencias:as, retardos:re, permanencias:pe, alumnos:l.length, orientador: orientadorNombre});
+ res.push({turno:turno, grupo:grupo, asistencias:as, retardosEntrada:re, retardosSalida:rs, alumnos:l.length, orientador: orientadorNombre});
  }));
  return res;
 }
@@ -3168,12 +3270,12 @@ function renderStats() {
  const s = statsGrados(periodo), sum = k => s.reduce((t, x) => t + x[k], 0), tot = sum('Alumnos');
  $('#st-total').text(tot);
  $('#st-asis').text(sum('Asistencias') + ' (' + (tot ? Math.round(sum('Asistencias')*100/tot) : 0) + '%)');
- $('#st-ret').text((sum('Retardos') + sum('Permanencias')) + ' (' + (tot ? Math.round((sum('Retardos') + sum('Permanencias'))*100/tot) : 0) + '%)');
+ $('#st-ret').text((sum('Retardo entrada') + sum('Retardo salida')) + ' (' + (tot ? Math.round((sum('Retardo entrada') + sum('Retardo salida'))*100/tot) : 0) + '%)');
  $('#stats-grados').html(s.map(x => `<div class="col-md-4"><button id="btn-grado-${x.gradoNum}" onclick="seleccionarGrado(${x.gradoNum})" class="btn tarjeta-grado p-3 border rounded-3 bg-light w-100 text-center" title="Selecciona este grado y usa Excel o PDF (arriba) para descargar su comparativa">
  <span class="fw-bold small d-block text-secondary">${x.Grado}</span>
  <span class="text-success fw-bold d-block">Asistencias: ${x['% Asistencias']}% (${x.Asistencias} de ${x.Alumnos})</span>
- <span class="text-warning fw-bold d-block">Retardos: ${x['% Retardos']}% (${x.Retardos})</span>
- <span class="text-danger fw-bold d-block">Permanencia: ${x.Permanencias} alumnos</span>
+ <span class="fw-bold d-block" style="color:#dc3545">Retardo entrada: ${x['% Retardo entrada']}% (${x['Retardo entrada']})</span>
+ <span class="fw-bold d-block" style="color:#a71d2a">Retardo salida: ${x['% Retardo salida']}% (${x['Retardo salida']})</span>
  </button></div>`).join(''));
  actualizarBotonesGrado();
  dibujarGraficaAsistencias(s);
@@ -3192,8 +3294,8 @@ function dibujarGraficaAsistencias(s) {
  if (!ctx || typeof Chart === 'undefined') return;
  const data = { labels: s.map(x => x.Grado), datasets: [
  {label:'Asistencias', data: s.map(x => x.Asistencias), backgroundColor:'#198754'},
- {label:'Retardos', data: s.map(x => x.Retardos), backgroundColor:'#ffc107'},
- {label:'Permanencias', data: s.map(x => x.Permanencias), backgroundColor:'#dc3545'}
+ {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#dc3545'},
+ {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#a71d2a'}
  ]};
  const titulo = 'Estadísticas de asistencia - ' + tituloPeriodo($('#sel-periodo-stats').val() || 'hoy');
  if (!libsOk('Chart')) return;
@@ -3221,14 +3323,14 @@ function cfgGraficaGeneral(s, titulo) {
  return {type:'bar',
  data:{labels: s.map(x => x.Grado), datasets:[
  {label:'Asistencias', data: s.map(x => x.Asistencias), backgroundColor:'#198754'},
- {label:'Retardos', data: s.map(x => x.Retardos), backgroundColor:'#ffc107'},
- {label:'Permanencias', data: s.map(x => x.Permanencias), backgroundColor:'#dc3545'}]},
+ {label:'Retardo entrada', data: s.map(x => x['Retardo entrada']), backgroundColor:'#dc3545'},
+ {label:'Retardo salida', data: s.map(x => x['Retardo salida']), backgroundColor:'#a71d2a'}]},
  options:{ plugins:{ legend:{position:'bottom'}, title:{display:true, text:titulo, font:{size:15, weight:'bold'}, color:'#800020'} },
  scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
 }
 function cfgGraficaGrupo(grado, g) {
  return {type:'bar',
- data:{ labels:['Asistencias','Retardos','Permanencias'], datasets:[{ data:[g.asistencias,g.retardos,g.permanencias], backgroundColor:['#198754','#ffc107','#dc3545'] }] },
+ data:{ labels:['Asistencias','Retardo entrada','Retardo salida'], datasets:[{ data:[g.asistencias,g.retardosEntrada,g.retardosSalida], backgroundColor:['#198754','#dc3545','#a71d2a'] }] },
  options:{ plugins:{ legend:{display:false}, title:{display:true, text:nomGrado[grado]+' '+g.grupo+' ('+g.turno+') — Orientador(a): '+g.orientador, font:{size:15, weight:'bold'}, color:'#800020'} },
  scales:{ y:{beginAtZero:true, grace:'10%', ticks:{precision:0}} } }};
 }
@@ -3271,7 +3373,7 @@ async function descargarGraficas(formato) {
  const tp = tituloPeriodo(periodo);
  if (formato === 'Excel') {
  if (!libsOk('Chart')) return;
- const filas = s.map(x => ({Grado:x.Grado, Alumnos:x.Alumnos, Asistencias:x.Asistencias, '% Asistencias':x['% Asistencias'], Retardos:x.Retardos, '% Retardos':x['% Retardos'], Permanencias:x.Permanencias}));
+ const filas = s.map(x => ({Grado:x.Grado, Alumnos:x.Alumnos, Asistencias:x.Asistencias, '% Asistencias':x['% Asistencias'], 'Retardo entrada':x['Retardo entrada'], '% Retardo entrada':x['% Retardo entrada'], 'Retardo salida':x['Retardo salida'], '% Retardo salida':x['% Retardo salida']}));
  const im = imagenDeGrafica(cfgGraficaGeneral(s, 'Estadísticas de asistencia - ' + tp), 800, 420);
  await descargarExcelConGraficas('estadisticas_' + hoy(), 'Estadísticas de asistencia - ' + tp, filas, [im]);
  return;
@@ -3287,14 +3389,14 @@ async function descargarGraficas(formato) {
  d.addImage(img, 'PNG', 14, 22, imgW, imgH);
  startY = 22 + imgH + 8;
  }
- const k = ['Grado','Alumnos','Asistencias','% Asistencias','Retardos','% Retardos','Permanencias'];
+ const k = ['Grado','Alumnos','Asistencias','% Asistencias','Retardo entrada','% Retardo entrada','Retardo salida','% Retardo salida'];
  d.autoTable({head:[k], body: s.map(o => k.map(x => o[x])), startY: startY, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]}});
  d.save('estadisticas_' + hoy() + '.pdf');
  } catch (e) { console.error(e); alert('No se pudo generar el archivo: ' + (e && e.message ? e.message : e)); }
 }
 /* Tabla de la comparativa de un grado (las mismas columnas en el Excel y en el PDF) */
 function filasComparativaGrado(grado, datos) {
- return datos.map(g => ({Grupo: nomGrado[grado] + ' ' + g.grupo, Turno: g.turno, 'Orientador(a)': g.orientador, Alumnos: g.alumnos, Asistencias: g.asistencias, Retardos: g.retardos, Permanencias: g.permanencias}));
+ return datos.map(g => ({Grupo: nomGrado[grado] + ' ' + g.grupo, Turno: g.turno, 'Orientador(a)': g.orientador, Alumnos: g.alumnos, Asistencias: g.asistencias, 'Retardo entrada': g.retardosEntrada, 'Retardo salida': g.retardosSalida}));
 }
 function descargarComparativaGradoPDF(grado) {
  if (!libsOk('Chart')) return;
@@ -4021,12 +4123,13 @@ function programarConsulta() {
 var _canalEstado = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_estado') : null;
 function avisarEstado() { try { if (_canalEstado) _canalEstado.postMessage(Date.now()); } catch (e) {} }
 if (_canalEstado) _canalEstado.onmessage = () => { if (rolActivo) { acelerarSync(); cargarDesdeServidor(); } };
-/* "Permanencia": un alumno sin salida pasa a ese estatus cuando LLEGA la hora de fin de su grupo, aunque no entre ningún dato nuevo.
-   Cada 20 s se revisa si se cruzó alguna hora de fin y, solo entonces, se vuelve a dibujar la tabla. */
+/* "Retardo salida": un alumno sin salida pasa a ese estatus cuando se pasa la hora de cierre de su grupo MÁS su tolerancia de salida, aunque no entre ningún dato nuevo.
+   Cada 20 s se revisa si se cruzó alguna de esas horas y, solo entonces, se vuelve a dibujar la tabla. */
 var _minutoPerm = null;
 function horasFinDeHoy() {
- const f = new Set(Object.values(LIM).map(x => x.fin));
- Object.values(db.horarios || {}).forEach(h => { if (h && h.entrada && h.salida) f.add(toMin(h.salida)); });
+ // +1: el retardo de salida empieza UN minuto después del límite (cierre + tolerancia)
+ const f = new Set(Object.values(LIM).map(x => x.fin + TOL_DEF.salida + 1));
+ Object.values(db.horarios || {}).forEach(h => { if (h && h.entrada && h.salida) f.add(toMin(h.salida) + tolDe(h, 'tolSalida', TOL_DEF.salida) + 1); });
  return f;
 }
 function cruzoHoraFin(antes, ahora, fines) { for (const m of fines) if (antes < m && ahora >= m) return true; return false; }
@@ -4053,7 +4156,7 @@ $(function () {
  pintarIndicadorCola();
  /* Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde 304 sin cuerpo si nada cambió y
     guarda la respuesta 1 s en caché). Las otras pestañas del mismo equipo se enteran al instante por BroadcastChannel. */
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1000);
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 500);
  if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)

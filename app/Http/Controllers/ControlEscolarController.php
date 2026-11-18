@@ -45,6 +45,7 @@ class ControlEscolarController extends Controller
             // Los demás roles con permiso "editar" únicamente pueden guardar asistencias.
             'guardar_todo'         => $this->guardarTodo($validado['datos'], !$esControl),
             'registrar_asistencia' => $this->registrarAsistencia($validado['datos']),
+            'registrar_asistencias' => $this->registrarAsistencias($validado['datos']),
             'eliminar_alumno'      => $this->eliminarAlumno($validado['datos']),
             'eliminar_lista_grupo' => $this->eliminarListaGrupo($validado['datos']),
             'eliminar_listas_grupos' => $this->eliminarListasGrupos($validado['datos']),
@@ -258,7 +259,7 @@ class ControlEscolarController extends Controller
         }
 
         if (!empty($d['curp'])) {
-            $alumno = Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->where('matricula', $d['curp'])->first();
+            $alumno = $this->alumnosLote[$d['curp']] ?? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->where('matricula', $d['curp'])->first();
         } else {
             $id = $this->mapaQr()[substr(strtolower($d['qr']), 0, 16)] ?? null;   // acepta también los códigos largos (20) de la versión anterior
             $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->find($id) : null;
@@ -281,48 +282,83 @@ class ControlEscolarController extends Controller
 
         $hora      = $ahora->format('H:i');
         $fechaHora = $ahora->format('Y-m-d H:i:00');
-        $grupo     = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida')->find($alumno->grupo_id);
+        $grupo     = $this->gruposLote[$alumno->grupo_id] ?? Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada')->find($alumno->grupo_id);
 
         $modo = $d['modo'] ?? 'Auto';
 
-        if ($modo === 'Auto') {
-            // Lector automático: Entrada o Salida según el HORARIO DEL GRUPO del alumno y lo que ya tiene hoy
-            // (ver App\Support\MovimientoAutomatico). Si vuelve a pasar la credencial en menos de 5 min,
-            // se toma como lectura repetida de la entrada.
+        // La PRIMERA hora en que se muestra la credencial es la que vale: mostrarla otra vez no cambia ni agrega nada
+        // (ni la entrada ni la salida), en modo automático y también en modo manual.
+        if ($this->enLote) {
+            // En un lote todo se resuelve en memoria (los registros de estos alumnos se leyeron UNA vez al inicio)
+            $dia = $ahora->toDateString();
+            $hoy = collect($this->asistenciasDeLote($alumno->id))
+                ->filter(fn ($x) => substr($x->fecha_hora, 0, 10) === $dia)->sortBy('fecha_hora')->values();
+        } else {
             $hoy = Asistencia::where('alumno_id', $alumno->id)
                 ->whereDate('fecha_hora', $ahora->toDateString())->orderBy('fecha_hora')->get();
-            $entrada = $hoy->first(fn ($x) => $x->estatus !== 'Salida');
-            $salida  = $hoy->first(fn ($x) => $x->estatus === 'Salida');
+        }
+        $entrada = $hoy->first(fn ($x) => $x->estatus !== 'Salida');
+        $salida  = $hoy->first(fn ($x) => $x->estatus === 'Salida');
+        $horaDe  = fn ($x) => Carbon::parse($x->fecha_hora)->format('H:i');
 
+        if ($modo === 'Auto') {
+            // Lector automático: Entrada o Salida según el HORARIO DEL GRUPO del alumno y lo que ya tiene hoy
+            // (ver App\Support\MovimientoAutomatico).
             [$minEntrada, $minSalida] = MovimientoAutomatico::horario($grupo->hora_entrada ?? null, $grupo->hora_salida ?? null, $grupo->turno ?? null);
-            $modo = MovimientoAutomatico::resolver((int) $ahora->format('G') * 60 + (int) $ahora->format('i'), $minEntrada, $minSalida, (bool) $entrada, (bool) $salida);
+            $minAhora = (int) $ahora->format('G') * 60 + (int) $ahora->format('i');
+            $modo = MovimientoAutomatico::resolver($minAhora, $minEntrada, $minSalida, (bool) $entrada, (bool) $salida);
 
             if ($modo === 'Completo') {
-                return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada y la salida de hoy ya estaban registradas'], 409);
+                return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': ya tiene entrada (' . $horaDe($entrada) . ') y salida (' . $horaDe($salida) . ') de hoy'], 409);
             }
-            if ($modo === 'Salida' && $entrada && $ahora->diffInMinutes(Carbon::parse($entrada->fecha_hora)) < MovimientoAutomatico::REPETIDA_MIN) {
-                return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada ya estaba registrada (' . Carbon::parse($entrada->fecha_hora)->format('H:i') . ')'], 409);
+            if ($modo === 'Salida' && $entrada && MovimientoAutomatico::esRepetida($minAhora, $minEntrada, $minSalida)) {
+                return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada ya estaba registrada (' . $horaDe($entrada) . ')'], 409);
             }
+        } elseif ($modo === 'Entrada' && $entrada) {
+            return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la entrada ya estaba registrada (' . $horaDe($entrada) . ')'], 409);
+        } elseif ($modo === 'Salida' && $salida) {
+            return response()->json(['ok' => false, 'mensaje' => $alumno->nombre . ': la salida ya estaba registrada (' . $horaDe($salida) . ')'], 409);
         }
 
         if ($modo === 'Salida') {
             $estatus = 'Salida';
         } else {
             // El retardo se calcula con el horario del grupo DEL ALUMNO
-            $estatus = ($grupo && $grupo->hora_entrada && $hora > substr($grupo->hora_entrada, 0, 5))
-                ? 'Retardo' : 'Asistencia';
+            // (hora límite de entrada + tolerancia de entrada del grupo)
+            $limite  = $grupo ? $grupo->limiteEntrada() : null;
+            $estatus = ($limite && $hora > $limite) ? 'Retardo' : 'Asistencia';
         }
 
         // Una salida en el mismo minuto que la entrada no debe pisarla: se anota un minuto después
-        if ($estatus === 'Salida' && Asistencia::where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->where('estatus', '!=', 'Salida')->exists()) {
+        $mismoMinutoEntrada = $this->enLote
+            ? collect($this->asistenciasDeLote($alumno->id))->contains(fn ($x) => $x->fecha_hora === $fechaHora && $x->estatus !== 'Salida')
+            : Asistencia::where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->where('estatus', '!=', 'Salida')->exists();
+        if ($estatus === 'Salida' && $mismoMinutoEntrada) {
             $fechaHora = $ahora->copy()->addMinute()->format('Y-m-d H:i:00');
         }
 
-        // updateOrCreate: si el teléfono reintenta el mismo escaneo no se duplica el registro
-        Asistencia::updateOrCreate(
-            ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],
-            ['estatus' => $estatus]
-        );
+        if ($this->enLote) {
+            // Se anota en memoria y se guarda todo junto al final del lote (un solo INSERT)
+            $existente = null;
+            foreach ($this->asisLote[$alumno->id] as $x) {
+                if ($x->fecha_hora === $fechaHora) { $existente = $x; break; }
+            }
+            if ($existente) {
+                if ($existente->estatus !== $estatus) {
+                    $existente->estatus = $estatus;
+                    $this->actualizarLote[] = [$alumno->id, $fechaHora, $estatus];
+                }
+            } else {
+                $this->asisLote[$alumno->id][] = (object) ['fecha_hora' => $fechaHora, 'estatus' => $estatus];
+                $this->nuevasLote[] = ['alumno_id' => $alumno->id, 'estatus' => $estatus, 'fecha_hora' => $fechaHora, 'created_at' => now(), 'updated_at' => now()];
+            }
+        } else {
+            // updateOrCreate: si el teléfono reintenta el mismo escaneo no se duplica el registro
+            Asistencia::updateOrCreate(
+                ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],
+                ['estatus' => $estatus]
+            );
+        }
 
         $partes = $grupo ? explode(' ', $grupo->nombre) : [];
 
@@ -341,6 +377,94 @@ class ControlEscolarController extends Controller
                 'turno'  => $grupo ? ($grupo->turno ?: 'Matutino') : null,
             ],
         ]);
+    }
+
+    /**
+     * Registra VARIOS escaneos en una sola petición (los que se acumularon en la cola del equipo).
+     * Se procesan en orden (así una entrada y su salida del mismo alumno quedan bien) y se responde el resultado de cada uno.
+     */
+    /** Alumnos y grupos precargados durante un lote de escaneos (vacío en un escaneo suelto) */
+    private array $alumnosLote = [];
+    private array $gruposLote = [];
+    private bool $enLote = false;
+    private array $asisLote = [];       // alumno_id => registros de asistencia (objetos con fecha_hora y estatus)
+    private array $nuevasLote = [];     // filas por insertar al final del lote
+    private array $actualizarLote = []; // [alumno_id, fecha_hora, estatus] por actualizar al final del lote
+
+    /** Registros de un alumno dentro de un lote (si no se precargaron, se leen una vez) */
+    private function asistenciasDeLote(int $alumnoId): array
+    {
+        if (!isset($this->asisLote[$alumnoId])) {
+            $this->asisLote[$alumnoId] = Asistencia::where('alumno_id', $alumnoId)->where('fecha_hora', '>=', now()->subDays(4)->startOfDay())
+                ->get(['fecha_hora', 'estatus'])->map(fn ($x) => (object) ['fecha_hora' => substr((string) $x->fecha_hora, 0, 19), 'estatus' => $x->estatus])->all();
+        }
+        return $this->asisLote[$alumnoId];
+    }
+
+    private function registrarAsistencias(array $d): JsonResponse
+    {
+        $items = $d['items'] ?? null;
+        if (!is_array($items) || !$items || count($items) > 200) {
+            return response()->json(['ok' => false, 'mensaje' => 'Lote de escaneos inválido'], 422);
+        }
+
+        // Alumnos y grupos del lote se consultan UNA vez (no una por escaneo) y todo se guarda en una sola transacción
+        $curps = [];
+        foreach ($items as $item) {
+            if (is_array($item) && !empty($item['curp']) && is_string($item['curp'])) {
+                $curps[] = $item['curp'];
+            }
+        }
+        $this->alumnosLote = $curps
+            ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->whereIn('matricula', array_values(array_unique($curps)))->get()->keyBy('matricula')->all()
+            : [];
+        $this->gruposLote = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada')->get()->keyBy('id')->all();
+
+        // Los registros de asistencia de esos alumnos se leen de una vez (antes: varias consultas por cada escaneo)
+        $this->enLote = true;
+        $this->asisLote = [];
+        $this->nuevasLote = [];
+        $this->actualizarLote = [];
+        $ids = array_values(array_map(fn ($a) => (int) $a->id, $this->alumnosLote));
+        foreach ($ids as $id) {
+            $this->asisLote[$id] = [];
+        }
+        foreach (array_chunk($ids, 500) as $bloque) {
+            foreach (DB::table('asistencias')->whereIn('alumno_id', $bloque)->where('fecha_hora', '>=', now()->subDays(4)->startOfDay())->select('alumno_id', 'fecha_hora', 'estatus')->cursor() as $x) {
+                $this->asisLote[(int) $x->alumno_id][] = (object) ['fecha_hora' => substr((string) $x->fecha_hora, 0, 19), 'estatus' => $x->estatus];
+            }
+        }
+
+        $resultados = [];
+        try {
+            DB::transaction(function () use ($items, &$resultados) {
+                foreach (array_values($items) as $item) {
+                    if (!is_array($item)) {
+                        $resultados[] = ['status' => 422, 'mensaje' => 'Datos de escaneo inválidos'];
+                        continue;
+                    }
+                    $r = $this->registrarAsistencia($item);
+                    $cuerpo = $r->getData(true);
+                    $resultados[] = ['status' => $r->getStatusCode(), 'mensaje' => $cuerpo['mensaje'] ?? null];
+                }
+                // Todo lo nuevo se guarda junto
+                foreach (array_chunk($this->nuevasLote, 500) as $bloque) {
+                    DB::table('asistencias')->insert($bloque);
+                }
+                foreach ($this->actualizarLote as [$aid, $fh, $est]) {
+                    Asistencia::where('alumno_id', $aid)->where('fecha_hora', $fh)->update(['estatus' => $est]);
+                }
+            });
+        } finally {
+            $this->alumnosLote = [];
+            $this->gruposLote = [];
+            $this->enLote = false;
+            $this->asisLote = [];
+            $this->nuevasLote = [];
+            $this->actualizarLote = [];
+        }
+
+        return response()->json(['ok' => true, 'resultados' => $resultados]);
     }
 
     /**
@@ -440,7 +564,7 @@ class ControlEscolarController extends Controller
     private function construirEstado(): array
     {
         $grupos = DB::table('grupos')
-            ->select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'orientador_id')
+            ->select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida', 'orientador_id')
             ->get()->keyBy('id');
 
         // Entrada (la más temprana) y salida (la más tardía) por alumno y día.
@@ -475,6 +599,8 @@ class ControlEscolarController extends Controller
                 'entrada'      => $g->hora_entrada ? substr($g->hora_entrada, 0, 5) : '',
                 'salida'       => $g->hora_salida ? substr($g->hora_salida, 0, 5) : '',
                 'orientadorId' => $g->orientador_id ? (string) $g->orientador_id : '',
+                'tolEntrada'   => (int) $g->tolerancia_entrada,
+                'tolSalida'    => (int) $g->tolerancia_salida,
             ];
         }
 
@@ -765,7 +891,7 @@ class ControlEscolarController extends Controller
     private function guardarHorarios(array $horarios, array $mapaOrientadores): void
     {
         // Todos los grupos en una sola consulta, sin las plantillas (son imágenes pesadas)
-        $existentes = Grupo::select('id', 'grado', 'nombre', 'turno', 'hora_entrada', 'hora_salida', 'orientador_id')->get()->keyBy(fn ($g) => $g->grado . '|' . $g->nombre . '|' . $g->turno);
+        $existentes = Grupo::select('id', 'grado', 'nombre', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida', 'orientador_id')->get()->keyBy(fn ($g) => $g->grado . '|' . $g->nombre . '|' . $g->turno);
 
         foreach ($horarios as $clave => $h) {
             [$grado, , $nombre, $turno] = $this->datosDeClave($clave);
@@ -775,6 +901,13 @@ class ControlEscolarController extends Controller
             // Un grupo puede tener orientador sin horario todavía: la hora vacía se guarda como NULL
             $grupo->hora_entrada = $this->horaValida($h['entrada'] ?? null);
             $grupo->hora_salida = $this->horaValida($h['salida'] ?? null);
+            // Solo si el navegador las manda (una copia vieja guardada en el equipo no debe borrar la tolerancia ya configurada)
+            if (array_key_exists('tolEntrada', $h)) {
+                $grupo->tolerancia_entrada = $this->toleranciaValida($h['tolEntrada'], 0);
+            }
+            if (array_key_exists('tolSalida', $h)) {
+                $grupo->tolerancia_salida = $this->toleranciaValida($h['tolSalida'], 30);
+            }
             $grupo->orientador_id = (!empty($h['orientadorId']) && isset($mapaOrientadores[$h['orientadorId']]))
                 ? $mapaOrientadores[$h['orientadorId']]
                 : null;
@@ -795,6 +928,16 @@ class ControlEscolarController extends Controller
         }
 
         return trim($hora);
+    }
+
+    /** Tolerancia en minutos: entero de 0 a 180; si viene vacía o inválida se usa el valor por defecto */
+    private function toleranciaValida(mixed $min, int $defecto): int
+    {
+        if ($min === null || $min === '' || !is_numeric($min)) {
+            return $defecto;
+        }
+
+        return max(0, min(180, (int) $min));
     }
 
     /** Plantillas (frente/reverso) propias de cada grupo (opcional, ya casi no se usa) */
@@ -865,7 +1008,7 @@ class ControlEscolarController extends Controller
             $k           = $turno . '|' . $nombreGrupo;
 
             // El grupo se identifica por grado + nombre + TURNO; se busca/crea una sola vez por grupo
-            $gruposCache[$k] ??= Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada')
+            $gruposCache[$k] ??= Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'tolerancia_entrada')
                 ->firstOrCreate(['grado' => $grado, 'nombre' => $nombreGrupo, 'turno' => $turno]);
             $grupo  = $gruposCache[$k];
             $nombre = mb_substr((string) ($a['nombre'] ?? ''), 0, 150);
@@ -984,7 +1127,7 @@ class ControlEscolarController extends Controller
 
         $existentes = Alumno::whereIn('matricula', $curps)->get(['id', 'matricula', 'grupo_id'])->keyBy('matricula');
         $porClave   = Alumno::whereIn('client_key', $claves)->get(['id', 'client_key', 'grupo_id'])->keyBy('client_key');
-        $grupos     = Grupo::select('id', 'hora_entrada')
+        $grupos     = Grupo::select('id', 'hora_entrada', 'tolerancia_entrada')
             ->whereIn('id', $existentes->pluck('grupo_id')->merge($porClave->pluck('grupo_id'))->unique())->get()->keyBy('id');
 
         $pares = [];
@@ -1019,7 +1162,7 @@ class ControlEscolarController extends Controller
             if (!is_array($reg)) {
                 continue;
             }
-            $horaLimite = ($grupo && $grupo->hora_entrada) ? substr($grupo->hora_entrada, 0, 5) : null;
+            $horaLimite = $grupo ? $grupo->limiteEntrada() : null;   // hora límite + tolerancia de entrada
 
             foreach ($reg as $fecha => $r) {
                 if (!$esFecha($fecha) || !is_array($r)) {
@@ -1051,10 +1194,21 @@ class ControlEscolarController extends Controller
         // 3) Solo se inserta lo que falta; solo se actualiza lo que cambió de estatus
         $ahora   = now();
         $nuevos  = [];
+        // La primera hora registrada de cada día (entrada y salida) es la que vale: no se agrega una segunda
+        $tiene = [];
+        foreach ($hay as $k => $est) {
+            [$aid, $fh] = explode('|', $k, 2);
+            $tiene[$aid . '|' . substr($fh, 0, 10) . '|' . ($est === 'Salida' ? 'S' : 'E')] = true;
+        }
         foreach ($deseado as $clave => $estatus) {
             [$alumnoId, $fechaHora] = explode('|', $clave, 2);
 
             if (!array_key_exists($clave, $hay)) {
+                $tipoDia = $alumnoId . '|' . substr($fechaHora, 0, 10) . '|' . ($estatus === 'Salida' ? 'S' : 'E');
+                if (isset($tiene[$tipoDia])) {
+                    continue;
+                }
+                $tiene[$tipoDia] = true;
                 $nuevos[] = ['alumno_id' => (int) $alumnoId, 'estatus' => $estatus, 'fecha_hora' => $fechaHora,
                              'created_at' => $ahora, 'updated_at' => $ahora];
             } elseif ($hay[$clave] !== $estatus) {
