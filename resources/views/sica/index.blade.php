@@ -589,6 +589,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-md-3">
  <label class="form-label">Período del reporte</label>
  <select id="sel-periodo-reporte" class="form-select shadow-sm">
+ <option value="dia">Día</option>
  <option value="semana" selected>Semana</option>
  <option value="mes">Mes</option>
  </select>
@@ -3202,12 +3203,21 @@ function colorDeCelda(o, k) {
  if (k === 'Estatus' && /^Retardo/.test(est)) return COLOR_DESCARGA.retardo;
  return null;
 }
+/* titulo: texto o lista de líneas (1.ª = título del reporte; las demás = turno y período). Se escriben arriba de la tabla en Excel y en PDF */
 async function descargar(nombre, filas, formato, titulo) {
  if (!filas.length) { alert('No hay datos para descargar.'); return; }
  if (!libsOk(formato === 'Excel' ? 'ExcelJS' : 'jspdf')) return;
  const k = Object.keys(filas[0]);
+ const lineas = Array.isArray(titulo) ? titulo : [titulo];
  if (formato === 'Excel') {
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Reporte');
+  lineas.forEach((t, i) => {
+   const fr = ws.addRow([t]);
+   ws.mergeCells(fr.number, 1, fr.number, k.length);
+   fr.getCell(1).font = {bold:true, size: i === 0 ? 15 : 12, color:{argb:'FF800020'}};
+   fr.getCell(1).alignment = {horizontal:'left'};
+  });
+  ws.addRow([]);
   const enc = ws.addRow(k);
   enc.eachCell(c => { c.font = {bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF800020'}}; c.alignment = {horizontal:'center'}; });
   filas.forEach(o => {
@@ -3215,7 +3225,7 @@ async function descargar(nombre, filas, formato, titulo) {
    k.forEach((x, i) => { const c = colorDeCelda(o, x); if (c) { const cel = fila.getCell(i + 1); cel.fill = {type:'pattern', pattern:'solid', fgColor:{argb:c.fondo}}; cel.font = {color:{argb:c.texto}, bold:true}; } });
   });
   k.forEach((x, i) => { ws.getColumn(i + 1).width = Math.min(Math.max(Math.max(String(x).length, ...filas.map(o => String(o[x] == null ? '' : o[x]).length)) + 3, 12), 40); });
-  ws.views = [{state:'frozen', ySplit:1}];
+  ws.views = [{state:'frozen', ySplit: enc.number}];
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre + '.xlsx';
@@ -3223,8 +3233,9 @@ async function descargar(nombre, filas, formato, titulo) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
  } else {
   const d = new window.jspdf.jsPDF({orientation:'landscape'});
-  d.setFontSize(13); d.text(titulo, 14, 14);
-  d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY:20, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]},
+  lineas.forEach((t, i) => { d.setFontSize(i === 0 ? 15 : 11); d.setFont(undefined, i === 0 ? 'bold' : 'normal'); d.text(t, 14, 14 + i * 7); });
+  d.setFont(undefined, 'normal');
+  d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY: 14 + (lineas.length - 1) * 7 + 6, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]},
    didParseCell: data => {
     if (data.section !== 'body') return;
     const c = colorDeCelda(filas[data.row.index], k[data.column.index]);
@@ -3238,20 +3249,30 @@ function descargarReporte(formato) {
  const periodo = $('#sel-periodo-reporte').val() || 'semana';
  const ref = $('#calendario-orientador').val() || hoy();
  const dias = diasDePeriodo(periodo, ref);
- const tp = tituloPeriodo(periodo, ref);
- const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
+ const dma = f => f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4);   // 2026-11-18 -> 18/11/2026 (día, mes y año)
+ const ini = dias[0], fin = dias[dias.length - 1];
+ let tp, tag;
+ if (periodo === 'mes') {
+  const mes = new Date(ref + 'T12:00:00').toLocaleDateString('es-MX', {month:'long', year:'numeric'});
+  tp = 'Mes de ' + mes + ' (del ' + dma(ini) + ' al ' + dma(fin) + ')'; tag = 'Mes_' + dma(ini).replace(/\//g, '-') + '_al_' + dma(fin).replace(/\//g, '-');
+ } else if (periodo === 'semana') {
+  tp = 'Semana del ' + dma(ini) + ' al ' + dma(fin); tag = 'Semana_' + dma(ini).replace(/\//g, '-') + '_al_' + dma(fin).replace(/\//g, '-');
+ } else {
+  tp = 'Día: ' + dma(ini); tag = 'Dia_' + dma(ini).replace(/\//g, '-');
+ }
+ const nombreArchivo = 'Reporte_asistencia_' + turnoActivo + '_' + tag;
  const filas = [];
  const lista = filtrados(), hoyF = hoy();
  // Los alumnos sin registro también salen en la lista (en otro color), pero solo en días de clases que ya pasaron y en los que alguien del grupo sí vino
  const diaConClase = {};
  dias.forEach(f => { const d = new Date(f + 'T12:00:00').getDay(); diaConClase[f] = f <= hoyF && d !== 0 && d !== 6 && lista.some(a => a.reg[f] && (a.reg[f].entrada || a.reg[f].salida)); });
- lista.forEach(a => dias.forEach(f => {
-  const r = a.reg[f], base = {Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno};
+ // Primero por fecha y, dentro de cada fecha, el orden de la lista de alumnos
+ dias.forEach(f => lista.forEach(a => {
+  const r = a.reg[f], base = {Fecha:dma(f), CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno};
   if (r && (r.entrada || r.salida)) filas.push(Object.assign(base, {Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', 'Retardo entrada':textoRetardo(a, r, f).ent, 'Retardo salida':textoRetardo(a, r, f).sal, Estatus:estatusDe(a, r, f)}));
   else if (diaConClase[f]) filas.push(Object.assign(base, {Entrada:'—', Salida:'—', 'Retardo entrada':'—', 'Retardo salida':'—', Estatus:'Sin registro'}));
  }));
- filas.sort((x, y) => x.Fecha < y.Fecha ? -1 : x.Fecha > y.Fecha ? 1 : 0);   // (el orden alfabético de alumnos se conserva dentro de cada fecha)
- descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
+ descargar(nombreArchivo, filas, formato, ['Reporte de asistencia', 'Turno ' + turnoActivo, tp]);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
 function statsGrados(periodo) {
