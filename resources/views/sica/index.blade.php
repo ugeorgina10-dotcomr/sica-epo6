@@ -522,8 +522,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
- <option value="reordenar" selected>Vienen como Nombre(s) + Apellidos (reordenar a Apellido paterno, materno y nombre)</option>
- <option value="tal-cual">Ya vienen como Apellido paterno, materno y nombre (no cambiar)</option>
+ <option value="tal-cual" selected>Ya vienen como Apellido paterno, materno y nombre (no cambiar)</option>
+ <option value="reordenar">Vienen como Nombre(s) + Apellidos (reordenar a Apellido paterno, materno y nombre)</option>
  </select>
  </div>
  </div>
@@ -3032,20 +3032,38 @@ function subirLista() {
  if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' en el ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + ')?\nSe agregan los alumnos nuevos y se actualizan los que ya existan.')) return;
  const modo = $('#orden-nombre-lista').val();
  const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
- leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /curp|matr|nombre|apellido/i.test(String(r[0] == null ? '' : r[0])), rows => {
- rows = rows.filter(r => r && r[0] != null && String(r[0]).trim());
- if (rows.length && /curp|matr|nombre|apellido/i.test(String(rows[0][0]))) rows.shift();
- if (!rows.length) { alert('El archivo no trae alumnos. Pon la CURP en la columna A y el nombre en la B.'); return; }
+ // Encabezado: alguna de las primeras celdas dice CURP / Nombre / Apellido... (y la fila no trae ya una CURP real)
+ const esEncabezado = r => !!r && !r.slice(0, 8).some(x => RX_CURP.test(String(x == null ? '' : x).trim())) && r.slice(0, 8).some(x => /curp|matr|nombre|apellido|paterno|materno/i.test(String(x == null ? '' : x)));
+ leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], esEncabezado, rows => {
+ rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
+ if (rows.length && esEncabezado(rows[0])) rows.shift();
+ if (!rows.length) { alert('El archivo no trae alumnos. Pon el nombre y la CURP en columnas (en cualquier orden: CURP y nombre, o nombre y CURP).'); return; }
  let nuevos = 0, actualizados = 0;
  const curpsInvalidas = [];
  rows.forEach(r => {
  let curp = '', fila = r, desde = 0;
- const c0 = String(r[0]).trim();
- if (RX_CURP.test(c0)) { curp = c0.toUpperCase(); desde = 1; }   // Excel: CURP en columna A
- else { const m = c0.match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/); if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; } else if (/^[A-Za-z0-9]{10,25}$/.test(c0) && /\d/.test(c0) && /[A-Za-z]/.test(c0)) { curpsInvalidas.push(c0 + ' (' + (c0.length === CURP_LARGO ? 'formato no válido' : curpDiferencia(c0).toLowerCase()) + ')'); return; } }   // PDF: "CURP Nombre"; si parece CURP pero no es válida, se omite
+ const cel = r.slice(0, 8).map(x => String(x == null ? '' : x).trim());
+ if (!cel.some(Boolean)) return;
+ const k = cel.findIndex(c => RX_CURP.test(c));   // la CURP puede estar en cualquier columna: antes o después del nombre
+ if (k > -1) {
+ curp = cel[k].toUpperCase();
+ const antes = cel.slice(0, k);
+ while (antes.length && /^\d{1,4}$/.test(antes[0])) antes.shift();   // columna de No. de lista
+ const hayNombreAntes = antes.some(c => c.length > 1 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(c));
+ if (hayNombreAntes) { fila = antes; desde = 0; }   // Excel: Nombre y luego CURP
+ else { fila = r; desde = k + 1; }                   // Excel: CURP y luego Nombre (con o sin No. de lista antes)
+ } else {
+ const m = cel[0].match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/), m2 = cel[0].match(/^(.+?)\s+([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)$/);
+ if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; }          // PDF: "CURP Nombre"
+ else if (m2) { curp = m2[2].toUpperCase(); fila = [m2[1]]; }   // PDF: "Nombre CURP"
+ else {
+ const mala = cel.find(c => /^[A-Za-z0-9]{10,25}$/.test(c) && /\d/.test(c) && /[A-Za-z]/.test(c));   // parece CURP pero no es válida: se omite la fila
+ if (mala) { curpsInvalidas.push(mala + ' (' + (mala.length === CURP_LARGO ? 'formato no válido' : curpDiferencia(mala).toLowerCase()) + ')'); return; }
+ }
+ }
  let nombre = armarNombre(fila, desde, modo);
  if (!nombre) return;
- if (curp) nombre = acomodarConCurp(nombre, curp);   // con la CURP se sabe cuál es paterno, materno y nombre aunque la lista venga revuelta
+ if (curp && modo === 'reordenar') nombre = acomodarConCurp(nombre, curp);   // solo si se eligió reordenar: con la CURP se sabe cuál es paterno, materno y nombre. Con "no cambiar" el nombre queda tal cual viene
  let a = curp ? db.alumnos.find(x => x.curp === curp) : null;
  if (!a) a = db.alumnos.find(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && (!curp ? true : !x.curp) && norm(x.nombre) === norm(nombre));
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
