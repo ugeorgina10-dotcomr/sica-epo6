@@ -69,6 +69,8 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .tarjeta-grado:hover{box-shadow:0 6px 16px rgba(0,0,0,.12)}
 .tarjeta-grado.seleccionada{border:2px solid #800020 !important;background:#fdf8f8 !important}
 .tarjeta-grado.grado-desactivado{opacity:.4;pointer-events:none;cursor:not-allowed}
+/* Tarjetas de grado: en columna y centradas (grado arriba y luego asistencias, retardo entrada y retardo salida, uno debajo del otro) */
+#vista-sistema .btn.tarjeta-grado{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;text-align:center}
 .preview-credencial{width:100%;max-width:340px;border:1px solid #dee2e6;border-radius:10px;background:#eee;display:block;margin:0 auto}
 .preview-plantilla{height:240px;object-fit:contain;object-position:center;background:#fff}
 /* Vista previa de la plantilla oficial: frente y reverso con el mismo alto y alineados arriba */
@@ -1141,12 +1143,12 @@ function conteoDe(a, f) {
  const t = retrasosDe(a, r, f), re = t.entrada > 0 ? 1 : 0, rs = t.salida > 0 ? 1 : 0;
  return {as: (re || rs) ? 0 : 1, re: re, rs: rs};
 }
-/* Duración legible: menos de una hora "45 min"; de una hora en adelante "1 h 43 min" (nunca "103 min"); horas exactas "2 h" */
+/* Duración legible: menos de una hora "45 min"; de una hora en adelante "1 hr 43 min" / "2 hrs" (nunca "103 min") */
 function durMin(n) {
  n = Math.max(0, Math.round(Number(n) || 0));
  if (n < 60) return n + ' min';
  const h = Math.floor(n / 60), m = n % 60;
- return h + ' h' + (m ? ' ' + m + ' min' : '');
+ return h + (h === 1 ? ' hr' : ' hrs') + (m ? ' ' + m + ' min' : '');
 }
 /* Texto de las columnas "Retardo entrada" y "Retardo salida" (tabla, Excel y PDF). "—" = no vino. */
 function textoRetardo(a, r, f) {
