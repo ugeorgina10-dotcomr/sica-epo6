@@ -20,12 +20,12 @@
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
 {{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
-     Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
+     Mismas URLs (?v=22) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
 @foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js', 'chart.umd.min.js', 'html5-qrcode.min.js'] as $lib)
-<link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
+<link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=22">
 @endforeach
 @foreach (['xlsx.full.min.js', 'jspdf.umd.min.js', 'jspdf.plugin.autotable.min.js', 'pdf.min.js', 'exceljs.min.js'] as $lib)
-<link rel="preload" as="script" fetchpriority="low" href="{{ asset('vendor/' . $lib) }}?v=21">
+<link rel="preload" as="script" fetchpriority="low" href="{{ asset('vendor/' . $lib) }}?v=22">
 @endforeach
 <link rel="preload" as="font" type="font/woff2" crossorigin href="{{ asset('vendor/fontawesome/webfonts/fa-solid-900.woff2') }}">
 <link rel="prefetch" href="{{ asset('vendor/pdf.worker.min.js') }}">
@@ -522,9 +522,11 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
- <option value="tal-cual" selected>Ya vienen como Apellido paterno, materno y nombre (no cambiar)</option>
+ <option value="auto" selected>Automático (recomendado)</option>
+ <option value="tal-cual">Ya vienen como Apellido paterno, materno y nombre (no cambiar)</option>
  <option value="reordenar">Vienen como Nombre(s) + Apellidos (reordenar a Apellido paterno, materno y nombre)</option>
  </select>
+ <div class="form-text">Automático: si el archivo ya trae el orden (apellido paterno, materno y nombre) se respeta tal cual; si no trae orden o viene revuelto, se acomoda con la CURP y, si no hay CURP, el nombre se guarda como viene. Nunca se rechaza una lista por su orden.</div>
  </div>
  </div>
  </div>
@@ -747,7 +749,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  const cargar = (src, baja) => new Promise(ok => {
   const s = document.createElement('script');
   if (baja) s.fetchPriority = 'low';   // Excel, PDF y gráficas bajan en paralelo pero sin quitarle ancho de banda a lo que se ve primero
-  s.src = base + src + '?v=21'; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=22'; s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
@@ -1212,10 +1214,15 @@ function reordenarNombrePrimero(txt) {
  Una columna con número o una sola letra (grado, grupo, sexo) no se toma como parte del nombre. */
 function armarNombre(fila, desde, modo) {
  const c = [0,1,2].map(i => String(fila[desde + i] == null ? '' : fila[desde + i]).trim());
- const esTexto = t => t.length > 1 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(t) && !/^\d+$/.test(t);
+ const esTexto = t => t.length > 1 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(t) && !/^\d+$/.test(t) && !ORI_ES_TURNO(t);
  if (esTexto(c[1]) && esTexto(c[2])) {
   const partes = modo === 'reordenar' ? [c[1], c[2], c[0]] : c;
   return partes.join(' ').replace(/\s+/g, ' ').trim();
+ }
+ // Dos columnas de texto (p. ej. "Ramírez Ortega | Juan"): no se pierde ninguna, se unen en el orden en que vienen
+ if (esTexto(c[0]) && esTexto(c[1])) {
+  const dos = (c[0] + ' ' + c[1]).replace(/\s+/g, ' ').trim();
+  return modo === 'reordenar' ? reordenarNombrePrimero(dos) : dos;
  }
  const t = c[0].replace(/\s+/g, ' ');
  return modo === 'reordenar' ? reordenarNombrePrimero(t) : t;
@@ -1319,6 +1326,9 @@ function leerVariosValidados(archivos, esEncabezado, callback, onError, caja) {
   if (archivos.length > 1) texto('Leyendo archivo ' + i + ' de ' + archivos.length + ': ' + original.name + '…');
   // Excel con imágenes, PDF con fotos o CSV con filas vacías se aligeran antes de leerse (el original no se modifica)
   (window.SicaCompresion ? SicaCompresion.comprimirArchivo(original).catch(() => original) : Promise.resolve(original)).then(f => leerFilasDesdeArchivo(f, filas => {
+   const malaCelda = window.SicaCompresion ? SicaCompresion.problemaDeCeldas(filas || []) : null;
+   if (malaCelda) { texto(''); onError && onError(original.name + ': ' + malaCelda); return; }
+   if (window.SicaCompresion) (filas || []).forEach(r => { if (r && r.length) for (let k = 0; k < r.length; k++) r[k] = SicaCompresion.sanearCelda(r[k]); });
    const lim = (filas || []).filter(r => r && r.some && r.some(x => x != null && String(x).trim() !== ''));
    if (lim.length && esEncabezado(lim[0])) lim.shift();
    lim.forEach(r => todas.push(r));
@@ -3096,7 +3106,7 @@ function subirLista() {
  }
  let nombre = armarNombre(fila, desde, modo);
  if (!nombre) return;
- if (curp && modo === 'reordenar') nombre = acomodarConCurp(nombre, curp);   // solo si se eligió reordenar: con la CURP se sabe cuál es paterno, materno y nombre. Con "no cambiar" el nombre queda tal cual viene
+ if (curp && (modo === 'reordenar' || modo === 'auto')) nombre = acomodarConCurp(nombre, curp);   // solo si se eligió reordenar: con la CURP se sabe cuál es paterno, materno y nombre. Con "no cambiar" el nombre queda tal cual viene
  let a = curp ? db.alumnos.find(x => x.curp === curp) : null;
  if (!a) a = db.alumnos.find(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && (!curp ? true : !x.curp) && norm(x.nombre) === norm(nombre));
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
