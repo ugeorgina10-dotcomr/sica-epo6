@@ -749,7 +749,15 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  const cargar = (src, baja) => new Promise(ok => {
   const s = document.createElement('script');
   if (baja) s.fetchPriority = 'low';   // Excel, PDF y gráficas bajan en paralelo pero sin quitarle ancho de banda a lo que se ve primero
-  s.src = base + src + '?v=22'; s.onload = s.onerror = () => ok();
+  s.src = base + src + '?v=22'; s.onload = () => ok();
+  // Si una librería falla (internet lento o cortado un instante), se reintenta sola hasta 3 veces antes de rendirse
+  s.onerror = () => { s.remove(); if ((cargar.n[src] = (cargar.n[src] || 0) + 1) <= 3) setTimeout(() => cargar(src, baja).then(ok), 700 * cargar.n[src]); else ok(); };
+  document.head.appendChild(s);
+ });
+ cargar.n = {};
+ window.SICA_CARGAR_LIB = src => new Promise(ok => {   // recarga una librería que no llegó (con otra URL para saltarse una copia dañada en caché)
+  const s = document.createElement('script');
+  s.src = base + src + '?v=22&r=' + Date.now(); s.onload = s.onerror = () => ok();
   document.head.appendChild(s);
  });
  // 1) Primero lo de las credenciales; 2) lo demás se baja en paralelo (antes iban uno tras otro y las plantillas esperaban a TODO)
@@ -4244,6 +4252,47 @@ $(function () {
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
  document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo) cargarDesdeServidor(); });
 });
+</script>
+<script>
+/* Descargas (Excel, PDF, gráficas, credenciales) y lectura de archivos: si la librería que necesitan todavía no llegó,
+   el sistema la espera (y la vuelve a pedir si falló) y luego continúa SOLO; ya no hay que pulsar otra vez. */
+(function(){
+ const LIBS = {XLSX:['xlsx.full.min.js'], ExcelJS:['exceljs.min.js'], jspdf:['jspdf.umd.min.js','jspdf.plugin.autotable.min.js'], pdfjsLib:['pdf.min.js'], Chart:['chart.umd.min.js'], JSZip:['jszip.min.js'], SicaDocx:['jszip.min.js','sica-docx.js'], QRious:['qrious.min.js']};
+ const faltan = () => Object.keys(LIBS).filter(k => typeof window[k] === 'undefined');
+ let aviso = null;
+ const mostrar = t => {
+  if (!aviso) { aviso = document.createElement('div'); aviso.setAttribute('role', 'status'); aviso.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:99999;background:#800020;color:#fff;padding:10px 18px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-size:14px;max-width:90vw;text-align:center'; document.body.appendChild(aviso); }
+  aviso.textContent = t; aviso.style.display = 'block';
+ };
+ const ocultar = () => { if (aviso) aviso.style.display = 'none'; };
+ let _preparando = null;
+ function preparar() {
+  if (_preparando) return _preparando;
+  _preparando = Promise.resolve(window.SICA_LIBS_LISTAS).catch(() => {}).then(async () => {
+   for (let intento = 0; intento < 3 && faltan().length; intento++) {
+    const archivos = []; faltan().forEach(k => LIBS[k].forEach(a => { if (archivos.indexOf(a) === -1) archivos.push(a); }));
+    for (const a of archivos) await window.SICA_CARGAR_LIB(a);
+   }
+   if (window.pdfjsLib && window.SICA_VENDOR_BASE) pdfjsLib.GlobalWorkerOptions.workerSrc = window.SICA_VENDOR_BASE + 'pdf.worker.min.js';
+  }).then(() => { _preparando = null; return faltan(); });
+  return _preparando;
+ }
+ const NOMBRES = ['descargar', 'descargarGraficas', 'descargarComparativaGradoPDF', 'descargarComparativaGradoExcel', 'generarPDFCredenciales', 'subirPlantillaOficial', 'subirLista', 'subirOrientadores', 'descargarExcelConGraficas'];
+ NOMBRES.forEach(n => {
+  const orig = window[n];
+  if (typeof orig !== 'function') return;
+  window[n] = function () {
+   const args = arguments, yo = this;
+   if (!faltan().length) return orig.apply(yo, args);
+   mostrar('Preparando la herramienta… un momento, tu acción continúa sola.');
+   return preparar().then(f => {
+    ocultar();
+    if (f.length) { alert('No se pudo cargar una herramienta del sistema (' + f.join(', ') + '). Revisa tu conexión a internet, recarga la página con Ctrl + F5 y vuelve a intentarlo.'); return; }
+    return orig.apply(yo, args);
+   });
+  };
+ });
+})();
 </script>
 </body>
 </html>
