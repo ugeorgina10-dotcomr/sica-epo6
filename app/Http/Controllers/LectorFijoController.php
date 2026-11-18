@@ -65,7 +65,7 @@ class LectorFijoController extends Controller
             if ($tipo === 'Completo') {
                 return response()->json(['success' => false, 'message' => "{$alumno->nombre}: la entrada y la salida de hoy ya estaban registradas"], 409);
             }
-            if ($tipo === 'Salida' && $entrada && $ahora->diffInMinutes(Carbon::parse($entrada->fecha_hora)) < MovimientoAutomatico::REPETIDA_MIN) {
+            if ($tipo === 'Salida' && $entrada && MovimientoAutomatico::esRepetida((int) $ahora->format('G') * 60 + (int) $ahora->format('i'), $minEntrada, $minSalida)) {
                 return response()->json(['success' => false, 'message' => "{$alumno->nombre}: la entrada ya estaba registrada"], 409);
             }
         }

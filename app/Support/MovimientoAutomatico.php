@@ -8,7 +8,8 @@ namespace App\Support;
  *
  * Reglas (en este orden):
  *  1. Ya tiene entrada y salida hoy            -> 'Completo' (no se registra nada más).
- *  2. Ya tiene entrada y aún no salida         -> 'Salida'   (también sirve para salidas anticipadas con permiso).
+ *  2. Ya tiene entrada y aún no salida         -> 'Salida' solo desde el bloque de salida; antes, mostrar la credencial otra vez
+ *     NO cambia la hora de entrada (ver esRepetida).
  *  3. Sin entrada hoy y la hora ya está en el bloque de salida del grupo -> 'Salida'.
  *  4. Sin entrada hoy en cualquier otro momento (antes del turno, a tiempo o con retardo) -> 'Entrada'.
  *
@@ -23,9 +24,6 @@ class MovimientoAutomatico
 {
     /** Minutos ANTES de la hora de salida del grupo en que ya se considera "bloque de salida" */
     public const SALIDA_ANTES = 30;
-
-    /** Un segundo escaneo dentro de estos minutos se toma como lectura repetida de la entrada */
-    public const REPETIDA_MIN = 5;
 
     /** Horario por defecto [entrada, salida] en minutos del día, si el grupo no tiene horario capturado */
     public const DEFECTO = [
@@ -60,6 +58,16 @@ class MovimientoAutomatico
     public static function inicioBloqueSalida(int $entrada, int $salida): int
     {
         return max($salida - self::SALIDA_ANTES, intdiv($entrada + $salida, 2));
+    }
+
+    /**
+     * Con la entrada ya registrada, ¿este escaneo es solo la credencial mostrada otra vez (NO cambia la hora de entrada)?
+     * Lo es mientras no llegue el bloque de salida (cierre menos SALIDA_ANTES en adelante, con o sin tolerancia): desde ahí el escaneo es la SALIDA.
+     * Una salida anticipada con permiso se registra con el modo manual Salida o con el botón «Marcar Salida».
+     */
+    public static function esRepetida(int $ahoraMin, int $entrada, int $salida): bool
+    {
+        return $ahoraMin < self::inicioBloqueSalida($entrada, $salida);
     }
 
     /**

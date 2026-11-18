@@ -49,6 +49,16 @@ class MovimientoAutomaticoTest extends TestCase
         $this->assertSame('Salida', M::resolver($this->hm('08:45'), $e, $s, false, false));
     }
 
+    public function test_segundo_escaneo_antes_de_la_salida_no_cambia_la_entrada(): void
+    {
+        [$e, $s] = M::horario('07:10', '14:00', 'Matutino');
+        $this->assertTrue(M::esRepetida($this->hm('07:12'), $e, $s));    // credencial mostrada otra vez: se ignora
+        $this->assertTrue(M::esRepetida($this->hm('10:00'), $e, $s));    // aunque pasen horas, antes del bloque de salida no es salida
+        $this->assertFalse(M::esRepetida($this->hm('13:30'), $e, $s));   // ya es el bloque de salida
+        [$e, $s] = M::horario('08:00', '08:10', 'Matutino');             // prueba con horario cortísimo
+        $this->assertFalse(M::esRepetida($this->hm('08:10'), $e, $s));
+    }
+
     public function test_aMinutos(): void
     {
         $this->assertSame(430, M::aMinutos('07:10'));

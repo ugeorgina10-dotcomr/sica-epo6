@@ -107,8 +107,7 @@ h5.fw-bold{font-size:1.05rem}
 h2.fw-bold{font-size:1.15rem}
 .btn{font-size:.8rem}
 }
-canvas#grafica-asistencias{max-width:100%;height:auto !important;display:block;margin:0 auto}
-.grafica-centrada{max-width:640px;width:100%;margin-left:auto;margin-right:auto;position:relative}
+canvas#grafica-asistencias{max-width:100%;height:auto !important}
 /* Botones: texto siempre centrado y del mismo alto, sin importar el ancho de la ventana (pantalla dividida incluida) */
 #vista-sistema .btn{display:inline-flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;white-space:normal}
 .grupo-botones{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
@@ -199,7 +198,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .dd-item .etq.mal{background:#dc3545;color:#fff}
 .dd-item .etq.bien{background:#d1e7dd;color:#0f5132}
 .burbujas-claves{position:fixed;top:14px;right:14px;z-index:1900;display:flex;flex-direction:column;gap:10px;max-width:340px;width:calc(100% - 28px)}
-.burbuja{position:relative;background:#800020;color:#fff;border-radius:1.1rem 1.1rem .3rem 1.1rem;padding:.8rem 2rem .8rem 1rem;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:.9rem;animation:burbujaEntra .35s ease-out}
+.burbuja{position:relative;background:#800020;color:#fff;border-radius:1.1rem 1.1rem .3rem 1.1rem;padding:.8rem 2rem .8rem 1rem;box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:.9rem;animation:burbujaEntra .15s ease-out}
 .burbuja-x{position:absolute;top:4px;right:10px;border:0;background:transparent;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;opacity:.8}
 .burbuja .burbuja-acciones{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
 .burbuja .burbuja-acciones .mt-2{margin-top:0!important}
@@ -620,7 +619,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <p class="text-muted small mb-2" id="subtitulo-periodo-stats">Estadísticas de asistencia -Hoy</p>
  <p class="small mb-2"><span class="fw-semibold" style="color:#800020">Se descargará:</span> <span id="lbl-descarga-seleccion" class="fw-semibold">Estadísticas generales (todos los grados)</span></p>
- <div class="mb-3 grafica-centrada"><canvas id="grafica-asistencias" height="220"></canvas></div>
+ <div class="mb-3" style="max-width:640px;margin:0 auto"><canvas id="grafica-asistencias" height="220"></canvas></div>
  <div class="row text-center g-3" id="stats-grados"></div>
  </div>
 
@@ -1858,7 +1857,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 1500);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 700);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -2561,7 +2560,7 @@ function encolarEscaneo(curp, modo, fecha, hora) {
  guardarCola();
  vaciarCola();
 }
-const LOTE_COLA = 50;   // escaneos que se mandan juntos en una sola petición
+const LOTE_COLA = 100;   // escaneos que se mandan juntos en una sola petición
 function vaciarCola() {
  if (_vaciandoCola || !colaEscaneos.length) return;
  _vaciandoCola = true;
@@ -2629,7 +2628,7 @@ function iniciarScanner(el, modoFn) {
  $('#' + el).siblings('.cam-ph').hide();
  // Teléfono: cámara trasera ('environment'). Computadora: la que haya ('user').
  // Sin recuadro: se analiza TODA la imagen, así el QR se lee de cerca o de lejos y en cualquier parte de la pantalla
- const cfg = {fps:20, disableFlip:true};
+ const cfg = {fps:30, disableFlip:true};
  const alLeer = txt => procesarQR(claveDeLectura(txt), modoFn(), el);
  const fallo = e => {
  delete scanners[el]; $('#' + el).siblings('.cam-ph').show();
@@ -2709,7 +2708,7 @@ function guardarYPintarLuego() {
    2. Ya tiene entrada y no salida  -> Salida (también salidas anticipadas con permiso).
    3. Sin entrada y la hora ya está en el bloque de salida del grupo (30 min antes de su hora de salida) -> Salida.
    4. Sin entrada en cualquier otro momento (antes del turno, a tiempo o con retardo) -> Entrada. */
-const MOV_AUTO = {salidaAntes: 30, repetida: 5, defecto: {Matutino: [430, 840], Vespertino: [790, 1200]}};
+const MOV_AUTO = {salidaAntes: 30, defecto: {Matutino: [430, 840], Vespertino: [790, 1200]}};
 function horarioAuto(a) {
  const h = db.horarios[claveGrupo(a.grado, a.grupo, a.turno)] || {}, ok = v => /^\d{1,2}:\d{2}/.test(v || '');
  const e = ok(h.entrada) ? toMin(h.entrada) : null, s = ok(h.salida) ? toMin(h.salida) : null;
@@ -2718,9 +2717,9 @@ function horarioAuto(a) {
 }
 function resolverMovimiento(a, r) {
  const [e, s] = horarioAuto(a), ahora = toMin(horaAhora());
- if (r.entrada && r.salida) return {error: a.nombre + ': la entrada y la salida de hoy ya estaban registradas'};
+ if (r.entrada && r.salida) return {error: a.nombre + ': ya tiene entrada (' + h12(r.entrada) + ') y salida (' + h12(r.salida) + ') de hoy'};
  if (r.entrada) {
-  if (ahora - toMin(r.entrada) < MOV_AUTO.repetida) return {error: a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
+  if (ahora < Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2))) return {error: a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
   return {modo: 'Salida'};
  }
  return {modo: ahora >= Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2)) ? 'Salida' : 'Entrada'};
@@ -2998,7 +2997,7 @@ function renderTabla() {
  }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
- renderStats();
+ if (!$('#panel-control').hasClass('d-none')) renderStats();   // las estadísticas solo se redibujan si se están viendo (al abrir ese panel se dibujan)
 }
 let _temporizadorTabla = null;
 function renderTablaPronto() { clearTimeout(_temporizadorTabla); _temporizadorTabla = setTimeout(renderTabla, 150); }
@@ -4141,7 +4140,7 @@ $(function () {
  pintarIndicadorCola();
  /* Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde 304 sin cuerpo si nada cambió y
     guarda la respuesta 1 s en caché). Las otras pestañas del mismo equipo se enteran al instante por BroadcastChannel. */
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 1000);
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 500);
  if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
