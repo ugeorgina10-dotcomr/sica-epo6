@@ -2737,7 +2737,8 @@ function resolverMovimiento(a, r) {
   if (ahora < Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2))) return {error: a.nombre + ': la entrada ya estaba registrada (' + h12(r.entrada) + ')'};
   return {modo: 'Salida'};
  }
- return {modo: ahora >= Math.max(s - MOV_AUTO.salidaAntes, Math.floor((e + s) / 2)) ? 'Salida' : 'Entrada'};
+ // Sin entrada: es ENTRADA hasta que llegue la hora de salida del grupo (aunque ya pasaron la hora de entrada y su tolerancia: solo lleva retardo); desde la hora de salida es SALIDA
+ return {modo: ahora >= s ? 'Salida' : 'Entrada'};
 }
 function aplicarRegistro(a, modo, sinEntradaOk) {
  if (!a) return {ok:false, msg:'Alumno no encontrado'};
