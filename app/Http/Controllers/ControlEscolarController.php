@@ -288,8 +288,15 @@ class ControlEscolarController extends Controller
 
         // La PRIMERA hora en que se muestra la credencial es la que vale: mostrarla otra vez no cambia ni agrega nada
         // (ni la entrada ni la salida), en modo automático y también en modo manual.
-        $hoy = Asistencia::where('alumno_id', $alumno->id)
-            ->whereDate('fecha_hora', $ahora->toDateString())->orderBy('fecha_hora')->get();
+        if ($this->enLote) {
+            // En un lote todo se resuelve en memoria (los registros de estos alumnos se leyeron UNA vez al inicio)
+            $dia = $ahora->toDateString();
+            $hoy = collect($this->asistenciasDeLote($alumno->id))
+                ->filter(fn ($x) => substr($x->fecha_hora, 0, 10) === $dia)->sortBy('fecha_hora')->values();
+        } else {
+            $hoy = Asistencia::where('alumno_id', $alumno->id)
+                ->whereDate('fecha_hora', $ahora->toDateString())->orderBy('fecha_hora')->get();
+        }
         $entrada = $hoy->first(fn ($x) => $x->estatus !== 'Salida');
         $salida  = $hoy->first(fn ($x) => $x->estatus === 'Salida');
         $horaDe  = fn ($x) => Carbon::parse($x->fecha_hora)->format('H:i');
@@ -323,15 +330,35 @@ class ControlEscolarController extends Controller
         }
 
         // Una salida en el mismo minuto que la entrada no debe pisarla: se anota un minuto después
-        if ($estatus === 'Salida' && Asistencia::where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->where('estatus', '!=', 'Salida')->exists()) {
+        $mismoMinutoEntrada = $this->enLote
+            ? collect($this->asistenciasDeLote($alumno->id))->contains(fn ($x) => $x->fecha_hora === $fechaHora && $x->estatus !== 'Salida')
+            : Asistencia::where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->where('estatus', '!=', 'Salida')->exists();
+        if ($estatus === 'Salida' && $mismoMinutoEntrada) {
             $fechaHora = $ahora->copy()->addMinute()->format('Y-m-d H:i:00');
         }
 
-        // updateOrCreate: si el teléfono reintenta el mismo escaneo no se duplica el registro
-        Asistencia::updateOrCreate(
-            ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],
-            ['estatus' => $estatus]
-        );
+        if ($this->enLote) {
+            // Se anota en memoria y se guarda todo junto al final del lote (un solo INSERT)
+            $existente = null;
+            foreach ($this->asisLote[$alumno->id] as $x) {
+                if ($x->fecha_hora === $fechaHora) { $existente = $x; break; }
+            }
+            if ($existente) {
+                if ($existente->estatus !== $estatus) {
+                    $existente->estatus = $estatus;
+                    $this->actualizarLote[] = [$alumno->id, $fechaHora, $estatus];
+                }
+            } else {
+                $this->asisLote[$alumno->id][] = (object) ['fecha_hora' => $fechaHora, 'estatus' => $estatus];
+                $this->nuevasLote[] = ['alumno_id' => $alumno->id, 'estatus' => $estatus, 'fecha_hora' => $fechaHora, 'created_at' => now(), 'updated_at' => now()];
+            }
+        } else {
+            // updateOrCreate: si el teléfono reintenta el mismo escaneo no se duplica el registro
+            Asistencia::updateOrCreate(
+                ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],
+                ['estatus' => $estatus]
+            );
+        }
 
         $partes = $grupo ? explode(' ', $grupo->nombre) : [];
 
@@ -359,6 +386,20 @@ class ControlEscolarController extends Controller
     /** Alumnos y grupos precargados durante un lote de escaneos (vacío en un escaneo suelto) */
     private array $alumnosLote = [];
     private array $gruposLote = [];
+    private bool $enLote = false;
+    private array $asisLote = [];       // alumno_id => registros de asistencia (objetos con fecha_hora y estatus)
+    private array $nuevasLote = [];     // filas por insertar al final del lote
+    private array $actualizarLote = []; // [alumno_id, fecha_hora, estatus] por actualizar al final del lote
+
+    /** Registros de un alumno dentro de un lote (si no se precargaron, se leen una vez) */
+    private function asistenciasDeLote(int $alumnoId): array
+    {
+        if (!isset($this->asisLote[$alumnoId])) {
+            $this->asisLote[$alumnoId] = Asistencia::where('alumno_id', $alumnoId)->where('fecha_hora', '>=', now()->subDays(4)->startOfDay())
+                ->get(['fecha_hora', 'estatus'])->map(fn ($x) => (object) ['fecha_hora' => substr((string) $x->fecha_hora, 0, 19), 'estatus' => $x->estatus])->all();
+        }
+        return $this->asisLote[$alumnoId];
+    }
 
     private function registrarAsistencias(array $d): JsonResponse
     {
@@ -379,6 +420,21 @@ class ControlEscolarController extends Controller
             : [];
         $this->gruposLote = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada')->get()->keyBy('id')->all();
 
+        // Los registros de asistencia de esos alumnos se leen de una vez (antes: varias consultas por cada escaneo)
+        $this->enLote = true;
+        $this->asisLote = [];
+        $this->nuevasLote = [];
+        $this->actualizarLote = [];
+        $ids = array_values(array_map(fn ($a) => (int) $a->id, $this->alumnosLote));
+        foreach ($ids as $id) {
+            $this->asisLote[$id] = [];
+        }
+        foreach (array_chunk($ids, 500) as $bloque) {
+            foreach (DB::table('asistencias')->whereIn('alumno_id', $bloque)->where('fecha_hora', '>=', now()->subDays(4)->startOfDay())->select('alumno_id', 'fecha_hora', 'estatus')->cursor() as $x) {
+                $this->asisLote[(int) $x->alumno_id][] = (object) ['fecha_hora' => substr((string) $x->fecha_hora, 0, 19), 'estatus' => $x->estatus];
+            }
+        }
+
         $resultados = [];
         try {
             DB::transaction(function () use ($items, &$resultados) {
@@ -391,10 +447,21 @@ class ControlEscolarController extends Controller
                     $cuerpo = $r->getData(true);
                     $resultados[] = ['status' => $r->getStatusCode(), 'mensaje' => $cuerpo['mensaje'] ?? null];
                 }
+                // Todo lo nuevo se guarda junto
+                foreach (array_chunk($this->nuevasLote, 500) as $bloque) {
+                    DB::table('asistencias')->insert($bloque);
+                }
+                foreach ($this->actualizarLote as [$aid, $fh, $est]) {
+                    Asistencia::where('alumno_id', $aid)->where('fecha_hora', $fh)->update(['estatus' => $est]);
+                }
             });
         } finally {
             $this->alumnosLote = [];
             $this->gruposLote = [];
+            $this->enLote = false;
+            $this->asisLote = [];
+            $this->nuevasLote = [];
+            $this->actualizarLote = [];
         }
 
         return response()->json(['ok' => true, 'resultados' => $resultados]);

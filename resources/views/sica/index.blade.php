@@ -2573,6 +2573,8 @@ function encolarEscaneo(curp, modo, fecha, hora) {
  guardarCola();
  vaciarCola();
 }
+let _demoraCola = 1500;   // si un envío falla, se reintenta pronto (1.5 s, luego 3, 6 y hasta 10 s) en vez de esperar al chequeo de cada 15 s
+function reintentarColaPronto() { setTimeout(vaciarCola, _demoraCola); _demoraCola = Math.min(_demoraCola * 2, 10000); }
 const LOTE_COLA = 100;   // escaneos que se mandan juntos en una sola petición
 function vaciarCola() {
  if (_vaciandoCola || !colaEscaneos.length) return;
@@ -2597,17 +2599,17 @@ function vaciarCola() {
    if (r.ok) {
     return r.json().catch(() => ({})).then(d => {
      const res = (d && d.resultados) || [];
-     if (res.length !== lote.length) { lote.forEach(it => { it.diferido = true; }); _errCola = 'respuesta incompleta del servidor, reintentando'; return terminar(huboExito); }
+     if (res.length !== lote.length) { lote.forEach(it => { it.diferido = true; }); _errCola = 'respuesta incompleta del servidor, reintentando'; terminar(huboExito); return reintentarColaPronto(); }
      // Cada escaneo sale de la cola cuando el servidor lo atendió; los rechazados de forma definitiva (403/404/409/422) se descartan para no atorarla
      const ids = new Set(lote.map(it => it.id));
      colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id));
-     _errCola = '';
+     _errCola = ''; _demoraCola = 1500;
      guardarCola(); acelerarSync(); avisarEstado();
      res.forEach((x, i) => { if (x.status >= 400) avisoPermiso('Un escaneo pendiente (' + lote[i].curp + ') fue rechazado por el servidor: ' + (x.mensaje || 'error ' + x.status)); });
      return enviar(false, true);
     });
    }
-   if (r.status >= 500 || r.status === 429) { lote.forEach(it => { it.diferido = true; }); _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; return terminar(huboExito); }
+   if (r.status >= 500 || r.status === 429) { lote.forEach(it => { it.diferido = true; }); _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; terminar(huboExito); return reintentarColaPronto(); }
    // 403 / 404 / 422 de toda la petición: se descarta el lote para no atorar la cola
    const ids = new Set(lote.map(it => it.id));
    colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id)); guardarCola();
@@ -2615,7 +2617,7 @@ function vaciarCola() {
     avisoPermiso('Escaneos pendientes rechazados por el servidor: ' + ((d && d.mensaje) || 'error ' + r.status));
     return enviar(false, huboExito);
    });
-  }).catch(() => { lote.forEach(it => { it.diferido = true; }); _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); });   // sin conexión: se quedan en la cola
+  }).catch(() => { lote.forEach(it => { it.diferido = true; }); _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); reintentarColaPronto(); });   // sin conexión: se quedan en la cola
  };
  enviar(false, false);
 }
