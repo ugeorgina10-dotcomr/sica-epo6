@@ -45,6 +45,7 @@ class ControlEscolarController extends Controller
             // Los demás roles con permiso "editar" únicamente pueden guardar asistencias.
             'guardar_todo'         => $this->guardarTodo($validado['datos'], !$esControl),
             'registrar_asistencia' => $this->registrarAsistencia($validado['datos']),
+            'registrar_asistencias' => $this->registrarAsistencias($validado['datos']),
             'eliminar_alumno'      => $this->eliminarAlumno($validado['datos']),
             'eliminar_lista_grupo' => $this->eliminarListaGrupo($validado['datos']),
             'eliminar_listas_grupos' => $this->eliminarListasGrupos($validado['datos']),
@@ -342,6 +343,31 @@ class ControlEscolarController extends Controller
                 'turno'  => $grupo ? ($grupo->turno ?: 'Matutino') : null,
             ],
         ]);
+    }
+
+    /**
+     * Registra VARIOS escaneos en una sola petición (los que se acumularon en la cola del equipo).
+     * Se procesan en orden (así una entrada y su salida del mismo alumno quedan bien) y se responde el resultado de cada uno.
+     */
+    private function registrarAsistencias(array $d): JsonResponse
+    {
+        $items = $d['items'] ?? null;
+        if (!is_array($items) || !$items || count($items) > 200) {
+            return response()->json(['ok' => false, 'mensaje' => 'Lote de escaneos inválido'], 422);
+        }
+
+        $resultados = [];
+        foreach (array_values($items) as $item) {
+            if (!is_array($item)) {
+                $resultados[] = ['status' => 422, 'mensaje' => 'Datos de escaneo inválidos'];
+                continue;
+            }
+            $r = $this->registrarAsistencia($item);
+            $cuerpo = $r->getData(true);
+            $resultados[] = ['status' => $r->getStatusCode(), 'mensaje' => $cuerpo['mensaje'] ?? null];
+        }
+
+        return response()->json(['ok' => true, 'resultados' => $resultados]);
     }
 
     /**

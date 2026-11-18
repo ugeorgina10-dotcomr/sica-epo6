@@ -2539,6 +2539,7 @@ function encolarEscaneo(curp, modo, fecha, hora) {
  guardarCola();
  vaciarCola();
 }
+const LOTE_COLA = 50;   // escaneos que se mandan juntos en una sola petición
 function vaciarCola() {
  if (_vaciandoCola || !colaEscaneos.length) return;
  _vaciandoCola = true;
@@ -2548,26 +2549,39 @@ function vaciarCola() {
   if (huboExito) cargarDesdeServidor();   // trae lo que escanearon los demás dispositivos
  };
  const enviar = (reintentoCsrf, huboExito) => {
-  const it = colaEscaneos[0];
-  if (!it) return terminar(huboExito);
+  const lote = colaEscaneos.slice(0, LOTE_COLA);
+  if (!lote.length) return terminar(huboExito);
   // Si el escaneo ya esperó (sin internet o en cola), el servidor usa la hora en que se escaneó de verdad
-  const diferido = !!it.diferido || (Date.now() - (it.ts || 0) > 60000);
+  const items = lote.map(it => ({curp: it.curp, modo: it.modo, fecha: it.fecha, hora: it.hora, diferido: !!it.diferido || (Date.now() - (it.ts || 0) > 60000)}));
   fetchT('/api/sica/sync', {
    method: 'POST',
    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
-   body: JSON.stringify({ accion: 'registrar_asistencia', datos: {curp: it.curp, modo: it.modo, fecha: it.fecha, hora: it.hora, diferido: diferido} })
-  }, 12000).then(r => {
+   body: JSON.stringify({ accion: 'registrar_asistencias', datos: {items: items} })
+  }, 30000).then(r => {
    if (r.status === 419 && !reintentoCsrf) return refrescarCsrf().then(() => enviar(true, huboExito));
    if (r.status === 401) { terminar(huboExito); sesionExpirada(); return; }   // la cola se conserva hasta volver a iniciar sesión
-   if (r.ok) { _errCola = ''; colaEscaneos.shift(); guardarCola(); acelerarSync(); avisarEstado(); return enviar(false, true); }
-   if (r.status >= 500 || r.status === 419 || r.status === 429) { it.diferido = true; _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; return terminar(huboExito); }
-   // 403 / 404 / 422: el servidor lo rechazó de forma definitiva -> se descarta para no atorar la cola
-   colaEscaneos.shift(); guardarCola();
+   if (r.ok) {
+    return r.json().catch(() => ({})).then(d => {
+     const res = (d && d.resultados) || [];
+     if (res.length !== lote.length) { lote.forEach(it => { it.diferido = true; }); _errCola = 'respuesta incompleta del servidor, reintentando'; return terminar(huboExito); }
+     // Cada escaneo sale de la cola cuando el servidor lo atendió; los rechazados de forma definitiva (403/404/409/422) se descartan para no atorarla
+     const ids = new Set(lote.map(it => it.id));
+     colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id));
+     _errCola = '';
+     guardarCola(); acelerarSync(); avisarEstado();
+     res.forEach((x, i) => { if (x.status >= 400) avisoPermiso('Un escaneo pendiente (' + lote[i].curp + ') fue rechazado por el servidor: ' + (x.mensaje || 'error ' + x.status)); });
+     return enviar(false, true);
+    });
+   }
+   if (r.status >= 500 || r.status === 429) { lote.forEach(it => { it.diferido = true; }); _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; return terminar(huboExito); }
+   // 403 / 404 / 422 de toda la petición: se descarta el lote para no atorar la cola
+   const ids = new Set(lote.map(it => it.id));
+   colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id)); guardarCola();
    return r.json().catch(() => ({})).then(d => {
-    avisoPermiso('Un escaneo pendiente (' + it.curp + ') fue rechazado por el servidor: ' + ((d && d.mensaje) || 'error ' + r.status));
+    avisoPermiso('Escaneos pendientes rechazados por el servidor: ' + ((d && d.mensaje) || 'error ' + r.status));
     return enviar(false, huboExito);
    });
-  }).catch(() => { it.diferido = true; _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); });   // sin conexión: se queda en la cola
+  }).catch(() => { lote.forEach(it => { it.diferido = true; }); _errCola = 'sin respuesta del servidor, reintentando'; terminar(huboExito); });   // sin conexión: se quedan en la cola
  };
  enviar(false, false);
 }
