@@ -2738,7 +2738,7 @@ function detener(el) {
    cada carácter es un dígito en base 4, así que 16 caracteres hexadecimales = 32 invisibles. "SICA" ya no se imprime;
    es solo la marca interna con la que el sistema pasa el código. Se siguen aceptando los QR anteriores:
    "EPO6 SICA<código>" y los de la CURP sola. */
-const QR_ZW = '​‌‍⁠';
+const QR_ZW = String.fromCharCode(0x200B, 0x200C, 0x200D, 0x2060);   // 4 caracteres invisibles (ancho cero): ZWSP, ZWNJ, ZWJ y WORD JOINER
 const QR_SOLO_ESCUELA = 'QRSOLOESCUELA';   // QR con solo los datos de la escuela (sin código de alumno)
 function qrOcultar(hex) {
  let s = ''; for (const h of String(hex).toLowerCase()) { const n = parseInt(h, 16); s += QR_ZW[n >> 2] + QR_ZW[n & 3]; }
@@ -2753,7 +2753,7 @@ function qrCodigoOculto(txt) {
  };
  txt = String(txt); let h = leer(txt);
  // Algunos escáneres leen el QR como Latin-1 en vez de UTF-8: los invisibles llegan como "â" + 2 signos. Se recomponen.
- if (!h && /â[\u0080-¿]/.test(txt)) { try { h = leer(decodeURIComponent(escape(txt))); } catch (e) {} }
+ if (!h && /\u00e2[\u0080-\u00bf]/.test(txt)) { try { h = leer(decodeURIComponent(escape(txt))); } catch (e) {} }
  return h;
 }
 const reQr = /SICA([0-9A-F]{16,20})$/;   // 16 = código actual; hasta 20 = versión anterior del QR

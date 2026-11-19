@@ -74,7 +74,7 @@
 
         // El QR de la credencial muestra solo la escuela y las C.C.T.; el código del alumno va al final con caracteres invisibles
         // (16 caracteres hexadecimales = 32 invisibles, base 4). También se aceptan los QR anteriores: "EPO6 SICA<código>" y la CURP sola.
-        const QR_ZW = '​‌‍⁠';
+        const QR_ZW = String.fromCharCode(0x200B, 0x200C, 0x200D, 0x2060);   // 4 caracteres invisibles (ancho cero): ZWSP, ZWNJ, ZWJ y WORD JOINER
         function qrCodigoOculto(txt) {
             const leer = t => {
                 let d = ''; for (const ch of t) { const i = QR_ZW.indexOf(ch); if (i >= 0) d += i; }
@@ -83,7 +83,7 @@
                 return h;
             };
             txt = String(txt); let h = leer(txt);
-            if (!h && /â[\u0080-¿]/.test(txt)) { try { h = leer(decodeURIComponent(escape(txt))); } catch (e) {} }   // escáner que lee en Latin-1
+            if (!h && /\u00e2[\u0080-\u00bf]/.test(txt)) { try { h = leer(decodeURIComponent(escape(txt))); } catch (e) {} }   // escáner que lee en Latin-1
             return h;
         }
         function datosDeQr(texto) {
