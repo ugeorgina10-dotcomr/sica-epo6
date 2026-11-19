@@ -44,3 +44,24 @@ No se abrió el sistema en un navegador ni se usaron cámara o dispositivos fís
 - Las solicitudes fueron simuladas en el entorno aislado de PHPUnit: esto comprueba rutas y respuestas, pero **no sustituye** una prueba visual manual del navegador ni una prueba de cámara/QR físico.
 - No se inició el servidor con la base MySQL configurada para la instalación, no se cargaron datos reales, no se instalaron dependencias y no se cambió código ni configuración.
 - Las pruebas y su salida completa se describen en `pruebas de caja blanca/Informe.md`.
+
+## Tablas para pegar capturas de interfaz y fragmentos de código
+
+Las celdas son espacios de inserción. En Word, pega la captura o el código en la celda indicada y conserva el pie. Una captura de código solo da contexto: no sustituye la evidencia del comportamiento observado.
+
+### Interfaces
+
+| ID | Pantalla / caso | Pegar captura aquí | Qué debe mostrar y pie |
+|---|---|---|---|
+| UI-CN-01 | Inicio de sesión y panel por rol | **[PEGAR CAPTURA DE INTERFAZ AQUÍ]** | Cuenta ficticia y acciones visibles para el rol. Pie: navegador, rol sintético, fecha y resultado. |
+| UI-CN-02 | Lector QR | **[PEGAR CAPTURA DE INTERFAZ AQUÍ]** | Antes/después de leer un QR de prueba y resultado de asistencia; no usar QR real. |
+| UI-CN-03 | Carga de plantilla | **[PEGAR CAPTURA DE INTERFAZ AQUÍ]** | Archivo de prueba y mensaje de aceptación/rechazo. |
+| UI-CN-04 | Respuesta HTTP | **[PEGAR CAPTURA DE INTERFAZ AQUÍ]** | Estado 401/403/304 en DevTools; ocultar cookies, tokens, datos y URL privada. |
+
+### Código relacionado con los casos
+
+| ID | Archivo / caso asociado | Pegar fragmento de código aquí | Qué explica |
+|---|---|---|---|
+| COD-CN-01 | `routes/web.php` y CN-02 | **[PEGAR FRAGMENTO AQUÍ]** | Ruta de login y respuesta observable; eliminar datos sensibles. |
+| COD-CN-02 | `VerificarPermisoSica.php` y CN-05/CN-06 | **[PEGAR FRAGMENTO AQUÍ]** | Regla por rol que se contrasta con la respuesta HTTP. |
+| COD-CN-03 | Prueba Feature que respalda el caso elegido | **[PEGAR FRAGMENTO AQUÍ]** | Preparación, petición y aserción. No presentar el código como captura de una ejecución manual. |

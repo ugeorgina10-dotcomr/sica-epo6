@@ -1,0 +1,1 @@
+﻿GET /=200; login=200 rol=control; estado_autorizado=200; logout=200; estado_anonimo=401; assets=/vendor/jquery.min.js=200, /vendor/bootstrap.min.css=200, /img/logo6.png=200
