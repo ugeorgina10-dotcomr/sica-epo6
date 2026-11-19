@@ -990,7 +990,9 @@
  const qrCache = {};
  function qrRecortado(valor) {
   if (qrCache[valor]) return qrCache[valor];
-  const q = new global.QRious({value: String(valor), size: 600, level: 'M', padding: 0});
+  // QRious solo codifica bien caracteres de 1 byte: el texto se le da ya convertido a bytes UTF-8 (así viajan bien la "ú" y los
+  // caracteres invisibles del código del alumno, y cualquier escáner lo lee como UTF-8)
+  const q = new global.QRious({value: unescape(encodeURIComponent(String(valor))), size: 600, level: 'M', padding: 0});
   const cv = q.canvas, W = cv.width, H = cv.height;
   const px = cv.getContext('2d').getImageData(0, 0, W, H).data;
   const oscuro = (x, y) => { const i = (y * W + x) * 4; return px[i + 3] > 0 && px[i] < 128; };
