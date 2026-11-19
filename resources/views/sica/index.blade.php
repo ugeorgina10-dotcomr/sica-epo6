@@ -3861,9 +3861,9 @@ function _hmacSha256Hex(clave, texto) {
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
 /* Texto del QR: lo único que ve cualquier otro escáner (cámara del teléfono, Google, computadora, lector físico) es el nombre de la escuela
-   y las C.C.T. de los dos turnos, en un solo renglón (un lector físico manda Enter en cada salto de línea). Sin enlace y sin mencionar el sistema.
+   y las C.C.T. de los dos turnos, en un solo renglón (un lector físico manda Enter en cada salto de línea). Sin enlace y sin mencionar el sistema. Corto a propósito: menos texto = QR menos denso.
    Al final va el código propio del alumno, invisible (ver qrOcultar). */
-const QR_TEXTO_ESCUELA = 'Escuela Preparatoria Oficial Núm. 6 CCT 15EBH0008G Matutino 15EBH0199N Vespertino';
+const QR_TEXTO_ESCUELA = 'EPO6 CCT 15EBH0008G Mat 15EBH0199N Vesp';
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
