@@ -2733,46 +2733,14 @@ function detener(el) {
  const s = scanners[el]; if (!s) return; delete scanners[el];
  s.stop().then(() => s.clear()).catch(() => {}); $('#' + el).siblings('.cam-ph').show();
 }
-/* El QR de la credencial muestra SOLO el nombre de la escuela y las C.C.T. (lo que ve cualquier otro escáner: cámara del teléfono,
-   Google, computadora...). El código del alumno va escondido al final con caracteres invisibles (de ancho cero):
-   cada carácter vale 3 bits: el código de 10 caracteres hexadecimales = 14 invisibles. "SICA" ya no se imprime;
-   es solo la marca interna con la que el sistema pasa el código. Se siguen aceptando los QR anteriores:
-   "EPO6 SICA<código>" y los de la CURP sola. */
-const QR_ZW = String.fromCharCode(0x200B, 0x200C, 0x200D, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064);   // 8 caracteres invisibles (ancho cero) = 3 bits cada uno
-const QR_SOLO_ESCUELA = 'QRSOLOESCUELA';   // QR con solo los datos de la escuela (sin código de alumno)
-const QR_LARGO = 10;   // el QR lleva los primeros 10 caracteres del código del alumno (40 bits): suficiente para miles de alumnos y deja el QR más ligero
-function qrOcultar(hex) {   // 10 hex = 40 bits -> 14 invisibles (3 bits cada uno)
- let bits = ''; for (const h of String(hex).toLowerCase().slice(0, QR_LARGO)) bits += parseInt(h, 16).toString(2).padStart(4, '0');
- while (bits.length % 3) bits += '0';
- let s = ''; for (let i = 0; i < bits.length; i += 3) s += QR_ZW[parseInt(bits.substr(i, 3), 2)];
- return s;
-}
-function qrCodigoOculto(txt) {   // devuelve 10 hex (QR actual) o 16 hex (QR de versiones anteriores), o '' si no trae código
- const leer = t => {
-  let d = ''; for (const ch of t) { const i = QR_ZW.indexOf(ch); if (i >= 0) d += i; }
-  let bits = '', n = 0;
-  if (d.length === 14) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 40; }
-  else if (d.length === 22) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 64; }                                    // versión anterior (22 invisibles)
-  else if (d.length === 32 && !/[4-7]/.test(d)) { for (const x of d) bits += (+x).toString(2).padStart(2, '0'); n = 64; }              // versión anterior (32 invisibles)
-  else return '';
-  let h = ''; for (let i = 0; i < n; i += 4) h += parseInt(bits.substr(i, 4), 2).toString(16);
-  return h;
- };
- txt = String(txt); let h = leer(txt);
- // Algunos escáneres leen el QR como Latin-1 en vez de UTF-8: los invisibles llegan como "â" + 2 signos. Se recomponen.
- if (!h && /â[\u0080-¿]/.test(txt)) { try { h = leer(decodeURIComponent(escape(txt))); } catch (e) {} }
- return h;
-}
+/* El QR de la credencial es un texto de la escuela que termina en "SICA<código>". Se reconoce aunque el lector cambie algún signo
+   porque solo se usan letras y números del final. Los QR viejos con la CURP sola se siguen aceptando. */
 const reQr = /SICA([0-9A-F]{16,20})$/;   // 16 = código actual; hasta 20 = versión anterior del QR
 function claveDeLectura(txt) {
- const oculto = qrCodigoOculto(txt);
- if (oculto) return 'SICA' + oculto.toUpperCase();
  const s = String(txt).toUpperCase().replace(/[^A-Z0-9]/g, ''), m = s.match(reQr);
- if (m) return 'SICA' + m[1].slice(0, 16);
- if (/PREPARATORIA/.test(s) && /15EBH0008G/.test(s) && /15EBH0199N/.test(s)) return QR_SOLO_ESCUELA;
- return String(txt).trim().toUpperCase();
+ return m ? 'SICA' + m[1].slice(0, 16) : String(txt).trim().toUpperCase();
 }
-const esClaveQr = c => /^SICA([0-9A-F]{10}|[0-9A-F]{16})$/.test(c);   // 10 = QR actual; 16 = QR de versiones anteriores
+const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
 function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
@@ -2780,7 +2748,6 @@ function procesarQR(curp, modo, el) {
   $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok ? 'text-success' : 'text-danger').text(r.msg);
   if (navigator.vibrate) navigator.vibrate(r.ok ? 150 : [100,60,100]);
  };
- if (curp === QR_SOLO_ESCUELA) return mostrar({ok:false, msg:'Este QR solo trae los datos de la escuela, no el código de un alumno. Si usas lector físico, debe enviar caracteres Unicode (UTF-8).'});
  const r = registrarPorCurp(curp, modo);
  if (r && typeof r.then === 'function') {   // alumno que este equipo aún no tiene: lo busca el servidor
   $('#res-' + el).removeClass('text-success text-danger').text('Buscando alumno…');
@@ -2847,12 +2814,7 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
 let _idxQr = {lista: null, n: -1, clave: null, mapa: new Map()};
 function construirIndiceQr() {
  const m = new Map();
- (db.alumnos || []).forEach(a => {
-  if (!a.curp) return; const c = qrCodigo(a.curp).toUpperCase(); if (!c) return;
-  m.set(c, a);                                        // código completo (QR de versiones anteriores)
-  const p = c.slice(0, QR_LARGO);                      // y su inicio (QR actual); si dos alumnos compartieran inicio, ninguno se acepta por el inicio
-  m.set(p, m.has(p) ? false : a);
- });
+ (db.alumnos || []).forEach(a => { if (a.curp) { const c = qrCodigo(a.curp); if (c) m.set(c.toUpperCase(), a); } });
  _idxQr = {lista: db.alumnos, n: (db.alumnos || []).length, clave: db.qrClave, mapa: m};
  return m;
 }
@@ -2860,7 +2822,7 @@ function precalentarIndiceQr() { try { if (db && db.qrClave) construirIndiceQr()
 function alumnoPorCodigoQr(cod) {
  const vigente = _idxQr.lista === db.alumnos && _idxQr.n === db.alumnos.length && _idxQr.clave === db.qrClave;
  let a = (vigente ? _idxQr.mapa : construirIndiceQr()).get(cod);
- if (a && a.curp && qrCodigo(a.curp).toUpperCase().startsWith(cod)) return a;   // sigue siendo el mismo alumno
+ if (a && a.curp && qrCodigo(a.curp).toUpperCase() === cod) return a;   // sigue siendo el mismo alumno
  return construirIndiceQr().get(cod) || null;                            // no estaba (o cambió algo): se rehace una vez, como antes
 }
 function registrarPorCurp(curp, modo) {
@@ -3867,10 +3829,8 @@ function _hmacSha256Hex(clave, texto) {
  const i1 = _sha256(a), b = new Uint8Array(96); b.set(ok); b.set(i1, 64);
  return Array.from(_sha256(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
-/* Texto del QR: lo único que ve cualquier otro escáner (cámara del teléfono, Google, computadora, lector físico) es el nombre de la escuela
-   y las C.C.T. de los dos turnos, en un solo renglón (un lector físico manda Enter en cada salto de línea). Sin enlace y sin mencionar el sistema. Corto a propósito: menos texto = QR menos denso.
-   Al final va el código propio del alumno, invisible (ver qrOcultar). */
-const QR_TEXTO_ESCUELA = 'EPO6 CCT 15EBH0008G Mat 15EBH0199N Vesp';
+/* Texto del QR: nombre corto de la escuela (lo que ve cualquier otra app de escaneo, sin enlace) y al final el código propio del alumno. Total: 25 caracteres, igual de simple que el QR con la CURP */
+const QR_TEXTO_ESCUELA = 'EPO6 ';   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
 const _memoQr = new Map();
 /* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
@@ -3881,9 +3841,9 @@ function qrCodigo(curp) {
  if (_memoQr.size > 6000) _memoQr.clear();
  _memoQr.set(k, c); return c;
 }
-/* Lo que lleva el QR impreso: datos de la escuela + código del alumno invisible (no la CURP). */
-const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + qrOcultar(c) : ''; };
-const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:unescape(encodeURIComponent(valor)), size:220}).toDataURL();   // QRious necesita los bytes UTF-8 ya hechos (ver sica-docx.js)
+/* Lo que lleva el QR impreso: datos de la escuela + código del alumno (no la CURP). */
+const qrValorDe = curp => { const c = qrCodigo(curp); return c ? QR_TEXTO_ESCUELA + 'SICA' + c : ''; };
+const qrImg = valor => (typeof QRious === 'undefined') ? '' : new QRious({value:valor, size:220}).toDataURL();
 const alumnosCred = () => db.alumnos.filter(a => a.grado === credSel.grado && a.grupo === credSel.grupo && a.turno === turnoCred).sort(porApellidos);
 /* CAMBIO: al elegir Matutino/Vespertino abajo, la etiqueta del turno y la
  vista previa (frente y reverso) de arriba cambian al mismo turno. */

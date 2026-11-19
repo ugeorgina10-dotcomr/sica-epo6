@@ -72,32 +72,11 @@
             }
         }
 
-        // El QR de la credencial muestra solo la escuela y las C.C.T.; el código del alumno va al final con caracteres invisibles
-        // (código de 10 caracteres hexadecimales = 14 invisibles, 3 bits cada uno). También se aceptan los QR anteriores: "EPO6 SICA<código>" y la CURP sola.
-        const QR_ZW = String.fromCharCode(0x200B, 0x200C, 0x200D, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064);   // 8 invisibles (ancho cero) = 3 bits cada uno
-        function qrCodigoOculto(txt) {
-            const leer = t => {
-                let d = ''; for (const ch of t) { const i = QR_ZW.indexOf(ch); if (i >= 0) d += i; }
-                let bits = '', n = 0;
-                if (d.length === 14) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 40; }      // QR actual: 10 caracteres hexadecimales
-                else if (d.length === 22) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 64; }   // versiones anteriores: 16
-                else if (d.length === 32 && !/[4-7]/.test(d)) { for (const x of d) bits += (+x).toString(2).padStart(2, '0'); n = 64; }
-                else return '';
-                let h = ''; for (let i = 0; i < n; i += 4) h += parseInt(bits.substr(i, 4), 2).toString(16);
-                return h;
-            };
-            txt = String(txt); let h = leer(txt);
-            if (!h && /â[\u0080-¿]/.test(txt)) { try { h = leer(decodeURIComponent(escape(txt))); } catch (e) {} }   // escáner que lee en Latin-1
-            return h;
-        }
+        // Texto del QR de la credencial: termina en "SICA<código de 16 caracteres>"
         function datosDeQr(texto) {
-            const oculto = qrCodigoOculto(texto);
-            if (oculto) return { qr: oculto };
             const limpio = String(texto).toUpperCase().replace(/[^A-Z0-9]/g, '');
             const m = limpio.match(/SICA([0-9A-F]{16,20})$/);
-            if (m) return { qr: m[1].slice(0, 16).toLowerCase() };
-            if (/PREPARATORIA/.test(limpio) && /15EBH0008G/.test(limpio) && /15EBH0199N/.test(limpio)) return null;   // QR solo con datos de la escuela
-            return { curp: String(texto).trim().toUpperCase() };
+            return m ? { qr: m[1].slice(0, 16).toLowerCase() } : { curp: String(texto).trim().toUpperCase() };
         }
 
         let ultimoQr = { t: '', ts: 0 };
@@ -106,13 +85,11 @@
             ultimoQr = { t: decodedText, ts: Date.now() };
             const caja = document.getElementById('resultado'), info = document.getElementById('infoAlumno');
             caja.classList.remove('hidden');
-            const datos = datosDeQr(decodedText);
-            if (!datos) { info.innerText = 'Este QR solo trae los datos de la escuela, no el código de un alumno.'; return; }
             info.innerText = 'Buscando alumno…';
             fetch('/api/sica/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                body: JSON.stringify({ accion: 'registrar_asistencia', datos: Object.assign(datos, { modo: modoActual }) })
+                body: JSON.stringify({ accion: 'registrar_asistencia', datos: Object.assign(datosDeQr(decodedText), { modo: modoActual }) })
             }).then(r => r.json().catch(() => ({})).then(d => {
                 if (r.ok && d.ok) {
                     const al = d.alumno || {};
