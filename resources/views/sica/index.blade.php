@@ -2735,25 +2735,27 @@ function detener(el) {
 }
 /* El QR de la credencial muestra SOLO el nombre de la escuela y las C.C.T. (lo que ve cualquier otro escáner: cámara del teléfono,
    Google, computadora...). El código del alumno va escondido al final con caracteres invisibles (de ancho cero):
-   cada carácter vale 3 bits, así que el código de 16 caracteres hexadecimales = 22 invisibles. "SICA" ya no se imprime;
+   cada carácter vale 3 bits: el código de 10 caracteres hexadecimales = 14 invisibles. "SICA" ya no se imprime;
    es solo la marca interna con la que el sistema pasa el código. Se siguen aceptando los QR anteriores:
    "EPO6 SICA<código>" y los de la CURP sola. */
 const QR_ZW = String.fromCharCode(0x200B, 0x200C, 0x200D, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064);   // 8 caracteres invisibles (ancho cero) = 3 bits cada uno
 const QR_SOLO_ESCUELA = 'QRSOLOESCUELA';   // QR con solo los datos de la escuela (sin código de alumno)
-function qrOcultar(hex) {   // 16 hex = 64 bits -> 22 invisibles
- let bits = ''; for (const h of String(hex).toLowerCase()) bits += parseInt(h, 16).toString(2).padStart(4, '0');
+const QR_LARGO = 10;   // el QR lleva los primeros 10 caracteres del código del alumno (40 bits): suficiente para miles de alumnos y deja el QR más ligero
+function qrOcultar(hex) {   // 10 hex = 40 bits -> 14 invisibles (3 bits cada uno)
+ let bits = ''; for (const h of String(hex).toLowerCase().slice(0, QR_LARGO)) bits += parseInt(h, 16).toString(2).padStart(4, '0');
  while (bits.length % 3) bits += '0';
  let s = ''; for (let i = 0; i < bits.length; i += 3) s += QR_ZW[parseInt(bits.substr(i, 3), 2)];
  return s;
 }
-function qrCodigoOculto(txt) {
+function qrCodigoOculto(txt) {   // devuelve 10 hex (QR actual) o 16 hex (QR de versiones anteriores), o '' si no trae código
  const leer = t => {
   let d = ''; for (const ch of t) { const i = QR_ZW.indexOf(ch); if (i >= 0) d += i; }
-  let bits = '';
-  if (d.length === 22) for (const x of d) bits += (+x).toString(2).padStart(3, '0');
-  else if (d.length === 32 && !/[4-7]/.test(d)) for (const x of d) bits += (+x).toString(2).padStart(2, '0');   // versión anterior (4 invisibles)
+  let bits = '', n = 0;
+  if (d.length === 14) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 40; }
+  else if (d.length === 22) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 64; }                                    // versión anterior (22 invisibles)
+  else if (d.length === 32 && !/[4-7]/.test(d)) { for (const x of d) bits += (+x).toString(2).padStart(2, '0'); n = 64; }              // versión anterior (32 invisibles)
   else return '';
-  let h = ''; for (let i = 0; i < 64; i += 4) h += parseInt(bits.substr(i, 4), 2).toString(16);
+  let h = ''; for (let i = 0; i < n; i += 4) h += parseInt(bits.substr(i, 4), 2).toString(16);
   return h;
  };
  txt = String(txt); let h = leer(txt);
@@ -2770,7 +2772,7 @@ function claveDeLectura(txt) {
  if (/PREPARATORIA/.test(s) && /15EBH0008G/.test(s) && /15EBH0199N/.test(s)) return QR_SOLO_ESCUELA;
  return String(txt).trim().toUpperCase();
 }
-const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
+const esClaveQr = c => /^SICA([0-9A-F]{10}|[0-9A-F]{16})$/.test(c);   // 10 = QR actual; 16 = QR de versiones anteriores
 function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
@@ -2845,7 +2847,12 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
 let _idxQr = {lista: null, n: -1, clave: null, mapa: new Map()};
 function construirIndiceQr() {
  const m = new Map();
- (db.alumnos || []).forEach(a => { if (a.curp) { const c = qrCodigo(a.curp); if (c) m.set(c.toUpperCase(), a); } });
+ (db.alumnos || []).forEach(a => {
+  if (!a.curp) return; const c = qrCodigo(a.curp).toUpperCase(); if (!c) return;
+  m.set(c, a);                                        // código completo (QR de versiones anteriores)
+  const p = c.slice(0, QR_LARGO);                      // y su inicio (QR actual); si dos alumnos compartieran inicio, ninguno se acepta por el inicio
+  m.set(p, m.has(p) ? false : a);
+ });
  _idxQr = {lista: db.alumnos, n: (db.alumnos || []).length, clave: db.qrClave, mapa: m};
  return m;
 }
@@ -2853,7 +2860,7 @@ function precalentarIndiceQr() { try { if (db && db.qrClave) construirIndiceQr()
 function alumnoPorCodigoQr(cod) {
  const vigente = _idxQr.lista === db.alumnos && _idxQr.n === db.alumnos.length && _idxQr.clave === db.qrClave;
  let a = (vigente ? _idxQr.mapa : construirIndiceQr()).get(cod);
- if (a && a.curp && qrCodigo(a.curp).toUpperCase() === cod) return a;   // sigue siendo el mismo alumno
+ if (a && a.curp && qrCodigo(a.curp).toUpperCase().startsWith(cod)) return a;   // sigue siendo el mismo alumno
  return construirIndiceQr().get(cod) || null;                            // no estaba (o cambió algo): se rehace una vez, como antes
 }
 function registrarPorCurp(curp, modo) {

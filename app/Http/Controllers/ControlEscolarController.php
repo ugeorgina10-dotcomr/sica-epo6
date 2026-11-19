@@ -261,7 +261,10 @@ class ControlEscolarController extends Controller
         if (!empty($d['curp'])) {
             $alumno = $this->alumnosLote[$d['curp']] ?? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->where('matricula', $d['curp'])->first();
         } else {
-            $id = $this->mapaQr()[substr(strtolower($d['qr']), 0, 16)] ?? null;   // acepta también los códigos largos (20) de la versión anterior
+            // El QR actual lleva 10 caracteres del código; los de versiones anteriores, 16 (o hasta 20: se recortan a 16)
+            $q  = strtolower($d['qr']);
+            $q  = strlen($q) >= 16 ? substr($q, 0, 16) : (strlen($q) >= 10 ? substr($q, 0, 10) : '');
+            $id = $q !== '' ? ($this->mapaQr()[$q] ?? null) : null;
             $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->find($id) : null;
         }
         if (!$alumno) {
@@ -488,10 +491,13 @@ class ControlEscolarController extends Controller
         // La llave depende SOLO de los alumnos (antes también de las asistencias: cada escaneo la invalidaba y se recalculaba el código de todos los alumnos)
         $h = DB::table('alumnos')->selectRaw('COUNT(*) c, MAX(id) i, MAX(updated_at) u')->first();
 
-        return Cache::remember('sica.mapaqr.v3.' . md5(json_encode($h)), 1800, function () {
+        return Cache::remember('sica.mapaqr.v4.' . md5(json_encode($h)), 1800, function () {
             $mapa = [];
             foreach (DB::table('alumnos')->whereNotNull('matricula')->where('matricula', '!=', '')->select('id', 'matricula')->cursor() as $a) {
-                $mapa[self::codigoQr($a->matricula)] = $a->id;
+                $cod = self::codigoQr($a->matricula);
+                $mapa[$cod] = $a->id;                                              // código completo (16)
+                $ini = substr($cod, 0, 10);                                        // y su inicio (10), que es lo que lleva el QR actual
+                $mapa[$ini] = isset($mapa[$ini]) ? 0 : $a->id;                     // 0 = dos alumnos comparten el inicio: no se acepta por el inicio
             }
             return $mapa;
         });

@@ -73,16 +73,17 @@
         }
 
         // El QR de la credencial muestra solo la escuela y las C.C.T.; el código del alumno va al final con caracteres invisibles
-        // (16 caracteres hexadecimales = 22 invisibles, 3 bits cada uno). También se aceptan los QR anteriores: "EPO6 SICA<código>" y la CURP sola.
+        // (código de 10 caracteres hexadecimales = 14 invisibles, 3 bits cada uno). También se aceptan los QR anteriores: "EPO6 SICA<código>" y la CURP sola.
         const QR_ZW = String.fromCharCode(0x200B, 0x200C, 0x200D, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064);   // 8 invisibles (ancho cero) = 3 bits cada uno
         function qrCodigoOculto(txt) {
             const leer = t => {
                 let d = ''; for (const ch of t) { const i = QR_ZW.indexOf(ch); if (i >= 0) d += i; }
-                let bits = '';
-                if (d.length === 22) for (const x of d) bits += (+x).toString(2).padStart(3, '0');
-                else if (d.length === 32 && !/[4-7]/.test(d)) for (const x of d) bits += (+x).toString(2).padStart(2, '0');   // versión anterior
+                let bits = '', n = 0;
+                if (d.length === 14) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 40; }      // QR actual: 10 caracteres hexadecimales
+                else if (d.length === 22) { for (const x of d) bits += (+x).toString(2).padStart(3, '0'); n = 64; }   // versiones anteriores: 16
+                else if (d.length === 32 && !/[4-7]/.test(d)) { for (const x of d) bits += (+x).toString(2).padStart(2, '0'); n = 64; }
                 else return '';
-                let h = ''; for (let i = 0; i < 64; i += 4) h += parseInt(bits.substr(i, 4), 2).toString(16);
+                let h = ''; for (let i = 0; i < n; i += 4) h += parseInt(bits.substr(i, 4), 2).toString(16);
                 return h;
             };
             txt = String(txt); let h = leer(txt);
