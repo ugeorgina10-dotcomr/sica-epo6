@@ -8,6 +8,7 @@ use App\Models\Asistencia;
 use App\Models\Grupo;
 use App\Models\Orientador;
 use App\Models\Permiso;
+use App\Support\ArchivoSeguro;
 use App\Support\MovimientoAutomatico;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -74,6 +75,12 @@ class ControlEscolarController extends Controller
         $ruta      = $request->file('archivo')->getRealPath();
         $extension = strtolower($request->file('archivo')->getClientOriginalExtension());
         $contenido = file_get_contents($ruta);
+        $nombre    = $request->file('archivo')->getClientOriginalName();
+
+        $problemaNombre = ArchivoSeguro::problemaDeNombre($nombre);
+        if ($problemaNombre !== null) {
+            return response()->json(['ok' => false, 'message' => $problemaNombre], 422);
+        }
 
         // Se revisa el CONTENIDO real (no solo la extensión): que sea de verdad un PDF o un Word, que coincida con su extensión y que no esté dañado
         $esPdf = str_starts_with($contenido, '%PDF-');
@@ -85,6 +92,10 @@ class ControlEscolarController extends Controller
             }
             if (!str_contains(substr($contenido, -2048), '%%EOF')) {
                 return response()->json(['ok' => false, 'message' => 'El PDF está dañado o incompleto (se cortó al guardarlo). Vuelve a exportarlo.'], 422);
+            }
+            $problemaPdf = ArchivoSeguro::problemaDePdf($contenido);
+            if ($problemaPdf !== null) {
+                return response()->json(['ok' => false, 'message' => $problemaPdf], 422);
             }
         } elseif ($esZip) {
             // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo (ni un Excel renombrado)
@@ -101,6 +112,10 @@ class ControlEscolarController extends Controller
             }
             if (!$ok) {
                 return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) válido o está dañado. Guárdalo de nuevo desde Word.'], 422);
+            }
+            $problemaOffice = ArchivoSeguro::problemaDeOffice($ruta);
+            if ($problemaOffice !== null) {
+                return response()->json(['ok' => false, 'message' => $problemaOffice], 422);
             }
         } else {
             return response()->json(['ok' => false, 'message' => 'El archivo no es un Word (.docx) ni un PDF válido.'], 422);
