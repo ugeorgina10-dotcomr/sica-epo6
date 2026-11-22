@@ -272,11 +272,11 @@ td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
    Para cambiar el tamaño de TODOS los botones o textos del sistema, solo se editan estas variables.
    ===================================================================== */
 :root{
- --btn-h:48px;          /* alto de todos los botones (objetivo táctil cómodo) */
- --btn-fs:1rem;         /* letra de todos los botones */
- --btn-px:1.25rem;      /* relleno lateral */
- --btn-radius:.7rem;
- --btn-minw:140px;      /* ancho mínimo para que dos botones seguidos se vean parejos */
+ --btn-h:40px;          /* alto de todos los botones (objetivo táctil cómodo) */
+ --btn-fs:.95rem;        /* letra de todos los botones */
+ --btn-px:1.1rem;      /* relleno lateral */
+ --btn-radius:.6rem;
+ --btn-minw:0px;        /* sin ancho mínimo: cada botón mide lo que necesita su texto */
  --fs-base:1rem;        /* texto normal, etiquetas, tablas */
  --fs-small:.95rem;     /* texto secundario (.small) */
  --fs-badge:.85rem;     /* etiquetas / insignias */
@@ -301,7 +301,7 @@ body .btn-cuenta,
 body .burbuja .burbuja-mudo{
  display:inline-flex;align-items:center;justify-content:center;gap:.45rem;box-sizing:border-box;
  height:auto;min-height:var(--btn-h) !important;
- padding:.55rem var(--btn-px) !important;
+ padding:.4rem var(--btn-px) !important;
  font-family:inherit;font-size:var(--btn-fs) !important;font-weight:600 !important;line-height:1.25 !important;
  letter-spacing:0 !important;text-transform:none !important;text-align:center;
  border-radius:var(--btn-radius) !important;
@@ -314,21 +314,13 @@ body .btn.btn-icono{display:inline-flex;align-items:center;justify-content:cente
 .btn.rounded-pill{border-radius:var(--btn-radius) !important}
 /* En tablas el botón no se parte en dos líneas */
 #vista-sistema td .btn,#vista-sistema th .btn,#panel-cuenta-clave .btn{white-space:nowrap}
-#vista-sistema table .btn-rapido{min-width:200px}
 /* Filas de botones: se reparten el ancho por igual y bajan de renglón si no caben (nada se corta) */
-.grupo-botones>.btn,.d-flex.flex-wrap>.btn,.d-flex.gap-2>.btn,.d-flex.gap-3>.btn,.ori-hor .btn,.burbuja .burbuja-acciones>*{flex:1 1 var(--btn-minw)}
 .d-flex.flex-wrap{min-width:0}
 .btn-vinotinto,.btn-vinotinto:hover{color:#fff}
 /* Avisos (burbujas): los botones de abajo ocupan todo el ancho y miden igual */
 .burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
 a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:var(--fs-small);font-weight:400}
-@media (max-width:575.98px){
- body .btn:not(.btn-close):not(.btn-icono){min-width:0;width:100%}
- body .btn-cuenta{width:auto}
- #vista-sistema td .btn{width:auto;min-width:150px}
- .d-flex.flex-wrap>.btn,.d-flex.gap-2>.btn,.d-flex.gap-3>.btn,.grupo-botones>.btn{flex:1 1 100%}
-}
 </style>
 </head>
 <body id="cuerpo-contenedor" class="bg-login">
