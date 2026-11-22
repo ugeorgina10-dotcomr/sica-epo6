@@ -66,7 +66,7 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .tarjeta-grado{cursor:pointer;transition:.2s}
 .tarjeta-grado:hover{box-shadow:0 6px 16px rgba(0,0,0,.12)}
 .tarjeta-grado.seleccionada{border:2px solid #800020 !important;background:#fdf8f8 !important}
-.tarjeta-grado.grado-desactivado{opacity:.4;pointer-events:none;cursor:not-allowed}
+.tarjeta-grado.grado-desactivado{opacity:.55;cursor:pointer}   /* se puede pasar directo a otro grado con un toque */
 /* Tarjetas de grado: en columna y centradas (grado arriba y luego asistencias, retardo entrada y retardo salida, uno debajo del otro) */
 #vista-sistema .btn.tarjeta-grado{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;text-align:center}
 .preview-credencial{width:100%;max-width:340px;border:1px solid #dee2e6;border-radius:10px;background:#eee;display:block;margin:0 auto}
@@ -167,7 +167,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 .ori-item:last-child{border-bottom:0}
 .ori-actual{background:#fdf3f5}
 /* ---- Contraseñas: botones de cuenta y ventana central ---- */
-.btn-cuenta{border:1.5px solid #d9c3c8;background:#fff;color:#5a1020;border-radius:999px;padding:.4rem .9rem;font-size:.85rem;font-weight:600;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;transition:all .15s}
+.btn-cuenta{border:1.5px solid #d9c3c8;background:#fff;color:#5a1020;border-radius:.3rem;padding:.4rem .9rem;font-size:.85rem;font-weight:600;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;transition:all .15s}
 .btn-cuenta:hover{border-color:#800020;background:#fdf3f5}
 .btn-cuenta.activa{background:#800020;border-color:#800020;color:#fff}
 .btn-cuenta.alerta:not(.activa){border-color:#dc3545}
@@ -194,7 +194,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 .burbuja-x{position:absolute;top:4px;right:10px;border:0;background:transparent;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;opacity:.8}
 .burbuja .burbuja-acciones{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
 .burbuja .burbuja-acciones .mt-2{margin-top:0!important}
-.burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.5rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
+.burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.3rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
 .burbuja .burbuja-mudo:hover{background:rgba(255,255,255,.15)}
 .burbuja.silenciada{background:#5c1a2c}
 /* Avisos de guardado (horarios y tolerancias): misma burbuja que las alertas de cuentas */
@@ -217,6 +217,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 .res-scan{min-height:28px;font-size:1.05rem;font-weight:700;line-height:1.4}
 .res-scan.text-success{color:#0b6b3a !important}
 .res-scan.text-danger{color:#b00020 !important}
+/* Varios escaneos a la vez: cada lectura es su propia tarjeta; la más reciente arriba y se conservan las últimas */
+.res-item{padding:.45rem .7rem;margin-bottom:.4rem;border-radius:.3rem;border-left:6px solid #6c757d;background:#f1f3f5;color:#343a40;font-size:1.05rem;font-weight:700;line-height:1.4;overflow-wrap:anywhere}
+.res-item.res-ok{border-left-color:#0b6b3a;background:#e8f5ee;color:#0b6b3a}
+.res-item.res-ret,.res-item.res-err{border-left-color:#b00020;background:#fdecee;color:#b00020}
+.res-item.res-pend{opacity:.85;font-weight:600}
+.res-item:nth-child(n+2){opacity:.8;font-size:.95rem}
 /* Aviso de retardo al escanear (entrada o salida) en ROJO, con ícono y borde para que no dependa solo del color */
 .res-retardo{color:#b00020;background:#fdecee;border-left:6px solid #b00020;border-radius:.4rem;padding:.55rem .8rem;font-size:1.15rem;font-weight:800}
 .hor-estado{font-size:.95rem}
@@ -275,7 +281,7 @@ td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
  --btn-h:40px;          /* alto de todos los botones (objetivo táctil cómodo) */
  --btn-fs:.95rem;        /* letra de todos los botones */
  --btn-px:1.1rem;      /* relleno lateral */
- --btn-radius:.6rem;
+ --btn-radius:.3rem;   /* esquinas discretas (antes .6rem) */
  --btn-minw:0px;        /* sin ancho mínimo: cada botón mide lo que necesita su texto */
  --fs-base:1rem;        /* texto normal, etiquetas, tablas */
  --fs-small:.95rem;     /* texto secundario (.small) */
@@ -322,7 +328,7 @@ body #btn-turno-matutino,body #btn-turno-vespertino,body #btn-turno-lector-matut
 body #btn-modo-entrada,body #btn-modo-salida,body #btn-orient-entrada,body #btn-orient-salida,
 body .btn.btn[onclick^="descargarReporte"],body .btn.btn[onclick^="descargarGraficas"],body .btn.btn[onclick^="activarCamara"],body .btn.btn[onclick^="apagarCamara"],body .btn.btn[onclick^="detener("],body #btn-activar-camara-orientador{min-width:170px}
 /* Entrar al sistema: un poco más grande que el resto, es la acción principal */
-body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')"]{min-height:56px !important;font-size:1.2rem !important;padding:.6rem 1.5rem !important;border-radius:.7rem !important;width:100%}
+body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')"]{min-height:56px !important;font-size:1.2rem !important;padding:.6rem 1.5rem !important;border-radius:.4rem !important;width:100%}
 /* Avisos (burbujas): los botones de abajo ocupan todo el ancho y miden igual */
 .burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
@@ -1287,15 +1293,15 @@ function limiteDe(a) {
  return {retardo: d.retardo + te, fin: d.fin + ts};
 }
 /* Minutos de retraso del alumno ese día: en la entrada (llegó después del límite + tolerancia) y en la salida
-   (salió después del cierre + tolerancia, o hoy todavía no sale y ya pasó ese límite) */
+   (salió después del cierre + tolerancia; solo cuando ya escaneó la salida) */
 function retrasosDe(a, r, fecha) {
  const res = {entrada: 0, salida: 0, sinSalida: false};
  if (r && !r.entrada && r.salida) { res.salida = Math.max(0, toMin(r.salida) - limiteDe(a).fin); return res; }   // salió sin entrada registrada: igual lleva su retardo de salida
  if (!r || !r.entrada) return res;
  const l = limiteDe(a);
  res.entrada = Math.max(0, toMin(r.entrada) - l.retardo);
+ // El retardo de salida se calcula SOLO cuando ya hay salida registrada (entrada y salida): antes de escanear la salida no aparece ningún retardo de salida
  if (r.salida) res.salida = Math.max(0, toMin(r.salida) - l.fin);
- else if (fecha === hoy() && toMin(horaAhora()) > l.fin) { res.salida = toMin(horaAhora()) - l.fin; res.sinSalida = true; }
  return res;
 }
 /* Para las estadísticas: cada alumno-día suma en Asistencias (sin ningún retardo) o en Retardo entrada y/o Retardo salida. Sin entrada = no vino. */
@@ -2730,7 +2736,7 @@ function abrirModalCuenta(modo, mensaje) {
  if (modo === 'confirmar') {
   titulo = '¿Olvidaste tu contraseña?';
   texto = 'Avisa a Control Escolar. Tu cuenta (<b>' + esc(nombre) + '</b>) quedará bloqueada automáticamente y no podrás entrar hasta que Control Escolar borre tu contraseña anterior, genere una nueva y te dé acceso otra vez.';
-  botones = btn('Avisar a Control Escolar', 'btn-vinotinto', 'confirmarOlvido()');
+  botones = btn('Cancelar', 'btn-outline-dark bg-white', 'cerrarModalCuenta()') + btn('Avisar a Control Escolar', 'btn-vinotinto', 'confirmarOlvido()');
  } else if (modo === 'info') {
   titulo = 'Control Escolar';
   texto = mensaje;
@@ -2746,6 +2752,9 @@ function abrirModalCuenta(modo, mensaje) {
  $('#modal-cuenta').removeClass('d-none');
 }
 function cerrarModalCuenta() { $('#modal-cuenta').addClass('d-none'); }
+/* La ventana también se cierra tocando fuera de ella o con la tecla Esc (sin dejar al usuario atrapado) */
+$(document).on('click', '#modal-cuenta', function (e) { if (e.target === this && !_olvidoEnCurso) cerrarModalCuenta(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal-cuenta').hasClass('d-none') && !_olvidoEnCurso) cerrarModalCuenta(); });
 function olvideContrasena() {
  const rol = $('#rol-select').val();
  if (rol === 'orientador' && !$('#select-orientador-login').val()) { alert('Primero selecciona tu nombre de la lista.'); return; }
@@ -2900,6 +2909,15 @@ function avisoRetardo(modo, minutos, limiteMin) {
 }
 /* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (y el retardo de entrada o de salida, si lo hubo) */
 const parRetardo = (modo, minutos) => minutos > 0 ? ' (Retardo de ' + (modo === 'Salida' ? 'salida' : 'entrada') + ': ' + durMin(minutos) + ')' : '';
+/* El aviso de tolerancia/retardo sale SOLO al final, cuando el alumno ya tiene entrada y salida: al registrar la entrada no se avisa nada.
+   Con la salida se avisa el retardo de entrada y el de salida (los que haya) en un solo mensaje. */
+function textoRetardoFinal(minEnt, minSal) {
+ const p = [];
+ if (minEnt > 0) p.push('Retardo de entrada: ' + durMin(minEnt));
+ if (minSal > 0) p.push('Retardo de salida: ' + durMin(minSal));
+ return p.join(' · ');
+}
+const parRetardoFinal = (minEnt, minSal) => { const t = textoRetardoFinal(minEnt, minSal); return t ? ' (' + t + ')' : ''; };
 function detalleRegistro(tipo, a, hora, extra) {
  // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
  let ori = '';
@@ -2978,24 +2996,37 @@ const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
 function mensajePrevioEscaneo(el, txt) {
  $('#res-' + el).removeClass('text-success text-danger').text(txt);
 }
+/* Cada lectura es una tarjeta propia en la lista de resultados (la más reciente arriba): se pueden pasar varias credenciales seguidas
+   sin esperar y ninguna se pisa. Devuelve una promesa con el resultado (o null si era la misma credencial leída otra vez). */
+const MAX_RESULTADOS = 6;
+function nuevaTarjetaResultado(el, txt) {
+ const caja = $('#res-' + el).removeClass('text-success text-danger');   // el color va en cada tarjeta
+ caja.contents().filter(function () { return this.nodeType === 3; }).remove();   // quita el mensaje de "Cámara lista"
+ const it = $('<div class="res-item res-pend">').text(txt);
+ caja.prepend(it);
+ caja.children('.res-item').slice(MAX_RESULTADOS).remove();
+ return it;
+}
+function pintarTarjetaResultado(it, r) {
+ // Verde = registrado. Rojo = error o, ya con entrada y salida, retardo (los minutos van dentro del mismo mensaje).
+ it.removeClass('res-pend res-ok res-ret res-err').addClass(!r.ok ? 'res-err' : (r.retardo ? 'res-ret' : 'res-ok')).text(r.msg);
+ if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
+}
+const ultimosQR = new Map();   // credencial -> hora de la última lectura (cada credencial se vigila por separado: A, B, A no se confunden)
 function procesarQR(curp, modo, el) {
- if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
- ultimo = {t:curp, ts:Date.now()};
- const mostrar = r => {
-  // Verde = registrado. Rojo = hubo un error. Si además pasó la tolerancia, abajo aparece en ROJO el aviso "Retardo de entrada / de salida".
-  // Con retardo TODO el texto (nombre, grupo, hora...) sale en rojo y abajo van los minutos u horas de retraso
-  const caja = $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok && !r.retardo ? 'text-success' : 'text-danger').empty();
-  $('<span>').text(r.msg).appendTo(caja);
-  if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
- };
- const r = registrarPorCurp(curp, modo);
- if (r && typeof r.then === 'function') {   // alumno que este equipo aún no tiene: lo busca el servidor
-  mensajePrevioEscaneo(el, 'Buscando alumno…');
-  r.then(mostrar);
- } else {   // el alumno ya está en este equipo: igual se ve primero "Buscando alumno…" y enseguida el resultado
-  mensajePrevioEscaneo(el, 'Buscando alumno…');
-  setTimeout(() => mostrar(r), 400);
+ const t = Date.now(), previo = ultimosQR.get(curp);
+ if (previo && t - previo < 4000) return Promise.resolve(null);   // misma credencial leída otra vez (la cámara la ve muchos cuadros seguidos)
+ ultimosQR.set(curp, t);
+ if (ultimosQR.size > 200) ultimosQR.forEach((v, k) => { if (t - v > 4000) ultimosQR.delete(k); });
+ let r;
+ try { r = registrarPorCurp(curp, modo); } catch (e) { r = {ok:false, msg:'No se pudo registrar: ' + e.message}; }
+ if (r && typeof r.then === 'function') {   // alumno que este equipo aún no tiene: lo busca el servidor (varios a la vez, cada uno en su tarjeta)
+  const it = nuevaTarjetaResultado(el, 'Buscando alumno…');
+  return r.then(x => { pintarTarjetaResultado(it, x); return x; });
  }
+ const it = nuevaTarjetaResultado(el, '');   // el alumno ya está en este equipo: resultado al instante, sin espera artificial
+ pintarTarjetaResultado(it, r);
+ return Promise.resolve(r);
 }
 let _guardarPend = null;
 /* Varios escaneos seguidos se juntan: como máximo cada 300 ms se guarda una copia local y se repinta la tabla.
@@ -3048,9 +3079,14 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
  guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
  // Retardo = pasó la hora límite del grupo MÁS su tolerancia: de entrada al entrar, de salida al salir (aunque no tenga entrada registrada)
- const lim = limiteDe(a), limiteMin = modo === 'Entrada' ? lim.retardo : lim.fin;
- const minRet = toMin(modo === 'Entrada' ? r.entrada : r.salida) - limiteMin;
- return {ok:true, retardo: avisoRetardo(modo, minRet, limiteMin), msg:detalleRegistro(modo, a, horaAhora(), '') + parRetardo(modo, minRet) +
+ // El retardo se avisa solo cuando ya hay entrada y salida (al escanear la salida); en la entrada no se muestra.
+ let minEnt = 0, minSal = 0;
+ if (modo === 'Salida') {
+  const lim = limiteDe(a);
+  minSal = Math.max(0, toMin(r.salida) - lim.fin);
+  if (r.entrada) minEnt = Math.max(0, toMin(r.entrada) - lim.retardo);
+ }
+ return {ok:true, retardo: textoRetardoFinal(minEnt, minSal), msg:detalleRegistro(modo, a, horaAhora(), '') + parRetardoFinal(minEnt, minSal) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 /*
@@ -3091,8 +3127,9 @@ function registrarDesconocido(curp, modo) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
    // El servidor avisa si ya pasó la tolerancia del grupo (de entrada o de salida)
-   const aviso = d.retardo ? avisoRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '';
-   return {ok:true, retardo: aviso, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '') + (d.retardo ? parRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '')};
+   // El servidor solo manda retardo cuando es la salida (ya con entrada y salida): retardo_entrada + retardo
+   const mEnt = d.retardo_entrada ? Number(d.retardo_entrada.minutos) || 0 : 0, mSal = d.retardo ? Number(d.retardo.minutos) || 0 : 0;
+   return {ok:true, retardo: textoRetardoFinal(mEnt, mSal), msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '') + parRetardoFinal(mEnt, mSal)};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
@@ -3176,9 +3213,8 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
    el.removeClass('text-success').addClass('text-danger').text('No tienes permiso para registrar. Se requiere autorización de Control Escolar.');
    tono(false); return;
   }
-  procesarQR(curp, d.modo, d.el);
-  // procesarQR escribe el resultado en #res-... (puede tardar si busca en el servidor): se suena según el color final
-  setTimeout(() => tono(!el.hasClass('text-danger')), 350);
+  // Cada lectura suena según SU propio resultado (pueden llegar varias seguidas)
+  procesarQR(curp, d.modo, d.el).then(r => { if (r) tono(!!r.ok); });
  }
  document.addEventListener('keydown', e => {
   if (!destino() || e.ctrlKey || e.altKey || e.metaKey) return;
@@ -4524,7 +4560,7 @@ $(function () {
    const bar = document.createElement('button');
    bar.id = 'barra-version-nueva'; bar.type = 'button';
    bar.textContent = 'Hay una versión nueva. Toca aquí para actualizar';
-   bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:2200;background:#800020;color:#fff;border:0;border-radius:.6rem;padding:.7rem 1.1rem;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:calc(100vw - 24px)';
+   bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:2200;background:#800020;color:#fff;border:0;border-radius:.3rem;padding:.7rem 1.1rem;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:calc(100vw - 24px)';
    bar.onclick = () => location.reload();
    document.body.appendChild(bar);
   };

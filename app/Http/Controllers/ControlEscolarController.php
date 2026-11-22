@@ -397,7 +397,17 @@ class ControlEscolarController extends Controller
         $partes = $grupo ? explode(' ', $grupo->nombre) : [];
 
         // Retardo ya pasada la tolerancia del grupo: de entrada (al entrar) o de salida (al salir). 0 minutos = a tiempo.
-        $minutosRetardo = $grupo ? $grupo->minutosRetardo($modo, (int) $ahora->format('G') * 60 + (int) $ahora->format('i')) : 0;
+        // El aviso de retardo sale SOLO al final, cuando ya hay entrada y salida: al escanear la entrada no se avisa nada; al escanear la salida se
+        // avisa el retardo de entrada (si lo hubo) y el de salida (si lo hubo) en el mismo mensaje.
+        $minutosRetardo = 0;
+        $minutosRetardoEntrada = 0;
+        if ($grupo && $modo === 'Salida') {
+            $minutosRetardo = $grupo->minutosRetardo('Salida', (int) $ahora->format('G') * 60 + (int) $ahora->format('i'));
+            if ($entrada) {
+                $horaEntrada = Carbon::parse($entrada->fecha_hora);
+                $minutosRetardoEntrada = $grupo->minutosRetardo('Entrada', (int) $horaEntrada->format('G') * 60 + (int) $horaEntrada->format('i'));
+            }
+        }
 
         return response()->json([
             'ok'      => true,
@@ -405,7 +415,8 @@ class ControlEscolarController extends Controller
             'hora'    => $hora,
             'estatus' => $estatus,
             'modo'    => $modo,
-            'retardo' => $minutosRetardo > 0 ? ['tipo' => $modo === 'Salida' ? 'salida' : 'entrada', 'minutos' => $minutosRetardo] : null,
+            'retardo' => $minutosRetardo > 0 ? ['tipo' => 'salida', 'minutos' => $minutosRetardo] : null,
+            'retardo_entrada' => $minutosRetardoEntrada > 0 ? ['tipo' => 'entrada', 'minutos' => $minutosRetardoEntrada] : null,
             // A qué grupo se mandó el registro (para mostrarlo en el teléfono)
             'alumno'  => [
                 'nombre' => $alumno->nombre,
