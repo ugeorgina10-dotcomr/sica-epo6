@@ -322,6 +322,19 @@ a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-
 @media (max-width:575.98px){
  body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,.main-card .btn,.login-card .btn{font-size:1.15rem !important;min-height:62px !important;padding:.75rem 1.2rem !important}
 }
+
+/* ===== BOTONES PAREJOS: mismo alto, mismo ancho mínimo, misma letra (y el mismo texto por dentro), en todo el sistema ===== */
+body .btn:not(.btn-close):not(.btn-icono){min-width:200px !important;max-width:100%;height:auto;white-space:normal;text-transform:none !important;letter-spacing:0 !important;font-family:inherit}
+body .btn *,#vista-sistema .btn *,.main-card .btn *,.login-card .btn *{font-size:inherit !important;font-weight:inherit !important;line-height:inherit !important;letter-spacing:inherit !important;text-transform:none !important}
+body .btn .fa,body .btn .fas,body .btn .far,body .btn i{font-size:1.1em !important;width:auto;flex:0 0 auto}
+.btn.btn-icono{min-width:64px !important;width:64px;padding:0 !important}
+#vista-sistema td .btn,#vista-sistema th .btn{white-space:nowrap}
+.grupo-botones .btn,.ori-hor .btn,.ori-hor .btn.btn-sm{flex:1 1 200px}
+.btn.rounded-pill{border-radius:.7rem !important}
+@media (max-width:575.98px){
+ body .btn:not(.btn-close):not(.btn-icono){min-width:0 !important;width:100%}
+ #vista-sistema td .btn{width:auto;min-width:170px !important}
+}
 </style>
 </head>
 <body id="cuerpo-contenedor" class="bg-login">
@@ -1817,7 +1830,7 @@ function htmlEditorOrientador(e) {
   '<select class="form-select form-select-sm" style="max-width:140px" onchange="oriEditando.filas[' + i + '].turno=this.value">' + opt(['Matutino', 'Vespertino'], f.turno) + '</select>' +
   '<select class="form-select form-select-sm" style="max-width:120px" onchange="oriEditando.filas[' + i + '].grado=Number(this.value)">' + opt([1, 2, 3], f.grado, v => v + '° grado') + '</select>' +
   '<select class="form-select form-select-sm" style="max-width:120px" onchange="oriEditando.filas[' + i + '].grupo=Number(this.value)">' + opt([1, 2, 3, 4], f.grupo, v => 'Grupo ' + v) + '</select>' +
-  '<button type="button" class="btn btn-outline-danger btn-sm" title="Quitar este grupo" aria-label="Quitar este grupo" onclick="oriEditando.filas.splice(' + i + ',1); renderListaOrientadores()">&times;</button></div>').join('');
+  '<button type="button" class="btn btn-outline-danger btn-sm btn-icono" title="Quitar este grupo" aria-label="Quitar este grupo" onclick="oriEditando.filas.splice(' + i + ',1); renderListaOrientadores()">&times;</button></div>').join('');
  return '<div class="p-2 border-bottom" style="background:#fdf3f5"><div class="small fw-semibold mb-2">Grados y grupos de este orientador(a)</div>' +
   (filas || '<div class="small text-muted mb-2">Sin grupos: quedará sin grupo asignado.</div>') +
   '<div class="d-flex gap-2 mt-1"><button type="button" class="btn btn-outline-dark btn-sm" onclick="oriEditando.filas.push({turno:turnoActivo,grado:1,grupo:1}); renderListaOrientadores()">+ Agregar grupo</button>' +
