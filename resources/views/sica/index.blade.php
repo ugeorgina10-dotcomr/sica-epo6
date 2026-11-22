@@ -2729,7 +2729,24 @@ function guardarClave(yaConfirmado) {
   url = '/api/sica/claves/rol';
   cuerpo = {rol: c.rol, password: nueva, password_confirmation: conf, password_actual: $('#clave-actual').val()};
  }
- // Esta sí espera al servidor (él revisa que la contraseña sirva y no esté repetida), pero ya no hace una segunda consulta después
+ // Director, Subdirector y Orientadores: la contraseña nueva se muestra AL INSTANTE (ya se generó aquí y cumple las reglas) y la petición va detrás.
+ // Si el servidor la rechaza (por ejemplo, ya la usa otra cuenta), se regresa todo a como estaba y sale el aviso.
+ if (!c.control) {
+  const copia = copiaClaves();
+  cambiarLocalClaves(c, c.tipo === 'ori' ? {estado: 'propia', bloqueada: false, olvido_at: null} : {borrada: false, bloqueada: false, olvido_at: null});
+  claveEntrega = {para: c.nombre, correo: c.correo, clave: nueva};
+  $('#entrega-para').text(c.nombre); $('#entrega-correo').text(c.correo); $('#entrega-clave-texto').text(nueva);
+  $('#entrega-clave').removeClass('d-none');
+  $('#resumen-claves').text('Contraseña nueva de ' + c.nombre + ' (confirmando en el servidor…)');
+  limpiarCamposClave();
+  renderClaves();
+  enviarClaves(url, 'POST', cuerpo, copia, 'No se pudo guardar la contraseña.').then(d => {
+   if (d.ok) $('#resumen-claves').text('Contraseña nueva guardada para ' + c.nombre + '. Ya puede entrar con ella.');
+   else { ocultarEntrega(); $('#resumen-claves').text(''); }   // el servidor la rechazó: no se debe entregar
+  });
+  return;
+ }
+ // Control Escolar (su propia contraseña): sí espera al servidor, que confirma la contraseña actual
  const btns = $('#panel-cuenta-clave button').prop('disabled', true);
  $('#resumen-claves').text('Guardando...');
  enviarClaves(url, 'POST', cuerpo, null, 'No se pudo guardar la contraseña.').then(d => {
