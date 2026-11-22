@@ -218,6 +218,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.5rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
 .burbuja .burbuja-mudo:hover{background:rgba(255,255,255,.15)}
 .burbuja.silenciada{background:#5c1a2c}
+/* Avisos de guardado (horarios y tolerancias): misma burbuja que las alertas de cuentas */
+.burbuja.aviso-error{background:#b00020}
+.burbuja.aviso-ok .aviso-ico{margin-right:.4rem}
+/* Botón rojo con borde: siempre legible (antes se veía desvanecido) */
+.btn-outline-danger{color:#b00020;border-color:#b00020;background:#fff;opacity:1}
+.btn-outline-danger:hover,.btn-outline-danger:focus,.btn-outline-danger:focus-visible,.btn-outline-danger:active{color:#fff !important;background:#b00020 !important;border-color:#b00020 !important;opacity:1}
 @keyframes burbujaEntra{from{opacity:0;transform:translateY(-12px) scale(.95)}to{opacity:1;transform:none}}
 /* ===== ACCESIBILIDAD Y USABILIDAD =====
    Botones y campos más grandes (objetivo táctil de 44-48 px), letra legible, foco visible con teclado, buen contraste y avisos claros. */
@@ -767,6 +773,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 </div>
 </div>
 <div id="burbujas-claves" class="burbujas-claves"></div>
+<div id="burbujas-avisos" class="burbujas-claves" style="top:auto;bottom:14px" role="status" aria-live="polite"></div>
 <div id="modal-cuenta" class="modal-cuenta d-none" role="dialog" aria-modal="true" aria-labelledby="modal-cuenta-titulo">
  <div class="modal-cuenta-caja">
     <h5 id="modal-cuenta-titulo"></h5>
@@ -1607,9 +1614,19 @@ function renderListaOrientadores() {
 let _horSel = {};   // grupo elegido en cada orientador(a) de esta lista
 let _horEstado = {};   // último aviso de guardado de cada grupo: {clave: {clase, txt}} (así no desaparece cuando la lista se vuelve a dibujar)
 const htmlEstadoHor = k => { const e = _horEstado[k]; return '<span class="hor-estado fw-semibold ' + (e ? e.clase : '') + '" role="status" aria-live="polite">' + (e ? esc(e.txt) : '') + '</span>'; };
+/* Avisos como los de las cuentas: una burbuja que sale sola y se va a los pocos segundos (o con la X) */
+function avisoBurbuja(txt, error) {
+ const b = $('<div class="burbuja ' + (error ? 'aviso-error' : 'aviso-ok') + '" role="alert"></div>');
+ b.append($('<button type="button" class="burbuja-x" aria-label="Cerrar">&times;</button>').on('click', () => b.remove()));
+ b.append($('<div></div>').text((error ? '⚠ ' : '✔ ') + txt));
+ $('#burbujas-avisos').append(b);
+ setTimeout(() => b.fadeOut(300, () => b.remove()), error ? 9000 : 5000);
+}
 function ponerEstadoHor(it, k, clase, txt) {
- _horEstado[k] = {clase: clase, txt: txt};
- it.find('.hor-estado').removeClass('text-success text-danger text-muted').addClass(clase).text(txt);
+ _horEstado[k] = {clase: '', txt: ''};
+ it.find('.hor-estado').text('');
+ if (clase === 'text-success') avisoBurbuja(txt.replace(/^✔\s*/, ''), false);
+ else if (clase === 'text-danger') avisoBurbuja(txt.replace(/^⚠\s*/, ''), true);
 }
 function renderListaHorarios() {
  renderGruposCargados();
