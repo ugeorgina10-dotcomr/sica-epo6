@@ -314,13 +314,13 @@ td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
 body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,#vista-sistema .btn.btn-lg,#vista-sistema .btn.small,#vista-sistema table .btn,#vista-sistema .btn-cuenta,
 .main-card .btn,.main-card .btn.btn-sm,.main-card .btn.btn-lg,.login-card .btn,.login-card .btn.btn-lg,.grupo-botones .btn,.ori-hor .btn,.ori-hor .btn.btn-sm,
 #vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino
-{min-height:56px !important;font-size:1.1rem !important;font-weight:600 !important;line-height:1.3 !important;padding:.65rem 1.5rem !important;border-radius:.7rem !important;align-items:center;justify-content:center;text-align:center;letter-spacing:0}
-#vista-sistema table .btn-rapido{min-width:190px}
-#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:190px}
+{min-height:64px !important;font-size:1.2rem !important;font-weight:600 !important;line-height:1.3 !important;padding:.8rem 1.7rem !important;border-radius:.7rem !important;align-items:center;justify-content:center;text-align:center;letter-spacing:0}
+#vista-sistema table .btn-rapido{min-width:210px}
+#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:210px}
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
 a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:.95rem;font-weight:400}
 @media (max-width:575.98px){
- body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,.main-card .btn,.login-card .btn{font-size:1.1rem !important;min-height:56px !important;padding:.65rem 1.1rem !important}
+ body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,.main-card .btn,.login-card .btn{font-size:1.15rem !important;min-height:62px !important;padding:.75rem 1.2rem !important}
 }
 </style>
 </head>
