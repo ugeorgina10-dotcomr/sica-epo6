@@ -258,7 +258,26 @@ class ControlEscolarController extends Controller
      * internet y enviado después) trae la hora en que se escaneó; solo se acepta si no es del futuro
      * (con 2 minutos de margen) y no tiene más de 3 días. Si no cumple, se usa la hora del servidor.
      */
+    /**
+     * Escaneos de UN mismo alumno al mismo tiempo (dos lectores, doble toque): se atienden de uno en uno,
+     * así el segundo ya ve el primero y nunca se duplica una entrada o una salida. Los de alumnos distintos no se esperan entre sí.
+     * (Dentro de un lote ya se resuelve todo en memoria y en una sola transacción, ahí no hace falta.)
+     */
     private function registrarAsistencia(array $d): JsonResponse
+    {
+        if ($this->enLote) {
+            return $this->registrarAsistenciaInterno($d);
+        }
+
+        $clave = 'sica.reg.' . md5((string) ($d['curp'] ?? $d['qr'] ?? ''));
+        try {
+            return Cache::lock($clave, 10)->block(4, fn () => $this->registrarAsistenciaInterno($d));
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            return $this->registrarAsistenciaInterno($d);   // si el seguro tarda demasiado, se atiende igual (mejor atender que dejar al alumno esperando)
+        }
+    }
+
+    private function registrarAsistenciaInterno(array $d): JsonResponse
     {
         $v = validator($d, [
             'curp'     => 'required_without:qr|nullable|string|max:30',

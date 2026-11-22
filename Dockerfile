@@ -10,6 +10,8 @@ RUN { \
       echo 'opcache.enable=1'; \
       echo 'opcache.memory_consumption=128'; \
       echo 'opcache.max_accelerated_files=10000'; \
+      echo 'opcache.interned_strings_buffer=16'; \
+      echo 'opcache.enable_cli=1'; \
       echo 'opcache.validate_timestamps=0'; \
     } > /usr/local/etc/php/conf.d/opcache-sica.ini
 
@@ -39,6 +41,27 @@ RUN a2enmod rewrite deflate headers \
     } > /etc/apache2/conf-available/sica-velocidad.conf \
     && a2enconf sica-velocidad
 
+# --- Que aguante muchos escaneos a la vez ---
+# Apache reparte el trabajo entre un número fijo de procesos. Muchos procesos gastan toda la memoria del servidor y lo tumban;
+# pocos y reutilizados (KeepAlive) atienden más gente al mismo tiempo porque cada petición del sistema dura milésimas de segundo.
+# Si subes a un plan con más memoria, aumenta MaxRequestWorkers (aprox. 1 por cada 40 MB libres).
+RUN { \
+      echo 'ServerName localhost'; \
+      echo 'Timeout 60'; \
+      echo 'KeepAlive On'; \
+      echo 'KeepAliveTimeout 5'; \
+      echo 'MaxKeepAliveRequests 200'; \
+      echo '<IfModule mpm_prefork_module>'; \
+      echo '    StartServers 5'; \
+      echo '    MinSpareServers 5'; \
+      echo '    MaxSpareServers 10'; \
+      echo '    ServerLimit 20'; \
+      echo '    MaxRequestWorkers 20'; \
+      echo '    MaxConnectionsPerChild 2000'; \
+      echo '</IfModule>'; \
+    } > /etc/apache2/conf-available/sica-rendimiento.conf \
+    && a2enconf sica-rendimiento
+
 # Indica que el sitio se muestra desde la carpeta "public"
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
@@ -49,8 +72,10 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
 RUN composer install --no-dev --optimize-autoloader \
+    && (php artisan view:cache || true) \
     && chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 80
 # Al encender el servidor: prepara todo, crea las tablas y las cuentas que falten, y abre el sistema
-CMD ["sh", "-c", "php artisan config:cache && php artisan view:cache && php artisan migrate --force && php artisan sica:crear-usuarios && chown -R www-data:www-data storage bootstrap/cache && apache2-foreground"]
+# (las vistas ya se prepararon al construir; aquí solo lo que depende de las variables de Render)
+CMD ["sh", "-c", "php artisan config:cache && php artisan migrate --force && php artisan sica:crear-usuarios && chown -R www-data:www-data storage bootstrap/cache && exec apache2-foreground"]
