@@ -1017,6 +1017,26 @@ const guardarYa = () => { if (ES_MOVIL) return; clearTimeout(_temporizadorSave);
  * Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
  * Si el servidor no responde, no muestra error y el sistema sigue funcionando con lo guardado en el navegador.
  */
+/* Aviso que NO bloquea la pantalla (a diferencia de alert): sale abajo, se va solo y se puede seguir trabajando o escaneando */
+function avisoRapido(mensaje, ms) {
+ try {
+  let cont = document.getElementById('avisos-rapidos');
+  if (!cont) {
+   cont = document.createElement('div');
+   cont.id = 'avisos-rapidos';
+   cont.setAttribute('role', 'status'); cont.setAttribute('aria-live', 'polite');
+   cont.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:2300;display:flex;flex-direction:column;gap:8px;align-items:center;width:calc(100% - 24px);max-width:520px;pointer-events:none';
+   document.body.appendChild(cont);
+  }
+  const el = document.createElement('div');
+  el.textContent = mensaje;
+  el.style.cssText = 'pointer-events:auto;background:#1f2937;color:#fff;border-left:5px solid #198754;border-radius:.5rem;padding:.65rem .9rem;font-size:.92rem;box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:pre-line;width:100%;cursor:pointer';
+  el.onclick = () => el.remove();
+  cont.appendChild(el);
+  while (cont.children.length > 3) cont.removeChild(cont.firstChild);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, ms || 5000);
+ } catch (e) { alert(mensaje); }
+}
 let _ultimoAvisoPermiso = 0;
 function avisoPermiso(mensaje) {
  if (Date.now() - _ultimoAvisoPermiso < 5000) return;   // un solo aviso cada 5 s
@@ -1206,9 +1226,10 @@ function cargarDesdeServidor() {
  * mezclarlos, guardarlos y redibujar la tabla aunque nada hubiera cambiado. Ahora se manda la marca de versión (ETag) a mano
  * (cache:'no-store') para recibir de verdad el "sin cambios" y no hacer nada cuando no hay cambios.
  */
-let _etagEstado = null, _descargandoEstado = false;
+let _etagEstado = null, _descargandoEstado = false, _repetirEstado = false;
 function descargarEstadoServidor() {
- if (_descargandoEstado) return Promise.resolve();   // no se amontonan consultas si el servidor tarda
+ // No se amontonan consultas si el servidor tarda; pero si llegó un aviso de cambio mientras tanto, se repite al terminar (no se pierde)
+ if (_descargandoEstado) { _repetirEstado = true; return Promise.resolve(); }
  _descargandoEstado = true;
  const inicioConsulta = Date.now();
  const cab = {'Accept':'application/json'};
@@ -1223,6 +1244,7 @@ function descargarEstadoServidor() {
   })
   .then(s => {
    _descargandoEstado = false;
+   if (_repetirEstado) { _repetirEstado = false; setTimeout(pedirEstadoYa, 0); }
    if (!s) return;
    fusionarServidor(s, inicioConsulta);
    acelerarSync(6000);   // hubo cambios: seguramente vienen más (una fila de alumnos escaneando, una lista que se sube...)
@@ -1246,7 +1268,7 @@ function descargarEstadoServidor() {
    }
    else if (!$('#vista-login').hasClass('d-none') && !$('#select-orientador-login').val()) actualizarCredenciales();
   })
-  .catch(() => { _descargandoEstado = false; });
+  .catch(() => { _descargandoEstado = false; _repetirEstado = false; });
 }
 let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Auto';
 let filtro = null, credSel = null, idEditando = null, chartAsistencias = null, gradoSeleccionado = null;
@@ -2140,8 +2162,10 @@ function aplicarPrecarga(d) {
   _clavesPrecargadas = true;
  }
 }
+let _tickClaves = 0;
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);   // antes 0.7 s: cada consulta ocupa un proceso del servidor
+ // Con el aviso instantáneo (pulso) activo esta consulta es solo un respaldo (cada 6 s); sin él, sigue cada 2 s como antes
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden && (!_pulsoVivo() || ++_tickClaves % 3 === 0)) cargarClaves(); }, 2000);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -2202,7 +2226,15 @@ function cargarClaves(forzar) {
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
   renderClaves();
- }).catch(() => {}).then(() => { _cargandoClaves = false; });
+ }).catch(() => {}).then(() => { _cargandoClaves = false; if (_clavesSucias && !_accionesClaves) pedirClavesYa(); });
+}
+/* Aviso instantáneo de cambio en las contraseñas / "olvidé mi contraseña": se consulta YA; si ahora hay otra consulta o acción en curso, se repite al terminar */
+let _clavesSucias = false;
+function pedirClavesYa() {
+ if (rolActivo !== 'control') return;
+ if (_cargandoClaves || _accionesClaves > 0) { _clavesSucias = true; return; }
+ _clavesSucias = false;
+ cargarClaves();
 }
 /* Acciones sobre las contraseñas: la pantalla cambia AL INSTANTE (sin esperar al servidor) y la petición va detrás.
    Si el servidor la rechaza, se regresa todo a como estaba y se avisa. */
@@ -2216,6 +2248,7 @@ function enviarClaves(url, metodo, cuerpo, copia, mensajeError) {
  _accionesClaves++; _versionClaves++;
  return llamarClaves(url, metodo, cuerpo).then(d => {
   _accionesClaves--; _versionClaves++;
+  if (_clavesSucias && !_accionesClaves) setTimeout(pedirClavesYa, 0);   // llegó un aviso de cambio mientras esta acción iba en camino
   if (!d.ok) {
    if (copia) { restaurarClaves(copia); renderClaves(); }
    $('#resumen-claves').text('');
@@ -2320,18 +2353,53 @@ function avisarOtrasPestanas(msg) {
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
 let _audioCtx = null, _sonidoPendiente = null, _tonosActivos = [];
+/* Sin retraso: el audio se pide con la latencia más baja ("interactive") y se "calienta" con un sonido mudo en el mismo toque que lo desbloquea
+   (así el primer tono ya no espera a que el navegador encienda la salida de audio). */
+function _calentarAudio() {
+ try {
+  const b = _audioCtx.createBuffer(1, 1, 22050), s = _audioCtx.createBufferSource();
+  s.buffer = b; s.connect(_audioCtx.destination); s.start(0);
+ } catch (e) {}
+}
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
-  if (!_audioCtx) _audioCtx = new AC();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume().then(() => {
+  if (!_audioCtx) {
+   try { _audioCtx = new AC({latencyHint: 'interactive'}); } catch (e) { _audioCtx = new AC(); }
+   _calentarAudio();
+  }
+  // 'suspended' (normal) o 'interrupted' (iPhone tras una llamada o al bloquear la pantalla)
+  if (_audioCtx.state !== 'running') _audioCtx.resume().then(() => {
+   _calentarAudio();
    // Si el aviso llegó antes de que alguien tocara la página, suena en cuanto se toca
    if (_sonidoPendiente) { const v = _sonidoPendiente; _sonidoPendiente = null; sonarAviso(v); }
   }).catch(() => {});
  } catch (e) {}
 }
 ['pointerdown', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, desbloquearAudio, {passive: true}));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && _audioCtx && _audioCtx.state !== 'running') desbloquearAudio(); });
+/* Tono del lector (pistola USB / teclado): corto y agudo = registrado; dos graves = error. Si el audio aún se estaba despertando, suena en cuanto despierta (antes se perdía). */
+function tonoEscaneo(ok) {
+ const tocar = () => {
+  const t0 = _audioCtx.currentTime;
+  (ok ? [[1320, 0, 0.1]] : [[330, 0, 0.12], [330, 0.16, 0.12]]).forEach(([hz, ret, dur]) => {
+   const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
+   osc.type = 'square'; osc.frequency.value = hz;
+   vol.gain.setValueAtTime(0.0001, t0 + ret);
+   vol.gain.exponentialRampToValueAtTime(0.15, t0 + ret + 0.004);   // arranque casi instantáneo (antes 10 ms)
+   vol.gain.exponentialRampToValueAtTime(0.0001, t0 + ret + dur);
+   osc.connect(vol); vol.connect(_audioCtx.destination);
+   osc.start(t0 + ret); osc.stop(t0 + ret + dur + 0.05);
+  });
+ };
+ try {
+  desbloquearAudio();
+  if (!_audioCtx) return;
+  if (_audioCtx.state === 'running') tocar();
+  else _audioCtx.resume().then(() => { if (_audioCtx.state === 'running') tocar(); }).catch(() => {});
+ } catch (e) {}
+}
 /* veces = cuántas repeticiones del par de tonos (las solicitudes de contraseña suenan 3 veces para que se note) */
 function sonarAviso(veces) {
  try {
@@ -2344,7 +2412,7 @@ function sonarAviso(veces) {
     const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
     osc.type = 'sine'; osc.frequency.value = hz;
     vol.gain.setValueAtTime(0.0001, ini);
-    vol.gain.exponentialRampToValueAtTime(0.5, ini + 0.02);
+    vol.gain.exponentialRampToValueAtTime(0.5, ini + 0.006);   // el aviso empieza a sonar al instante (antes 20 ms de subida)
     vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
     osc.connect(vol); vol.connect(_audioCtx.destination);
     osc.start(ini); osc.stop(ini + 0.4);
@@ -2547,7 +2615,15 @@ function consultarOlvidosInicio() {
   .then(r => { if (!r.ok) return null; const et = r.headers.get('ETag'); return r.json().then(d => { d._etag = et; return d; }); })
   .then(d => { if (d && d.ok && !rolActivo) { _etagOlvidos = d._etag; pintarBurbujas(d.roles || [], d.orientadores || [], false); } })
   .catch(() => {})
-  .then(() => { _consultandoOlvidos = false; });
+  .then(() => { _consultandoOlvidos = false; if (_olvidosSucios) pedirOlvidosYa(); });
+}
+/* Aviso instantáneo (pulso) en la pantalla de inicio: se consulta YA; si hay otra consulta en curso, se repite al terminar */
+let _olvidosSucios = false, _tickOlvidos = 0;
+function pedirOlvidosYa() {
+ if (rolActivo || _olvidoEnCurso) return;
+ if (_consultandoOlvidos) { _olvidosSucios = true; return; }
+ _olvidosSucios = false;
+ consultarOlvidosInicio();
 }
 /* Pulsar la burbuja (o "Dar acceso"). En la pestaña principal abre la solicitud aquí mismo; en una pestaña secundaria
    (la que entró sola por el aviso) manda a la pestaña principal a iniciar sesión como Control Escolar, rápido. */
@@ -3192,22 +3268,7 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
  // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
  // Solo cuentan los campos donde de verdad se escribe texto: un menú (Grado/Grupo), casilla o botón con el foco NO debe bloquear al lector
  const enCampo = el => !!el && ((el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color|image)$/i.test(el.type)) || el.isContentEditable) && el.offsetParent !== null;
- function tono(ok) {
-  try {
-   desbloquearAudio();
-   if (!_audioCtx || _audioCtx.state !== 'running') return;
-   const t0 = _audioCtx.currentTime;
-   (ok ? [[1320, 0, 0.12]] : [[330, 0, 0.14], [330, 0.2, 0.14]]).forEach(([hz, ret, dur]) => {
-    const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
-    osc.type = 'square'; osc.frequency.value = hz;
-    vol.gain.setValueAtTime(0.0001, t0 + ret);
-    vol.gain.exponentialRampToValueAtTime(0.15, t0 + ret + 0.01);
-    vol.gain.exponentialRampToValueAtTime(0.0001, t0 + ret + dur);
-    osc.connect(vol); vol.connect(_audioCtx.destination);
-    osc.start(t0 + ret); osc.stop(t0 + ret + dur + 0.05);
-   });
-  } catch (e) {}
- }
+ function tono(ok) { tonoEscaneo(ok); }   // el sonido vive arriba (tonoEscaneo), junto al del aviso
  function terminar() {
   clearTimeout(pausa); pausa = null;
   const crudo = buf, cb = campo; buf = ''; campo = null;
@@ -3425,7 +3486,8 @@ function subirLista() {
  save(); guardarYa(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);   // la lista ya va al servidor mientras se lee el aviso
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
  const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
- alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.') + (curpsInvalidas.length ? '\n\nSe omitieron ' + curpsInvalidas.length + ' fila(s) con CURP no válida (debe tener 18 caracteres): ' + curpsInvalidas.slice(0, 8).join(', ') + (curpsInvalidas.length > 8 ? '…' : '') + '. Corrígelas en el archivo y súbelo otra vez.' : ''));
+ const _msgLista = ('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.') + (curpsInvalidas.length ? '\n\nSe omitieron ' + curpsInvalidas.length + ' fila(s) con CURP no válida (debe tener 18 caracteres): ' + curpsInvalidas.slice(0, 8).join(', ') + (curpsInvalidas.length > 8 ? '…' : '') + '. Corrígelas en el archivo y súbelo otra vez.' : ''));
+ if (sinCurp || curpsInvalidas.length) alert(_msgLista); else avisoRapido(_msgLista);   // lo importante (faltan CURP / filas omitidas) sigue como alerta; si todo salió bien, no bloquea la pantalla
  $('#archivo-lista').val('');
  }, msg => alert(msg));
 }
@@ -3447,7 +3509,7 @@ function borrarListaGrupo() {
  _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
   if (!r.ok) return Promise.reject();
   ids.forEach(id => _firmasGuardadas.delete(id));
-  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
+  avisoRapido('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
  }).catch(() => {
   const hay = new Set(db.alumnos.map(a => a.id));
   lista.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
@@ -4051,6 +4113,7 @@ function subirPlantillaOficial(lado) {
    const fallo = res.find(x => !x.ok);
    if (fallo) throw fallo.error;
   }).then(() => {
+   _ignorarPlantillasHasta = Date.now() + 2500;   // el aviso de cambio de esta misma subida no hace falta: ya se ve en este equipo
    turnos.forEach(t => { origenPlantilla[t + '-' + lado] = 'servidor'; });
    actualizarBotonesPlantilla();
    caja.removeClass('text-muted text-danger').addClass('text-success')
@@ -4073,6 +4136,7 @@ function restaurarPlantillaOficial() {
  if (!lados.length) { alert('La plantilla original del turno ' + t + ' ya fue eliminada, por eso no se puede restaurar.'); return; }
  if (!confirm('¿Volver a la plantilla original del turno ' + t + '?')) return;
  const cab = {'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''};
+ _ignorarPlantillasHasta = Date.now() + 2500;   // este equipo ya se actualiza solo: no hace falta el aviso de su propio cambio
  Promise.all(lados.map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers: cab}).catch(() => {})))
   .then(() => { plantillasDefault[t] = {frente: null, reverso: null}; cargarPlantillasDefault(true); });
  $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success').text('Se restauró la plantilla original del turno ' + t);
@@ -4100,6 +4164,9 @@ function eliminarPlantillaAnterior() {
   .catch(() => ({ok: false, mensaje: 'No hubo conexión con el servidor.'}))
  )).then(res => {
   const mal = res.filter(r => !r.ok);
+  // Se marca como eliminado AL INSTANTE lo que el servidor confirmó (antes se volvía a preguntar archivo por archivo y los botones tardaban en cambiar)
+  res.forEach((r, i) => { if (r.ok) existeOriginal[ARCHIVOS_PLANTILLA[t][lados[i]]] = false; });
+  actualizarBotonesPlantilla();
   revisarOriginales();
   if (mal.length) caja.removeClass('text-muted text-success').addClass('text-danger').text(mal.map(r => r.mensaje).filter((v, i, a) => a.indexOf(v) === i).join(' '));
   else caja.removeClass('text-muted text-danger').addClass('text-success').text('Listo: la plantilla anterior del turno ' + t + ' se eliminó para siempre. Sigue en uso la plantilla nueva.');
@@ -4250,7 +4317,7 @@ function guardarCambiosCredencial() {
  if (!confirm('¿Guardar los cambios de este alumno?\nNombre: ' + nombre + '\nCURP: ' + curp)) return;
  a.curp = curp; a.nombre = nombre; save();
  actualizarVistaPreviaCredencial();
- alert('Cambios guardados en la credencial.');
+ avisoRapido('Cambios guardados en la credencial.');
 }
 /*
  * Dibuja la vista previa en vivo de frente y reverso mientras se edita al alumno,
@@ -4511,8 +4578,60 @@ window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredencial
  */
 var _rafagaHasta = 0;
 function acelerarSync(ms) { _rafagaHasta = Math.max(_rafagaHasta, Date.now() + (ms || 6000)); }
+/*
+ * ---- Aviso instantáneo de cambios (pulso) ----
+ * Cada cambio que acepta el servidor (escaneo, guardado, borrado, plantilla subida, contraseña desbloqueada...) sube un contador que
+ * public/pulso.php entrega SIN arrancar Laravel ni tocar la base de datos (~1 ms). Cada equipo (computadora o celular) lo pregunta
+ * unas 2 veces por segundo y, en cuanto cambia, descarga SOLO lo que cambió. Resultado: los cambios se ven en menos de un segundo en todos los equipos.
+ * Si el aviso no responde (servidor viejo, sin red), todo sigue funcionando con las consultas de siempre (que quedan como respaldo).
+ */
+const PULSO_MS = ES_MOVIL ? 600 : 450, PULSO_OCULTA_MS = 3000, ESTADO_MIN_MS = 600;
+let _pulsoPrev = null, _pulsoEnCurso = false, _pulsoFallos = 0, _pulsoOkHasta = 0, _ignorarPlantillasHasta = 0;
+let _ultimoPedidoEstado = 0, _pedidoEstadoPend = null;
+function _pulsoVivo() { return _pulsoOkHasta > Date.now(); }
+/* Descarga el estado ya, pero no más de una vez cada ESTADO_MIN_MS (con muchos escaneos seguidos se juntan en una sola descarga) */
+function pedirEstadoYa() {
+ if (!rolActivo) return;
+ const falta = ESTADO_MIN_MS - (Date.now() - _ultimoPedidoEstado);
+ if (falta > 0) {
+  if (!_pedidoEstadoPend) _pedidoEstadoPend = setTimeout(() => { _pedidoEstadoPend = null; pedirEstadoYa(); }, falta);
+  return;
+ }
+ _ultimoPedidoEstado = Date.now();
+ acelerarSync();
+ Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {});
+}
+function alCambiarPulso(p) {
+ const a = _pulsoPrev; _pulsoPrev = p;
+ if (!a) return;   // primera lectura: solo se guarda como punto de partida
+ if (p.e !== a.e) pedirEstadoYa();
+ if (p.c !== a.c) { if (rolActivo === 'control') pedirClavesYa(); else if (!rolActivo) pedirOlvidosYa(); }
+ // Plantilla nueva subida o borrada desde otro equipo: se vuelve a leer (el teléfono del orientador solo escanea y no la usa)
+ if (p.p !== a.p && rolActivo && !(ES_MOVIL && rolActivo === 'orientador') && Date.now() > _ignorarPlantillasHasta) {
+  try { cargarPlantillasDefault(true); } catch (e) {}
+ }
+}
+function consultarPulso() {
+ if (_pulsoEnCurso) return;
+ _pulsoEnCurso = true;
+ fetchT('/pulso.php', {cache: 'no-store', credentials: 'omit'}, 4000)
+  .then(r => r.ok ? r.json() : Promise.reject(new Error('pulso')))
+  .then(p => {
+   if (!p || typeof p.e === 'undefined') throw new Error('pulso');
+   _pulsoFallos = 0; _pulsoOkHasta = Date.now() + 5000;
+   alCambiarPulso(p);
+  })
+  .catch(() => { if (++_pulsoFallos >= 3) _pulsoOkHasta = 0; })   // sin respuesta 3 veces: vuelven las consultas normales (más rápidas)
+  .then(() => { _pulsoEnCurso = false; });
+}
+function programarPulso() {
+ setTimeout(() => { consultarPulso(); programarPulso(); }, document.hidden ? PULSO_OCULTA_MS : PULSO_MS);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) consultarPulso(); });   // al volver a la pestaña se entera al momento
+window.addEventListener('online', () => { consultarPulso(); if (rolActivo) pedirEstadoYa(); });
 function programarConsulta() {
- const espera = Date.now() < _rafagaHasta ? 1200 : (ES_MOVIL ? 3500 : 3000);   // menos consultas = el servidor responde más rápido a lo que sí importa (escanear, entrar, guardar)
+ // Con el pulso activo esta consulta es solo un respaldo; sin él, se consulta seguido como antes
+ const espera = _pulsoVivo() ? 5000 : (Date.now() < _rafagaHasta ? 1200 : (ES_MOVIL ? 3500 : 3000));
  setTimeout(() => {
   const p = (rolActivo && !document.hidden) ? Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {}) : Promise.resolve();
   p.then(programarConsulta);
@@ -4548,6 +4667,7 @@ $(function () {
  // Todos los equipos consultan al servidor (computadoras cada 3 s, teléfonos cada 5 s) para ver los mismos datos;
  // se pausa si la pestaña está oculta para no gastar datos ni servidor
  programarConsulta();
+ consultarPulso(); programarPulso();   // aviso instantáneo de cambios (ver arriba)
  setInterval(() => { if (!document.hidden) vigilarPermanencia(); }, 20000);
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
@@ -4556,7 +4676,8 @@ $(function () {
   * Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde "sin cambios" (304) si nada cambió y
   * guarda la respuesta 1 s). Las otras pestañas del mismo equipo se enteran al instante por un canal interno.
   */
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden && !_olvidoEnCurso) consultarOlvidosInicio(); }, 2000);   // antes cada 0.5 s en cada equipo: saturaba el servidor y hacía lentos el login y el aviso
+ // Con el aviso instantáneo (pulso) activo esta consulta es solo un respaldo (cada 6 s); sin él, sigue cada 2 s como antes
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden && !_olvidoEnCurso && (!_pulsoVivo() || ++_tickOlvidos % 3 === 0)) consultarOlvidosInicio(); }, 2000);
  if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Modo sin internet (service worker): permite abrir el sistema sin internet (solo funciona en https o localhost)

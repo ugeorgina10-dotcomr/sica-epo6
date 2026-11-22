@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CabecerasSeguridad;
+use App\Http\Middleware\PulsoTrasCambio;
 use App\Http\Middleware\VerificarPermisoSica;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -27,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Revisión de permisos por rol: sica:control / sica:sync
         $middleware->alias([
             'sica' => VerificarPermisoSica::class,
+            // Avisa a todos los equipos, al instante, que algo cambió (pulso:sync | pulso:c | pulso:p)
+            'pulso' => PulsoTrasCambio::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
