@@ -322,7 +322,7 @@ body #btn-turno-matutino,body #btn-turno-vespertino,body #btn-turno-lector-matut
 body #btn-modo-entrada,body #btn-modo-salida,body #btn-orient-entrada,body #btn-orient-salida,
 body .btn.btn[onclick^="descargarReporte"],body .btn.btn[onclick^="descargarGraficas"],body .btn.btn[onclick^="activarCamara"],body .btn.btn[onclick^="apagarCamara"],body .btn.btn[onclick^="detener("],body #btn-activar-camara-orientador{min-width:170px}
 /* Entrar al sistema: un poco más grande que el resto, es la acción principal */
-body #btn-ingresar.btn,body .btn[onclick*="mostrarSeccion('vista-login')"]{min-height:56px !important;font-size:1.2rem !important;padding:.6rem 1.5rem !important;border-radius:.7rem !important;width:100%}
+body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')"]{min-height:56px !important;font-size:1.2rem !important;padding:.6rem 1.5rem !important;border-radius:.7rem !important;width:100%}
 /* Avisos (burbujas): los botones de abajo ocupan todo el ancho y miden igual */
 .burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
