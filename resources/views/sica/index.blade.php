@@ -317,6 +317,12 @@ body .btn.btn-icono{display:inline-flex;align-items:center;justify-content:cente
 /* Filas de botones: se reparten el ancho por igual y bajan de renglón si no caben (nada se corta) */
 .d-flex.flex-wrap{min-width:0}
 .btn-vinotinto,.btn-vinotinto:hover{color:#fff}
+/* Botones que van en pareja (turnos, Entrada/Salida, Excel/PDF, cámara): mismo ancho para que no varíen */
+body #btn-turno-matutino,body #btn-turno-vespertino,body #btn-turno-lector-matutino,body #btn-turno-lector-vespertino,body #btn-turno-cred-matutino,body #btn-turno-cred-vespertino,
+body #btn-modo-entrada,body #btn-modo-salida,body #btn-orient-entrada,body #btn-orient-salida,
+body .btn.btn[onclick^="descargarReporte"],body .btn.btn[onclick^="descargarGraficas"],body .btn.btn[onclick^="activarCamara"],body .btn.btn[onclick^="apagarCamara"],body .btn.btn[onclick^="detener("],body #btn-activar-camara-orientador{min-width:170px}
+/* Entrar al sistema: un poco más grande que el resto, es la acción principal */
+body #btn-ingresar.btn,body .btn[onclick*="mostrarSeccion('vista-login')"]{min-height:52px !important;font-size:1.1rem !important;padding:.6rem 1.5rem !important}
 /* Avisos (burbujas): los botones de abajo ocupan todo el ancho y miden igual */
 .burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
