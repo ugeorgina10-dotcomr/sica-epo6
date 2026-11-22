@@ -2141,7 +2141,7 @@ function aplicarPrecarga(d) {
  }
 }
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 700);
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 2000);   // antes 0.7 s: cada consulta ocupa un proceso del servidor
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -4512,7 +4512,7 @@ window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredencial
 var _rafagaHasta = 0;
 function acelerarSync(ms) { _rafagaHasta = Math.max(_rafagaHasta, Date.now() + (ms || 6000)); }
 function programarConsulta() {
- const espera = Date.now() < _rafagaHasta ? 800 : (ES_MOVIL ? 1500 : 1500);
+ const espera = Date.now() < _rafagaHasta ? 1200 : (ES_MOVIL ? 3500 : 3000);   // menos consultas = el servidor responde más rápido a lo que sí importa (escanear, entrar, guardar)
  setTimeout(() => {
   const p = (rolActivo && !document.hidden) ? Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {}) : Promise.resolve();
   p.then(programarConsulta);
@@ -4556,7 +4556,7 @@ $(function () {
   * Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde "sin cambios" (304) si nada cambió y
   * guarda la respuesta 1 s). Las otras pestañas del mismo equipo se enteran al instante por un canal interno.
   */
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 500);
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden && !_olvidoEnCurso) consultarOlvidosInicio(); }, 2000);   // antes cada 0.5 s en cada equipo: saturaba el servidor y hacía lentos el login y el aviso
  if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Modo sin internet (service worker): permite abrir el sistema sin internet (solo funciona en https o localhost)
