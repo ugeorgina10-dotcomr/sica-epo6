@@ -74,62 +74,41 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 /* Vista previa de la plantilla oficial: frente y reverso con el mismo alto y alineados arriba */
 .slot-prev-plantilla{min-height:150px;display:flex;align-items:flex-start;justify-content:center}
 .slot-prev-plantilla canvas.preview-credencial{max-width:100%;margin:0}
-.badge-asignado{font-size:.7rem}
+.badge-asignado{font-size:.85rem}
 /* ===== Responsivo ===== */
 @media (max-width:767.98px){
 .form-control,.form-select{font-size:16px;min-height:46px} /* 16px evita que el iPhone haga zoom automático */
-.btn{min-height:44px}
 .main-card,.login-card{padding:1.5rem !important;border-radius:16px}
 .institution-logo{width:90px;height:90px}
 .small-logo{width:55px;height:55px}
 h2.fw-bold{font-size:1.4rem}
-h5.fw-bold{font-size:1.05rem}
 #selector-pestanas-superior .profile-card{padding:.75rem !important}
 #selector-pestanas-superior .profile-card i{font-size:1.1rem !important}
-#selector-pestanas-superior .profile-card h6{font-size:.75rem}
 .camera-box-ref{max-width:100%}
-.table-responsive table{font-size:.75rem}
-.d-flex.justify-content-between.align-items-center.mb-2.flex-wrap.gap-2 .badge{font-size:.75rem}
-#stats-grados .grado-btn{font-size:.8rem}
 }
 @media (max-width:575.98px){
-.btn-lg.rounded-pill{padding:.75rem 1.25rem !important;font-size:1rem !important}
-.row.g-2.mb-4.justify-content-center .btn{font-size:.75rem}
 #vista-sistema .d-flex.justify-content-between.align-items-center.mb-2.flex-wrap.gap-2{flex-direction:column;align-items:flex-start !important;gap:.75rem !important}
 #vista-sistema .d-flex.align-items-center.gap-2{width:100%;justify-content:space-between}
-.d-flex.justify-content-center.gap-3.mb-3.flex-wrap .btn{flex:1 1 45%;font-size:.8rem;white-space:normal}
-.d-flex.gap-2.flex-wrap .btn{flex:1 1 100%}
 #panel-control .row.text-center.mb-4.g-3 > div{margin-bottom:.5rem}
 .card.main-card{padding:1rem !important}
 }
 @media (max-width:400px){
 .institution-logo{width:70px;height:70px}
 h2.fw-bold{font-size:1.15rem}
-.btn{font-size:.9rem}
 }
 canvas#grafica-asistencias{max-width:100%;height:auto !important}
 /* Botones: texto siempre centrado y del mismo alto, sin importar el ancho de la ventana (pantalla dividida incluida) */
-#vista-sistema .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;text-align:center;line-height:1.25;white-space:normal;font-size:.95rem;font-weight:600;padding:.5rem 1rem;max-width:100%;overflow-wrap:break-word}
-#vista-sistema td .btn,#vista-sistema th .btn,#vista-sistema .table .btn{white-space:nowrap;overflow-wrap:normal;flex-shrink:0}
-#vista-sistema .btn.btn-sm{font-size:.875rem;padding:.4rem .8rem;min-height:38px}
-#vista-sistema .btn.small{font-size:.9rem}
 #vista-sistema .btn .fa,#vista-sistema .btn .fas,#vista-sistema .btn i{flex:0 0 auto}
 /* Celular y pantalla dividida: el botón que va solo en su columna ocupa todo el ancho, con la misma letra que los demás */
 @media (max-width:767.98px){
- #vista-sistema .row>[class*="col-"]>.btn:only-child,#vista-sistema .row>[class*="col-"]>button.btn{width:100%}
- #vista-sistema .btn{font-size:.95rem;min-height:44px}
- #vista-sistema .btn.btn-sm{font-size:.9rem;min-height:40px}
  .btn-cuenta{white-space:normal;text-align:left}
- .ori-hor .btn,.ori-hor .btn.btn-sm{flex:1 1 140px}
 }
 .grupo-botones{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
-.grupo-botones .btn{min-width:130px}
 .grupo-botones .form-select{width:auto}
 @media (max-width:991.98px){
  .cab-centrable{justify-content:center !important;text-align:center}
  .cab-centrable>*{justify-content:center}
  .grupo-botones{justify-content:center;width:100%}
- .grupo-botones .btn{flex:1 1 130px;max-width:240px}
  #stats-grados>div{flex:0 0 100%;max-width:100%}
  #panel-control .row.text-center>div{flex:0 0 100%;max-width:100%}
 }
@@ -175,7 +154,7 @@ body.modo-movil #bloque-tabla-orientador th:nth-child(3),body.modo-movil #bloque
 body.modo-movil #bloque-tabla-orientador th:nth-child(4),body.modo-movil #bloque-tabla-orientador td:nth-child(4),
 body.modo-movil #bloque-tabla-orientador th:nth-child(7),body.modo-movil #bloque-tabla-orientador td:nth-child(7),
 body.modo-movil #bloque-tabla-orientador th:nth-child(9),body.modo-movil #bloque-tabla-orientador td:nth-child(9){display:none}
-body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;padding:.9rem}
+body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 /* ---- Orientadores: lista desplegable ---- */
 .ori-desplegable{border:1.5px solid #d9c3c8;border-radius:.75rem;background:#fff;overflow:hidden}
 .ori-desplegable>summary{cursor:pointer;padding:.55rem .9rem;font-weight:600;color:#5a1020;list-style:none}
@@ -227,22 +206,13 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 @keyframes burbujaEntra{from{opacity:0;transform:translateY(-12px) scale(.95)}to{opacity:1;transform:none}}
 /* ===== ACCESIBILIDAD Y USABILIDAD =====
    Botones y campos más grandes (objetivo táctil de 44-48 px), letra legible, foco visible con teclado, buen contraste y avisos claros. */
-#vista-sistema .btn,.main-card .btn,.login-card .btn{min-height:48px;font-size:1rem;padding:.6rem 1.25rem !important}   /* !important: ya no quedan botones diminutos por "py-0 px-2" */
-#vista-sistema .btn.btn-sm,.main-card .btn.btn-sm{min-height:44px;font-size:1rem;padding:.5rem 1rem !important}
-#vista-sistema .btn.small,.main-card .btn.small{font-size:1rem}
-#vista-sistema .btn.rounded-pill{padding-left:1.6rem !important;padding-right:1.6rem !important}
-#vista-sistema table .btn{min-height:44px;font-size:.95rem;padding:.45rem .9rem !important}
-#vista-sistema table .btn-rapido{min-width:160px;min-height:48px;font-size:1rem}   /* registro rápido: botón grande y fácil de tocar */
 .burbujas-claves{max-width:380px}
-#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:190px;min-height:54px;font-size:1.1rem}
 /* Botones blancos con borde (turno no elegido, Entrada/Salida): al pasar el mouse o enfocarlos el texto se volvía blanco sobre blanco y no se leía */
 .btn-outline-dark.bg-white:hover,.btn-outline-dark.bg-white:focus,.btn-outline-dark.bg-white:focus-visible,.btn-outline-dark.bg-white:active{color:#212529 !important;background-color:#f3e3e7 !important;border-color:#800020 !important}
 #vista-sistema .form-control,#vista-sistema .form-select,.main-card .form-control,.main-card .form-select,.login-card .form-control,.login-card .form-select{min-height:48px;font-size:1rem}
 #vista-sistema .form-control-sm,#vista-sistema .form-select-sm,#vista-sistema .input-group-sm>.form-control,#vista-sistema .input-group-sm>.input-group-text{min-height:44px;font-size:1rem;padding-top:.4rem;padding-bottom:.4rem}
 #vista-sistema .form-check-input{width:1.4em;height:1.4em;margin-top:.15em}
 #vista-sistema .form-check-label{padding-left:.3rem}
-#vista-sistema .small,#vista-sistema small,.main-card .small,.login-card .small{font-size:.95rem}
-#vista-sistema .form-label,.main-card .form-label{font-size:1rem}
 .text-muted{color:#505a63 !important}   /* contraste alto sobre fondo claro */
 .res-scan{min-height:28px;font-size:1.05rem;font-weight:700;line-height:1.4}
 .res-scan.text-success{color:#0b6b3a !important}
@@ -261,14 +231,10 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .burbuja-x{width:44px;height:44px;top:0;right:0;font-size:1.7rem;opacity:1}
 .burbuja .burbuja-mudo{min-height:44px;font-size:.95rem;padding:.4rem .9rem}
 #selector-pestanas-superior .profile-card{min-height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-#selector-pestanas-superior .profile-card h6{font-size:.95rem}
 .profile-card:hover{border-color:#800020}
 /* Foco claro al navegar con el teclado (Tab) */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,.profile-card:focus-visible,[tabindex]:focus-visible{outline:3px solid #1d4ed8 !important;outline-offset:2px;box-shadow:0 0 0 6px #fff !important}
 @media (max-width:767.98px){
- .table-responsive table{font-size:.85rem}
- #vista-sistema .btn,.main-card .btn,.login-card .btn{min-height:50px}
- #selector-pestanas-superior .profile-card h6{font-size:.85rem}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}
 
@@ -278,13 +244,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
 .txt-ret-ent,.txt-ret-sal{color:#b00020}
 /* ===== Botones más grandes ===== */
-#vista-sistema .btn,.main-card .btn,.login-card .btn{min-height:48px;font-size:1rem;font-weight:600;padding:.55rem 1.25rem !important;border-radius:.75rem}
-#vista-sistema .btn.btn-sm,.main-card .btn.btn-sm{min-height:48px;font-size:1rem;padding:.55rem 1.25rem !important}
-#vista-sistema table .btn{min-height:46px;font-size:.95rem;padding:.5rem 1.1rem !important}
-#vista-sistema table .btn-rapido{min-width:170px;min-height:48px;font-size:1rem}
-#vista-sistema .btn-cuenta{min-height:48px;font-size:1rem}
-#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:170px;min-height:48px;font-size:1rem}
-#vista-sistema .burbuja .burbuja-mudo{min-height:44px}
 /* ===== Pantalla dividida y celular: nada se sale ni se corta ===== */
 #vista-sistema :is(p,span,div,label,h1,h2,h3,h4,h5,h6,summary,li,small,.alert,.badge){overflow-wrap:anywhere}
 #bloque-tabla-orientador td,#bloque-tabla-orientador th,.table-responsive td,.table-responsive th{overflow-wrap:normal}
@@ -300,40 +259,75 @@ td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
  .ori-hor .col-12{width:100%}
  .ori-item{flex-wrap:wrap}
  .ori-item>.d-flex{width:100%}
- .ori-item>.d-flex .btn{flex:1 1 140px}
 }
 @media (max-width:575.98px){
  .ori-hor .col-xl-2{width:100%}
  .res-retardo{font-size:1.05rem;padding:.5rem .6rem}
  .res-scan{font-size:1rem}
- #vista-sistema .btn,.main-card .btn,.login-card .btn{font-size:1rem;padding:.55rem 1rem !important}
- .grupo-botones .btn,.d-flex.gap-2.flex-wrap .btn{flex:1 1 100%;max-width:100%}
 }
 
-/* ===== BOTONES: todos del mismo tamaño (cómodos de tocar, sin verse exagerados), sin importar btn-sm / btn-lg ni el ancho de la pantalla ===== */
-body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,#vista-sistema .btn.btn-lg,#vista-sistema .btn.small,#vista-sistema table .btn,#vista-sistema .btn-cuenta,
-.main-card .btn,.main-card .btn.btn-sm,.main-card .btn.btn-lg,.login-card .btn,.login-card .btn.btn-lg,.grupo-botones .btn,.ori-hor .btn,.ori-hor .btn.btn-sm,
-#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino
-{min-height:64px !important;font-size:1.2rem !important;font-weight:600 !important;line-height:1.3 !important;padding:.8rem 1.7rem !important;border-radius:.7rem !important;align-items:center;justify-content:center;text-align:center;letter-spacing:0}
-#vista-sistema table .btn-rapido{min-width:210px}
-#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:210px}
-/* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
-a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:.95rem;font-weight:400}
-@media (max-width:575.98px){
- body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,.main-card .btn,.login-card .btn{font-size:1.15rem !important;min-height:62px !important;padding:.75rem 1.2rem !important}
+/* =====================================================================
+   SISTEMA UNIFICADO DE BOTONES Y TEXTO  (una sola fuente de verdad)
+   Todo botón mide lo mismo y usa la misma letra, sin importar si trae btn-sm, btn-lg, py-*, px-*, fs-* o el ancho de la pantalla.
+   Para cambiar el tamaño de TODOS los botones o textos del sistema, solo se editan estas variables.
+   ===================================================================== */
+:root{
+ --btn-h:48px;          /* alto de todos los botones (objetivo táctil cómodo) */
+ --btn-fs:1rem;         /* letra de todos los botones */
+ --btn-px:1.25rem;      /* relleno lateral */
+ --btn-radius:.7rem;
+ --btn-minw:140px;      /* ancho mínimo para que dos botones seguidos se vean parejos */
+ --fs-base:1rem;        /* texto normal, etiquetas, tablas */
+ --fs-small:.95rem;     /* texto secundario (.small) */
+ --fs-badge:.85rem;     /* etiquetas / insignias */
 }
-
-/* ===== BOTONES PAREJOS: mismo alto, mismo ancho mínimo, misma letra (y el mismo texto por dentro), en todo el sistema ===== */
-body .btn:not(.btn-close):not(.btn-icono){min-width:200px !important;max-width:100%;height:auto;white-space:normal;text-transform:none !important;letter-spacing:0 !important;font-family:inherit}
-body .btn *,#vista-sistema .btn *,.main-card .btn *,.login-card .btn *{font-size:inherit !important;font-weight:inherit !important;line-height:inherit !important;letter-spacing:inherit !important;text-transform:none !important}
+body{font-size:var(--fs-base);line-height:1.5}
+/* --- Texto: misma escala en todas las pantallas --- */
+body .small,body small,body .form-text{font-size:var(--fs-small) !important}
+body .form-label,body .form-check-label{font-size:var(--fs-base) !important}
+body .badge,body .badge-asignado{font-size:var(--fs-badge) !important;font-weight:600}
+body .table,body .table-responsive table{font-size:.95rem !important}
+body .table code,body .table .badge{font-size:inherit}
+body .table .badge{font-size:var(--fs-badge) !important}
+body h6,body .modal-cuenta-caja h6{font-size:1rem !important}
+body h5,body h5.fw-bold{font-size:1.15rem !important}
+body .cct-text,body .hor-estado,body #badge-rol-activo{font-size:var(--fs-small) !important}
+body .burbuja{font-size:var(--fs-base)}
+body .btn-cuenta .etq,body .dd-item .etq{font-size:var(--fs-badge) !important}
+body .dd-item,body .modal-cuenta-caja p{font-size:var(--fs-base)}
+/* --- Botones: mismo alto, misma letra, texto centrado --- */
+body .btn:not(.btn-close):not(.btn-icono),
+body .btn-cuenta,
+body .burbuja .burbuja-mudo{
+ display:inline-flex;align-items:center;justify-content:center;gap:.45rem;box-sizing:border-box;
+ height:auto;min-height:var(--btn-h) !important;
+ padding:.55rem var(--btn-px) !important;
+ font-family:inherit;font-size:var(--btn-fs) !important;font-weight:600 !important;line-height:1.25 !important;
+ letter-spacing:0 !important;text-transform:none !important;text-align:center;
+ border-radius:var(--btn-radius) !important;
+ white-space:normal;overflow-wrap:break-word;max-width:100%;
+}
+body .btn:not(.btn-close):not(.btn-icono){min-width:var(--btn-minw)}
+body .btn *{font-size:inherit !important;font-weight:inherit !important;line-height:inherit !important;letter-spacing:inherit !important;text-transform:none !important}
 body .btn .fa,body .btn .fas,body .btn .far,body .btn i{font-size:1.1em !important;width:auto;flex:0 0 auto}
-.btn.btn-icono{min-width:64px !important;width:64px;padding:0 !important}
-#vista-sistema td .btn,#vista-sistema th .btn{white-space:nowrap}
-.grupo-botones .btn,.ori-hor .btn,.ori-hor .btn.btn-sm{flex:1 1 200px}
-.btn.rounded-pill{border-radius:.7rem !important}
+body .btn.btn-icono{display:inline-flex;align-items:center;justify-content:center;min-width:var(--btn-h) !important;width:var(--btn-h);min-height:var(--btn-h) !important;padding:0 !important;font-size:var(--btn-fs) !important;border-radius:var(--btn-radius) !important}
+.btn.rounded-pill{border-radius:var(--btn-radius) !important}
+/* En tablas el botón no se parte en dos líneas */
+#vista-sistema td .btn,#vista-sistema th .btn,#panel-cuenta-clave .btn{white-space:nowrap}
+#vista-sistema table .btn-rapido{min-width:200px}
+/* Filas de botones: se reparten el ancho por igual y bajan de renglón si no caben (nada se corta) */
+.grupo-botones>.btn,.d-flex.flex-wrap>.btn,.d-flex.gap-2>.btn,.d-flex.gap-3>.btn,.ori-hor .btn,.burbuja .burbuja-acciones>*{flex:1 1 var(--btn-minw)}
+.d-flex.flex-wrap{min-width:0}
+.btn-vinotinto,.btn-vinotinto:hover{color:#fff}
+/* Avisos (burbujas): los botones de abajo ocupan todo el ancho y miden igual */
+.burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
+/* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
+a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:var(--fs-small);font-weight:400}
 @media (max-width:575.98px){
- body .btn:not(.btn-close):not(.btn-icono){min-width:0 !important;width:100%}
- #vista-sistema td .btn{width:auto;min-width:170px !important}
+ body .btn:not(.btn-close):not(.btn-icono){min-width:0;width:100%}
+ body .btn-cuenta{width:auto}
+ #vista-sistema td .btn{width:auto;min-width:150px}
+ .d-flex.flex-wrap>.btn,.d-flex.gap-2>.btn,.d-flex.gap-3>.btn,.grupo-botones>.btn{flex:1 1 100%}
 }
 </style>
 </head>
@@ -550,7 +544,7 @@ body .btn .fa,body .btn .fas,body .btn .far,body .btn i{font-size:1.1em !importa
 <!-- ===== 2. LECTOR FIJO (no visible para Director/Subdirector) ===== -->
 <div id="panel-lector" class="panel-perfil d-none">
  <div class="p-3 bg-light rounded-4 border mb-3 text-center">
- <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Lector Fijo - Control de Entradas y Salidas</h6>
+ <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020">Lector Fijo - Control de Entradas y Salidas</h6>
  {{-- Por defecto el modo es AUTOMÁTICO: el sistema detecta el grupo del alumno y, según el horario del grupo, registra Entrada o Salida. Pulsar Entrada o Salida fuerza ese modo; pulsar el mismo botón otra vez regresa a Automático. --}}
  <div class="d-flex justify-content-center gap-2 mb-1 flex-wrap">
  <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
@@ -568,7 +562,7 @@ body .btn .fa,body .btn .fas,body .btn .far,body .btn i{font-size:1.1em !importa
  <!-- SOLO CONTROL ESCOLAR: registros de entradas y salidas (el buscador y la tabla se pasan aquí desde el Panel de Orientadores) -->
  <div id="lector-registros-control" class="d-none">
  <div class="p-3 bg-light rounded-4 border shadow-sm mb-3">
- <h6 class="fw-bold mb-2 text-uppercase" style="color:#800020;font-size:.9rem">Registros de Entradas y Salidas</h6>
+ <h6 class="fw-bold mb-2 text-uppercase" style="color:#800020">Registros de Entradas y Salidas</h6>
  <div class="row g-2">
  <div class="col-12 d-flex justify-content-center gap-2 flex-wrap mb-1">
  <button onclick="setTurno('Matutino')" id="btn-turno-lector-matutino" class="btn btn-vinotinto px-4 py-2 fw-semibold shadow-sm small">Turno Matutino</button>
@@ -682,7 +676,7 @@ body .btn .fa,body .btn .fas,body .btn .far,body .btn i{font-size:1.1em !importa
  </div>
  <!-- Cámara (orientador / director / subdirector) -->
  <div id="bloque-camara-orientador" class="p-3 bg-light rounded-4 border mb-4 text-center">
- <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Cámara de Escaneo (Entradas y Salidas)</h6>
+ <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020">Cámara de Escaneo (Entradas y Salidas)</h6>
  <!-- CAMBIO: cualquier orientador puede registrar entrada o salida de cualquier alumno -->
  <div class="d-flex justify-content-center gap-2 mb-1 flex-wrap">
  <button onclick="setModoOrient('Entrada')" id="btn-orient-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
@@ -798,10 +792,10 @@ body .btn .fa,body .btn .fas,body .btn .far,body .btn i{font-size:1.1em !importa
    <div class="col-md-4"><label class="form-label small">Repite la contraseña nueva</label>
     <input type="password" id="clave-confirmar" class="form-control form-control-sm" autocomplete="new-password" maxlength="72" oninput="revisarRequisitosClave()">
    </div>
-   <div class="col-md-4 d-flex gap-2">
-    <button type="button" onclick="generarClave()" class="btn btn-outline-dark btn-sm py-2 text-nowrap" title="Crea una contraseña segura al azar">Generar</button>
-    <button type="button" onclick="guardarClave()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button>
-    <button type="button" id="btn-generar-guardar" onclick="generarYGuardar()" class="btn btn-success btn-sm py-2 text-nowrap fw-semibold d-none" title="Crea una contraseña al azar, la guarda y la deja lista para entregar (no hace falta borrar la anterior)">Generar y guardar</button>
+   <div class="col-lg-4 d-flex flex-wrap gap-2">
+    <button type="button" onclick="generarClave()" class="btn btn-outline-dark btn-sm" title="Crea una contraseña segura al azar">Generar</button>
+    <button type="button" onclick="guardarClave()" class="btn btn-vinotinto btn-sm">Guardar</button>
+    <button type="button" id="btn-generar-guardar" onclick="generarYGuardar()" class="btn btn-success btn-sm d-none" title="Crea una contraseña al azar, la guarda y la deja lista para entregar (no hace falta borrar la anterior)">Generar y guardar</button>
    </div>
   </div>
   <div class="form-check mt-2 small"><input class="form-check-input" type="checkbox" id="ver-claves" onchange="verClavesNuevas()"><label class="form-check-label" for="ver-claves">Mostrar lo que escribo</label></div>
