@@ -16,6 +16,12 @@ En `C:\xampp\php\php.ini` deben estar activas (sin `;`): `extension=zip`, `exten
 Cuentas iniciales: ver `database/seeders/UsuarioSeeder.php` (contrasena inicial `prepa06`; cambiala desde Control Escolar).
 Si aparece "500 Server Error": pon `APP_DEBUG=true` en `.env` o revisa `storage/logs/laravel.log`.
 
+## Cambios al instante (computadoras y celulares)
+Cada escaneo, guardado, borrado, plantilla subida o contraseña desbloqueada sube un contador (`storage/framework/pulso.json`).
+Todos los equipos lo consultan unas 2 veces por segundo en `public/pulso.php` (no arranca Laravel ni usa la base de datos, responde en ~1 ms)
+y en cuanto cambia descargan lo nuevo: los cambios se ven en menos de un segundo. Si `pulso.php` no responde, el sistema vuelve solo a las
+consultas de siempre (cada 1.2 a 3.5 s). La carpeta `storage/framework` debe poder escribirse (ya lo está en XAMPP, Codespaces y Render).
+
 ## Plantillas de credencial (Word o PDF)
 El diseño de la credencial es un archivo de Word (.docx) o un PDF: `FrenteMatutino.docx`, `FrenteVespertino.docx` y `Reverso.docx`
 (carpeta `public/plantillas`). El sistema los lee y escribe encima nombre, CURP, grado, grupo, turno y el QR de cada alumno,

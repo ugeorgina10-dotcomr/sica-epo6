@@ -24,6 +24,9 @@ if (!is_file($router)) {
     exit(1);
 }
 
+// Mantiene abierta la conexión a la base de datos entre visitas (abrirla cada vez es lento con la base de datos en la nube)
+putenv('DB_PERSISTENT=true');
+
 echo "Preparando configuración y vistas...\n";
 passthru("$php artisan config:cache", $c1);
 passthru("$php artisan view:cache", $c2);
@@ -32,8 +35,11 @@ if ($c1 !== 0 || $c2 !== 0) {
     exit(1);
 }
 
+// Mejoras pendientes de la base de datos, y despertarla (la de la nube se duerme sola) + llenar las listas en memoria
+passthru("$php artisan migrate --force > " . (stripos(PHP_OS, 'WIN') === 0 ? 'NUL' : '/dev/null') . ' 2>&1');
+passthru("$php artisan sica:calentar");
 if (stripos(PHP_OS, 'WIN') !== 0) {
-    putenv('PHP_CLI_SERVER_WORKERS=' . (getenv('PHP_CLI_SERVER_WORKERS') ?: '4'));
+    putenv('PHP_CLI_SERVER_WORKERS=' . (getenv('PHP_CLI_SERVER_WORKERS') ?: '64'));
 }
 
 $ajustes = [

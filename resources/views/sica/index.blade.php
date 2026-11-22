@@ -66,7 +66,7 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .tarjeta-grado{cursor:pointer;transition:.2s}
 .tarjeta-grado:hover{box-shadow:0 6px 16px rgba(0,0,0,.12)}
 .tarjeta-grado.seleccionada{border:2px solid #800020 !important;background:#fdf8f8 !important}
-.tarjeta-grado.grado-desactivado{opacity:.4;pointer-events:none;cursor:not-allowed}
+.tarjeta-grado.grado-desactivado{opacity:.55;cursor:pointer}   /* se puede pasar directo a otro grado con un toque */
 /* Tarjetas de grado: en columna y centradas (grado arriba y luego asistencias, retardo entrada y retardo salida, uno debajo del otro) */
 #vista-sistema .btn.tarjeta-grado{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;text-align:center}
 .preview-credencial{width:100%;max-width:340px;border:1px solid #dee2e6;border-radius:10px;background:#eee;display:block;margin:0 auto}
@@ -167,7 +167,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 .ori-item:last-child{border-bottom:0}
 .ori-actual{background:#fdf3f5}
 /* ---- Contraseñas: botones de cuenta y ventana central ---- */
-.btn-cuenta{border:1.5px solid #d9c3c8;background:#fff;color:#5a1020;border-radius:999px;padding:.4rem .9rem;font-size:.85rem;font-weight:600;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;transition:all .15s}
+.btn-cuenta{border:1.5px solid #d9c3c8;background:#fff;color:#5a1020;border-radius:.3rem;padding:.4rem .9rem;font-size:.85rem;font-weight:600;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;transition:all .15s}
 .btn-cuenta:hover{border-color:#800020;background:#fdf3f5}
 .btn-cuenta.activa{background:#800020;border-color:#800020;color:#fff}
 .btn-cuenta.alerta:not(.activa){border-color:#dc3545}
@@ -194,7 +194,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 .burbuja-x{position:absolute;top:4px;right:10px;border:0;background:transparent;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;opacity:.8}
 .burbuja .burbuja-acciones{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
 .burbuja .burbuja-acciones .mt-2{margin-top:0!important}
-.burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.5rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
+.burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.3rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
 .burbuja .burbuja-mudo:hover{background:rgba(255,255,255,.15)}
 .burbuja.silenciada{background:#5c1a2c}
 /* Avisos de guardado (horarios y tolerancias): misma burbuja que las alertas de cuentas */
@@ -217,6 +217,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 .res-scan{min-height:28px;font-size:1.05rem;font-weight:700;line-height:1.4}
 .res-scan.text-success{color:#0b6b3a !important}
 .res-scan.text-danger{color:#b00020 !important}
+/* Varios escaneos a la vez: cada lectura es su propia tarjeta; la más reciente arriba y se conservan las últimas */
+.res-item{padding:.45rem .7rem;margin-bottom:.4rem;border-radius:.3rem;border-left:6px solid #6c757d;background:#f1f3f5;color:#343a40;font-size:1.05rem;font-weight:700;line-height:1.4;overflow-wrap:anywhere}
+.res-item.res-ok{border-left-color:#0b6b3a;background:#e8f5ee;color:#0b6b3a}
+.res-item.res-ret,.res-item.res-err{border-left-color:#b00020;background:#fdecee;color:#b00020}
+.res-item.res-pend{opacity:.85;font-weight:600}
+.res-item:nth-child(n+2){opacity:.8;font-size:.95rem}
 /* Aviso de retardo al escanear (entrada o salida) en ROJO, con ícono y borde para que no dependa solo del color */
 .res-retardo{color:#b00020;background:#fdecee;border-left:6px solid #b00020;border-radius:.4rem;padding:.55rem .8rem;font-size:1.15rem;font-weight:800}
 .hor-estado{font-size:.95rem}
@@ -275,7 +281,7 @@ td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
  --btn-h:40px;          /* alto de todos los botones (objetivo táctil cómodo) */
  --btn-fs:.95rem;        /* letra de todos los botones */
  --btn-px:1.1rem;      /* relleno lateral */
- --btn-radius:.6rem;
+ --btn-radius:.3rem;   /* esquinas discretas (antes .6rem) */
  --btn-minw:0px;        /* sin ancho mínimo: cada botón mide lo que necesita su texto */
  --fs-base:1rem;        /* texto normal, etiquetas, tablas */
  --fs-small:.95rem;     /* texto secundario (.small) */
@@ -322,16 +328,17 @@ body #btn-turno-matutino,body #btn-turno-vespertino,body #btn-turno-lector-matut
 body #btn-modo-entrada,body #btn-modo-salida,body #btn-orient-entrada,body #btn-orient-salida,
 body .btn.btn[onclick^="descargarReporte"],body .btn.btn[onclick^="descargarGraficas"],body .btn.btn[onclick^="activarCamara"],body .btn.btn[onclick^="apagarCamara"],body .btn.btn[onclick^="detener("],body #btn-activar-camara-orientador{min-width:170px}
 /* Entrar al sistema: un poco más grande que el resto, es la acción principal */
-body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')"]{min-height:56px !important;font-size:1.2rem !important;padding:.6rem 1.5rem !important;border-radius:.7rem !important;width:100%}
+body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')"]{min-height:56px !important;font-size:1.2rem !important;padding:.6rem 1.5rem !important;border-radius:.4rem !important;width:100%}
 /* Avisos (burbujas): los botones de abajo ocupan todo el ancho y miden igual */
 .burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
 a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:var(--fs-small);font-weight:400}
 
-/* ===== Botón "Elegir archivos": misma forma, alto y letra que el resto de botones ===== */
-body input[type=file],body input[type=file].form-control{display:flex;align-items:center;min-height:var(--btn-h);padding:.25rem !important;font-size:var(--btn-fs) !important;line-height:1.25;color:#495057;border-radius:var(--btn-radius)}
-body input[type=file]::file-selector-button{box-sizing:border-box;height:calc(var(--btn-h) - .5rem - 2px);margin:0 .9rem 0 0;padding:0 var(--btn-px);border:1px solid #212529;border-radius:var(--btn-radius);background:#fff;color:#212529;font-family:inherit;font-size:var(--btn-fs);font-weight:600;line-height:1.25;cursor:pointer;transition:background .12s,border-color .12s}
-body input[type=file]:hover::file-selector-button{background:#f3e3e7;border-color:#800020}
+/* ===== Botón "Elegir archivos": gris como el original, pero COMPLETO y rodeado de negro para que se note que es un botón ===== */
+body input[type=file],body input[type=file].form-control{display:flex;align-items:center;flex-wrap:nowrap;width:100%;min-height:var(--btn-h);padding:.25rem !important;font-size:var(--btn-fs) !important;line-height:1.25;color:#495057;border-radius:var(--btn-radius);overflow:hidden;text-overflow:ellipsis}
+body input[type=file]::file-selector-button{box-sizing:border-box;flex:0 0 auto;white-space:nowrap;min-width:max-content;height:calc(var(--btn-h) - .5rem - 2px);margin:0 .8rem 0 0;padding:0 1rem;border:2px solid #000;border-radius:var(--btn-radius);background:#e9ecef;color:#212529;font-family:inherit;font-size:var(--btn-fs);font-weight:600;line-height:1.25;cursor:pointer;transition:background .12s}
+body input[type=file]:hover::file-selector-button{background:#d8dde2}
+@media (max-width:359.98px){body input[type=file]::file-selector-button{padding:0 .7rem;margin-right:.5rem;font-size:.9rem}}
 /* ===== CUALQUIER TELÉFONO: nada se sale ni se corta, con muescas, barras del navegador y pantallas desde 320 px ===== */
 html{overflow-x:hidden}
 body{min-height:100vh;min-height:100dvh;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
@@ -1010,6 +1017,26 @@ const guardarYa = () => { if (ES_MOVIL) return; clearTimeout(_temporizadorSave);
  * Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
  * Si el servidor no responde, no muestra error y el sistema sigue funcionando con lo guardado en el navegador.
  */
+/* Aviso que NO bloquea la pantalla (a diferencia de alert): sale abajo, se va solo y se puede seguir trabajando o escaneando */
+function avisoRapido(mensaje, ms) {
+ try {
+  let cont = document.getElementById('avisos-rapidos');
+  if (!cont) {
+   cont = document.createElement('div');
+   cont.id = 'avisos-rapidos';
+   cont.setAttribute('role', 'status'); cont.setAttribute('aria-live', 'polite');
+   cont.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:2300;display:flex;flex-direction:column;gap:8px;align-items:center;width:calc(100% - 24px);max-width:520px;pointer-events:none';
+   document.body.appendChild(cont);
+  }
+  const el = document.createElement('div');
+  el.textContent = mensaje;
+  el.style.cssText = 'pointer-events:auto;background:#1f2937;color:#fff;border-left:5px solid #198754;border-radius:.5rem;padding:.65rem .9rem;font-size:.92rem;box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:pre-line;width:100%;cursor:pointer';
+  el.onclick = () => el.remove();
+  cont.appendChild(el);
+  while (cont.children.length > 3) cont.removeChild(cont.firstChild);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, ms || 5000);
+ } catch (e) { alert(mensaje); }
+}
 let _ultimoAvisoPermiso = 0;
 function avisoPermiso(mensaje) {
  if (Date.now() - _ultimoAvisoPermiso < 5000) return;   // un solo aviso cada 5 s
@@ -1199,9 +1226,10 @@ function cargarDesdeServidor() {
  * mezclarlos, guardarlos y redibujar la tabla aunque nada hubiera cambiado. Ahora se manda la marca de versión (ETag) a mano
  * (cache:'no-store') para recibir de verdad el "sin cambios" y no hacer nada cuando no hay cambios.
  */
-let _etagEstado = null, _descargandoEstado = false;
+let _etagEstado = null, _descargandoEstado = false, _repetirEstado = false;
 function descargarEstadoServidor() {
- if (_descargandoEstado) return Promise.resolve();   // no se amontonan consultas si el servidor tarda
+ // No se amontonan consultas si el servidor tarda; pero si llegó un aviso de cambio mientras tanto, se repite al terminar (no se pierde)
+ if (_descargandoEstado) { _repetirEstado = true; return Promise.resolve(); }
  _descargandoEstado = true;
  const inicioConsulta = Date.now();
  const cab = {'Accept':'application/json'};
@@ -1216,6 +1244,7 @@ function descargarEstadoServidor() {
   })
   .then(s => {
    _descargandoEstado = false;
+   if (_repetirEstado) { _repetirEstado = false; setTimeout(pedirEstadoYa, 0); }
    if (!s) return;
    fusionarServidor(s, inicioConsulta);
    acelerarSync(6000);   // hubo cambios: seguramente vienen más (una fila de alumnos escaneando, una lista que se sube...)
@@ -1239,7 +1268,7 @@ function descargarEstadoServidor() {
    }
    else if (!$('#vista-login').hasClass('d-none') && !$('#select-orientador-login').val()) actualizarCredenciales();
   })
-  .catch(() => { _descargandoEstado = false; });
+  .catch(() => { _descargandoEstado = false; _repetirEstado = false; });
 }
 let rolActivo = null, turnoActivo = 'Matutino', indicePanelActual = 0, modoEscaneo = 'Auto';
 let filtro = null, credSel = null, idEditando = null, chartAsistencias = null, gradoSeleccionado = null;
@@ -1286,15 +1315,15 @@ function limiteDe(a) {
  return {retardo: d.retardo + te, fin: d.fin + ts};
 }
 /* Minutos de retraso del alumno ese día: en la entrada (llegó después del límite + tolerancia) y en la salida
-   (salió después del cierre + tolerancia, o hoy todavía no sale y ya pasó ese límite) */
+   (salió después del cierre + tolerancia; solo cuando ya escaneó la salida) */
 function retrasosDe(a, r, fecha) {
  const res = {entrada: 0, salida: 0, sinSalida: false};
  if (r && !r.entrada && r.salida) { res.salida = Math.max(0, toMin(r.salida) - limiteDe(a).fin); return res; }   // salió sin entrada registrada: igual lleva su retardo de salida
  if (!r || !r.entrada) return res;
  const l = limiteDe(a);
  res.entrada = Math.max(0, toMin(r.entrada) - l.retardo);
+ // El retardo de salida se calcula SOLO cuando ya hay salida registrada (entrada y salida): antes de escanear la salida no aparece ningún retardo de salida
  if (r.salida) res.salida = Math.max(0, toMin(r.salida) - l.fin);
- else if (fecha === hoy() && toMin(horaAhora()) > l.fin) { res.salida = toMin(horaAhora()) - l.fin; res.sinSalida = true; }
  return res;
 }
 /* Para las estadísticas: cada alumno-día suma en Asistencias (sin ningún retardo) o en Retardo entrada y/o Retardo salida. Sin entrada = no vino. */
@@ -1712,7 +1741,9 @@ const htmlEstadoHor = k => { const e = _horEstado[k]; return '<span class="hor-e
 function ponerEstadoHor(it, k, clase, txt, avisar) {
  _horEstado[k] = {clase: '', txt: ''};
  it.find('.hor-estado').text('');
- if (avisar && (clase === 'text-success' || clase === 'text-danger')) alert(txt);
+ // El mismo aviso no se repite si se dispara dos veces seguidas (p. ej. dos eventos "change" del mismo campo)
+ const ahora = Date.now(), clave = k + '|' + txt;
+ if (avisar && (clase === 'text-success' || clase === 'text-danger') && !(window._ultAvisoHor && window._ultAvisoHor.c === clave && ahora - window._ultAvisoHor.t < 1500)) { window._ultAvisoHor = {c: clave, t: ahora}; alert(txt); }
 }
 function renderListaHorarios() {
  renderGruposCargados();
@@ -1793,7 +1824,9 @@ function horarioCambiado(input, ya) {
  if (!k) return;
  const v = leerHorarioInline(it);
  if (v.error) {   // mientras se escribe solo se avisa que falta; al terminar (change) se explica el problema en rojo
-  if (ya) ponerEstadoHor(it, k, 'text-danger', v.error + ' Todavía no se ha guardado.', true);
+  // Si solo faltan las horas (se está llenando el renglón paso a paso: tolerancia de entrada, luego salida, etc.) NO se avisa nada:
+  // el único mensaje es el final de "Horario guardado", cuando ya está todo completo y se guardó.
+  if (ya && (v.e && v.s || v.error.indexOf('tolerancia') > -1)) ponerEstadoHor(it, k, 'text-danger', v.error + ' Todavía no se ha guardado.', true);
   return;
  }
  const h = db.horarios[k] = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''};
@@ -2129,8 +2162,10 @@ function aplicarPrecarga(d) {
   _clavesPrecargadas = true;
  }
 }
+let _tickClaves = 0;
 function vigilarClaves() {
- if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden) cargarClaves(); }, 700);
+ // Con el aviso instantáneo (pulso) activo esta consulta es solo un respaldo (cada 6 s); sin él, sigue cada 2 s como antes
+ if (!temporizadorClaves) temporizadorClaves = setInterval(() => { if (rolActivo === 'control' && !document.hidden && (!_pulsoVivo() || ++_tickClaves % 3 === 0)) cargarClaves(); }, 2000);
 }
 function llamarClaves(url, metodo, cuerpo, reintento) {
  return fetch(url, {
@@ -2191,7 +2226,15 @@ function cargarClaves(forzar) {
   clavesOrientadores = d.orientadores || [];
   clavesRoles = d.roles || [];
   renderClaves();
- }).catch(() => {}).then(() => { _cargandoClaves = false; });
+ }).catch(() => {}).then(() => { _cargandoClaves = false; if (_clavesSucias && !_accionesClaves) pedirClavesYa(); });
+}
+/* Aviso instantáneo de cambio en las contraseñas / "olvidé mi contraseña": se consulta YA; si ahora hay otra consulta o acción en curso, se repite al terminar */
+let _clavesSucias = false;
+function pedirClavesYa() {
+ if (rolActivo !== 'control') return;
+ if (_cargandoClaves || _accionesClaves > 0) { _clavesSucias = true; return; }
+ _clavesSucias = false;
+ cargarClaves();
 }
 /* Acciones sobre las contraseñas: la pantalla cambia AL INSTANTE (sin esperar al servidor) y la petición va detrás.
    Si el servidor la rechaza, se regresa todo a como estaba y se avisa. */
@@ -2205,6 +2248,7 @@ function enviarClaves(url, metodo, cuerpo, copia, mensajeError) {
  _accionesClaves++; _versionClaves++;
  return llamarClaves(url, metodo, cuerpo).then(d => {
   _accionesClaves--; _versionClaves++;
+  if (_clavesSucias && !_accionesClaves) setTimeout(pedirClavesYa, 0);   // llegó un aviso de cambio mientras esta acción iba en camino
   if (!d.ok) {
    if (copia) { restaurarClaves(copia); renderClaves(); }
    $('#resumen-claves').text('');
@@ -2309,18 +2353,53 @@ function avisarOtrasPestanas(msg) {
    Dos tonos cortos hechos con el navegador (no hay archivo de audio). Los navegadores solo dejan sonar después de que la persona
    toca o teclea algo en la página, por eso el audio se "desbloquea" con el primer clic o tecla de cada pestaña. */
 let _audioCtx = null, _sonidoPendiente = null, _tonosActivos = [];
+/* Sin retraso: el audio se pide con la latencia más baja ("interactive") y se "calienta" con un sonido mudo en el mismo toque que lo desbloquea
+   (así el primer tono ya no espera a que el navegador encienda la salida de audio). */
+function _calentarAudio() {
+ try {
+  const b = _audioCtx.createBuffer(1, 1, 22050), s = _audioCtx.createBufferSource();
+  s.buffer = b; s.connect(_audioCtx.destination); s.start(0);
+ } catch (e) {}
+}
 function desbloquearAudio() {
  try {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return;
-  if (!_audioCtx) _audioCtx = new AC();
-  if (_audioCtx.state === 'suspended') _audioCtx.resume().then(() => {
+  if (!_audioCtx) {
+   try { _audioCtx = new AC({latencyHint: 'interactive'}); } catch (e) { _audioCtx = new AC(); }
+   _calentarAudio();
+  }
+  // 'suspended' (normal) o 'interrupted' (iPhone tras una llamada o al bloquear la pantalla)
+  if (_audioCtx.state !== 'running') _audioCtx.resume().then(() => {
+   _calentarAudio();
    // Si el aviso llegó antes de que alguien tocara la página, suena en cuanto se toca
    if (_sonidoPendiente) { const v = _sonidoPendiente; _sonidoPendiente = null; sonarAviso(v); }
   }).catch(() => {});
  } catch (e) {}
 }
 ['pointerdown', 'keydown', 'touchstart'].forEach(ev => document.addEventListener(ev, desbloquearAudio, {passive: true}));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && _audioCtx && _audioCtx.state !== 'running') desbloquearAudio(); });
+/* Tono del lector (pistola USB / teclado): corto y agudo = registrado; dos graves = error. Si el audio aún se estaba despertando, suena en cuanto despierta (antes se perdía). */
+function tonoEscaneo(ok) {
+ const tocar = () => {
+  const t0 = _audioCtx.currentTime;
+  (ok ? [[1320, 0, 0.1]] : [[330, 0, 0.12], [330, 0.16, 0.12]]).forEach(([hz, ret, dur]) => {
+   const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
+   osc.type = 'square'; osc.frequency.value = hz;
+   vol.gain.setValueAtTime(0.0001, t0 + ret);
+   vol.gain.exponentialRampToValueAtTime(0.15, t0 + ret + 0.004);   // arranque casi instantáneo (antes 10 ms)
+   vol.gain.exponentialRampToValueAtTime(0.0001, t0 + ret + dur);
+   osc.connect(vol); vol.connect(_audioCtx.destination);
+   osc.start(t0 + ret); osc.stop(t0 + ret + dur + 0.05);
+  });
+ };
+ try {
+  desbloquearAudio();
+  if (!_audioCtx) return;
+  if (_audioCtx.state === 'running') tocar();
+  else _audioCtx.resume().then(() => { if (_audioCtx.state === 'running') tocar(); }).catch(() => {});
+ } catch (e) {}
+}
 /* veces = cuántas repeticiones del par de tonos (las solicitudes de contraseña suenan 3 veces para que se note) */
 function sonarAviso(veces) {
  try {
@@ -2333,7 +2412,7 @@ function sonarAviso(veces) {
     const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
     osc.type = 'sine'; osc.frequency.value = hz;
     vol.gain.setValueAtTime(0.0001, ini);
-    vol.gain.exponentialRampToValueAtTime(0.5, ini + 0.02);
+    vol.gain.exponentialRampToValueAtTime(0.5, ini + 0.006);   // el aviso empieza a sonar al instante (antes 20 ms de subida)
     vol.gain.exponentialRampToValueAtTime(0.0001, ini + 0.35);
     osc.connect(vol); vol.connect(_audioCtx.destination);
     osc.start(ini); osc.stop(ini + 0.4);
@@ -2374,7 +2453,9 @@ function mostrarAvisoLento(mostrar) {
 function entrarSiHaySesion() {
  if (rolActivo || _entrandoPorAviso) return;
  _entrandoPorAviso = true;
- const reloj = setTimeout(() => { if (!rolActivo) mostrarAvisoLento(true); }, 2500);   // pasados 2.5 s sin entrar: botón Recargar
+ // La barra "Entrando al sistema… Recargar" SOLO sale si el servidor confirmó que hay una sesión abierta y entrar tarda de verdad.
+ // Antes salía con solo esperar la respuesta (servidor lento o sin sesión) y aparecía cada vez que se volvía a la pestaña de inicio.
+ let reloj = null;
  const vigila = setInterval(() => { if (rolActivo) { limpiar(); mostrarAvisoLento(false); } }, 300);
  const limpiar = () => { clearTimeout(reloj); clearInterval(vigila); };
  fetchT('/auth/me?estado=1', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 8000)
@@ -2384,10 +2465,11 @@ function entrarSiHaySesion() {
    if (!d || !d.ok || rolActivo) { if (!rolActivo) { limpiar(); mostrarAvisoLento(false); } return; }   // sin sesión en el servidor: se queda en el login
    if (d.csrf) $('meta[name="csrf-token"]').attr('content', d.csrf);
    _esSecundaria = true;
+   reloj = setTimeout(() => { if (!rolActivo) mostrarAvisoLento(true); }, 2500);   // hay sesión y pasados 2.5 s aún no entra: botón Recargar
    restaurarSesion({rol: d.rol, nombre: d.nombre, email: d.email});
    setTimeout(limpiar, 60000);   // la vigilancia termina sola si pasado un minuto aún no entra
   })
-  .catch(() => { clearInterval(vigila); mostrarAvisoLento(true); })   // no hubo respuesta: se deja el botón para recargar
+  .catch(() => { limpiar(); mostrarAvisoLento(false); })   // sin respuesta del servidor: no hay nada que "entrar", se queda en el login sin avisos
   .then(() => { _entrandoPorAviso = false; });
 }
 /* Pestaña PRINCIPAL: otra pestaña (la secundaria) pidió atender una solicitud -> aquí se pide iniciar sesión como Control Escolar */
@@ -2533,7 +2615,15 @@ function consultarOlvidosInicio() {
   .then(r => { if (!r.ok) return null; const et = r.headers.get('ETag'); return r.json().then(d => { d._etag = et; return d; }); })
   .then(d => { if (d && d.ok && !rolActivo) { _etagOlvidos = d._etag; pintarBurbujas(d.roles || [], d.orientadores || [], false); } })
   .catch(() => {})
-  .then(() => { _consultandoOlvidos = false; });
+  .then(() => { _consultandoOlvidos = false; if (_olvidosSucios) pedirOlvidosYa(); });
+}
+/* Aviso instantáneo (pulso) en la pantalla de inicio: se consulta YA; si hay otra consulta en curso, se repite al terminar */
+let _olvidosSucios = false, _tickOlvidos = 0;
+function pedirOlvidosYa() {
+ if (rolActivo || _olvidoEnCurso) return;
+ if (_consultandoOlvidos) { _olvidosSucios = true; return; }
+ _olvidosSucios = false;
+ consultarOlvidosInicio();
 }
 /* Pulsar la burbuja (o "Dar acceso"). En la pestaña principal abre la solicitud aquí mismo; en una pestaña secundaria
    (la que entró sola por el aviso) manda a la pestaña principal a iniciar sesión como Control Escolar, rápido. */
@@ -2729,7 +2819,8 @@ function abrirModalCuenta(modo, mensaje) {
  if (modo === 'confirmar') {
   titulo = '¿Olvidaste tu contraseña?';
   texto = 'Avisa a Control Escolar. Tu cuenta (<b>' + esc(nombre) + '</b>) quedará bloqueada automáticamente y no podrás entrar hasta que Control Escolar borre tu contraseña anterior, genere una nueva y te dé acceso otra vez.';
-  botones = btn('Avisar a Control Escolar', 'btn-vinotinto', 'confirmarOlvido()');
+  botones = btn('Avisar a Control Escolar', 'btn-vinotinto', 'confirmarOlvido()') +
+   '<div class="w-100 text-center mt-2"><a href="#" class="small text-muted text-decoration-underline" onclick="cerrarModalCuenta(); return false;">Cancelar</a></div>';   // texto discreto debajo, como "Recargar sistema"
  } else if (modo === 'info') {
   titulo = 'Control Escolar';
   texto = mensaje;
@@ -2745,6 +2836,9 @@ function abrirModalCuenta(modo, mensaje) {
  $('#modal-cuenta').removeClass('d-none');
 }
 function cerrarModalCuenta() { $('#modal-cuenta').addClass('d-none'); }
+/* La ventana también se cierra tocando fuera de ella o con la tecla Esc (sin dejar al usuario atrapado) */
+$(document).on('click', '#modal-cuenta', function (e) { if (e.target === this && !_olvidoEnCurso) cerrarModalCuenta(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal-cuenta').hasClass('d-none') && !_olvidoEnCurso) cerrarModalCuenta(); });
 function olvideContrasena() {
  const rol = $('#rol-select').val();
  if (rol === 'orientador' && !$('#select-orientador-login').val()) { alert('Primero selecciona tu nombre de la lista.'); return; }
@@ -2765,7 +2859,9 @@ function confirmarOlvido(reintento) {
  // Respuesta al instante: para Director, Subdirector y Orientador el resultado ya se conoce (la cuenta queda bloqueada), así que se muestra
  // el aviso de "Cuenta bloqueada" en el acto y la petición va detrás. Si el servidor responde otra cosa o falla, ese mensaje lo reemplaza.
  // (Control Escolar no se bloquea desde aquí: ahí sí se espera la respuesta del servidor.)
- const optimista = rol !== 'control';
+ const optimista = true;   // todos los roles: el aviso sale en el acto
+ // Control Escolar no se bloquea desde aquí y el servidor siempre responde lo mismo: el mensaje sale YA, sin esperar la petición
+ if (rol === 'control') { _olvidoEnCurso = false; abrirModalCuenta('info', 'La cuenta de Control Escolar no se bloquea desde aquí. Avisa a quien administra el sistema: debe ejecutar en el servidor php artisan sica:restablecer-claves para asignar una contraseña nueva. No se pierde ningún dato.'); return; }
  if (optimista && !reintento) abrirModalCuenta('bloqueada', MENSAJE_OLVIDO_LOCAL);
  const btn = optimista ? $() : $('#modal-cuenta-botones button').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Enviando...');
  fetchT('/auth/olvide', {
@@ -2899,6 +2995,15 @@ function avisoRetardo(modo, minutos, limiteMin) {
 }
 /* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (y el retardo de entrada o de salida, si lo hubo) */
 const parRetardo = (modo, minutos) => minutos > 0 ? ' (Retardo de ' + (modo === 'Salida' ? 'salida' : 'entrada') + ': ' + durMin(minutos) + ')' : '';
+/* El aviso de tolerancia/retardo sale SOLO al final, cuando el alumno ya tiene entrada y salida: al registrar la entrada no se avisa nada.
+   Con la salida se avisa el retardo de entrada y el de salida (los que haya) en un solo mensaje. */
+function textoRetardoFinal(minEnt, minSal) {
+ const p = [];
+ if (minEnt > 0) p.push('Retardo de entrada: ' + durMin(minEnt));
+ if (minSal > 0) p.push('Retardo de salida: ' + durMin(minSal));
+ return p.join(' · ');
+}
+const parRetardoFinal = (minEnt, minSal) => { const t = textoRetardoFinal(minEnt, minSal); return t ? ' (' + t + ')' : ''; };
 function detalleRegistro(tipo, a, hora, extra) {
  // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
  let ori = '';
@@ -2977,24 +3082,37 @@ const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
 function mensajePrevioEscaneo(el, txt) {
  $('#res-' + el).removeClass('text-success text-danger').text(txt);
 }
+/* Cada lectura es una tarjeta propia en la lista de resultados (la más reciente arriba): se pueden pasar varias credenciales seguidas
+   sin esperar y ninguna se pisa. Devuelve una promesa con el resultado (o null si era la misma credencial leída otra vez). */
+const MAX_RESULTADOS = 6;
+function nuevaTarjetaResultado(el, txt) {
+ const caja = $('#res-' + el).removeClass('text-success text-danger');   // el color va en cada tarjeta
+ caja.contents().filter(function () { return this.nodeType === 3; }).remove();   // quita el mensaje de "Cámara lista"
+ const it = $('<div class="res-item res-pend">').text(txt);
+ caja.prepend(it);
+ caja.children('.res-item').slice(MAX_RESULTADOS).remove();
+ return it;
+}
+function pintarTarjetaResultado(it, r) {
+ // Verde = registrado. Rojo = error o, ya con entrada y salida, retardo (los minutos van dentro del mismo mensaje).
+ it.removeClass('res-pend res-ok res-ret res-err').addClass(!r.ok ? 'res-err' : (r.retardo ? 'res-ret' : 'res-ok')).text(r.msg);
+ if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
+}
+const ultimosQR = new Map();   // credencial -> hora de la última lectura (cada credencial se vigila por separado: A, B, A no se confunden)
 function procesarQR(curp, modo, el) {
- if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
- ultimo = {t:curp, ts:Date.now()};
- const mostrar = r => {
-  // Verde = registrado. Rojo = hubo un error. Si además pasó la tolerancia, abajo aparece en ROJO el aviso "Retardo de entrada / de salida".
-  // Con retardo TODO el texto (nombre, grupo, hora...) sale en rojo y abajo van los minutos u horas de retraso
-  const caja = $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok && !r.retardo ? 'text-success' : 'text-danger').empty();
-  $('<span>').text(r.msg).appendTo(caja);
-  if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
- };
- const r = registrarPorCurp(curp, modo);
- if (r && typeof r.then === 'function') {   // alumno que este equipo aún no tiene: lo busca el servidor
-  mensajePrevioEscaneo(el, 'Buscando alumno…');
-  r.then(mostrar);
- } else {   // el alumno ya está en este equipo: igual se ve primero "Buscando alumno…" y enseguida el resultado
-  mensajePrevioEscaneo(el, 'Buscando alumno…');
-  setTimeout(() => mostrar(r), 400);
+ const t = Date.now(), previo = ultimosQR.get(curp);
+ if (previo && t - previo < 4000) return Promise.resolve(null);   // misma credencial leída otra vez (la cámara la ve muchos cuadros seguidos)
+ ultimosQR.set(curp, t);
+ if (ultimosQR.size > 200) ultimosQR.forEach((v, k) => { if (t - v > 4000) ultimosQR.delete(k); });
+ let r;
+ try { r = registrarPorCurp(curp, modo); } catch (e) { r = {ok:false, msg:'No se pudo registrar: ' + e.message}; }
+ if (r && typeof r.then === 'function') {   // alumno que este equipo aún no tiene: lo busca el servidor (varios a la vez, cada uno en su tarjeta)
+  const it = nuevaTarjetaResultado(el, 'Buscando alumno…');
+  return r.then(x => { pintarTarjetaResultado(it, x); return x; });
  }
+ const it = nuevaTarjetaResultado(el, '');   // el alumno ya está en este equipo: resultado al instante, sin espera artificial
+ pintarTarjetaResultado(it, r);
+ return Promise.resolve(r);
 }
 let _guardarPend = null;
 /* Varios escaneos seguidos se juntan: como máximo cada 300 ms se guarda una copia local y se repinta la tabla.
@@ -3047,9 +3165,14 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
  guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
  // Retardo = pasó la hora límite del grupo MÁS su tolerancia: de entrada al entrar, de salida al salir (aunque no tenga entrada registrada)
- const lim = limiteDe(a), limiteMin = modo === 'Entrada' ? lim.retardo : lim.fin;
- const minRet = toMin(modo === 'Entrada' ? r.entrada : r.salida) - limiteMin;
- return {ok:true, retardo: avisoRetardo(modo, minRet, limiteMin), msg:detalleRegistro(modo, a, horaAhora(), '') + parRetardo(modo, minRet) +
+ // El retardo se avisa solo cuando ya hay entrada y salida (al escanear la salida); en la entrada no se muestra.
+ let minEnt = 0, minSal = 0;
+ if (modo === 'Salida') {
+  const lim = limiteDe(a);
+  minSal = Math.max(0, toMin(r.salida) - lim.fin);
+  if (r.entrada) minEnt = Math.max(0, toMin(r.entrada) - lim.retardo);
+ }
+ return {ok:true, retardo: textoRetardoFinal(minEnt, minSal), msg:detalleRegistro(modo, a, horaAhora(), '') + parRetardoFinal(minEnt, minSal) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 /*
@@ -3090,8 +3213,9 @@ function registrarDesconocido(curp, modo) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
    // El servidor avisa si ya pasó la tolerancia del grupo (de entrada o de salida)
-   const aviso = d.retardo ? avisoRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '';
-   return {ok:true, retardo: aviso, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '') + (d.retardo ? parRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '')};
+   // El servidor solo manda retardo cuando es la salida (ya con entrada y salida): retardo_entrada + retardo
+   const mEnt = d.retardo_entrada ? Number(d.retardo_entrada.minutos) || 0 : 0, mSal = d.retardo ? Number(d.retardo.minutos) || 0 : 0;
+   return {ok:true, retardo: textoRetardoFinal(mEnt, mSal), msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '') + parRetardoFinal(mEnt, mSal)};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
@@ -3144,22 +3268,7 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
  // Un campo oculto (de otro panel) que quedó con el foco no cuenta: no se está escribiendo en él
  // Solo cuentan los campos donde de verdad se escribe texto: un menú (Grado/Grupo), casilla o botón con el foco NO debe bloquear al lector
  const enCampo = el => !!el && ((el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|reset|file|range|color|image)$/i.test(el.type)) || el.isContentEditable) && el.offsetParent !== null;
- function tono(ok) {
-  try {
-   desbloquearAudio();
-   if (!_audioCtx || _audioCtx.state !== 'running') return;
-   const t0 = _audioCtx.currentTime;
-   (ok ? [[1320, 0, 0.12]] : [[330, 0, 0.14], [330, 0.2, 0.14]]).forEach(([hz, ret, dur]) => {
-    const osc = _audioCtx.createOscillator(), vol = _audioCtx.createGain();
-    osc.type = 'square'; osc.frequency.value = hz;
-    vol.gain.setValueAtTime(0.0001, t0 + ret);
-    vol.gain.exponentialRampToValueAtTime(0.15, t0 + ret + 0.01);
-    vol.gain.exponentialRampToValueAtTime(0.0001, t0 + ret + dur);
-    osc.connect(vol); vol.connect(_audioCtx.destination);
-    osc.start(t0 + ret); osc.stop(t0 + ret + dur + 0.05);
-   });
-  } catch (e) {}
- }
+ function tono(ok) { tonoEscaneo(ok); }   // el sonido vive arriba (tonoEscaneo), junto al del aviso
  function terminar() {
   clearTimeout(pausa); pausa = null;
   const crudo = buf, cb = campo; buf = ''; campo = null;
@@ -3175,9 +3284,8 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
    el.removeClass('text-success').addClass('text-danger').text('No tienes permiso para registrar. Se requiere autorización de Control Escolar.');
    tono(false); return;
   }
-  procesarQR(curp, d.modo, d.el);
-  // procesarQR escribe el resultado en #res-... (puede tardar si busca en el servidor): se suena según el color final
-  setTimeout(() => tono(!el.hasClass('text-danger')), 350);
+  // Cada lectura suena según SU propio resultado (pueden llegar varias seguidas)
+  procesarQR(curp, d.modo, d.el).then(r => { if (r) tono(!!r.ok); });
  }
  document.addEventListener('keydown', e => {
   if (!destino() || e.ctrlKey || e.altKey || e.metaKey) return;
@@ -3378,7 +3486,8 @@ function subirLista() {
  save(); guardarYa(); renderTabla(); if (credSel) selCred(credSel.grado, credSel.grupo);   // la lista ya va al servidor mientras se lee el aviso
  const hg = db.horarios[claveGrupo(filtro.grado, filtro.grupo, turnoActivo)], og = hg && hg.orientadorId ? db.orientadores.find(x => x.id === hg.orientadorId) : null;
  const sinCurp = db.alumnos.filter(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && !x.curp).length;
- alert('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.') + (curpsInvalidas.length ? '\n\nSe omitieron ' + curpsInvalidas.length + ' fila(s) con CURP no válida (debe tener 18 caracteres): ' + curpsInvalidas.slice(0, 8).join(', ') + (curpsInvalidas.length > 8 ? '…' : '') + '. Corrígelas en el archivo y súbelo otra vez.' : ''));
+ const _msgLista = ('Lista cargada en ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + '): ' + nuevos + ' alumno(s) nuevo(s), ' + actualizados + ' actualizado(s).\nOrientador(a) del grupo: ' + (og ? og.nombre : 'sin asignar todavía') + '.' + (sinCurp ? '\nOjo: ' + sinCurp + ' alumno(s) quedaron sin CURP (el archivo no lo traía).' : '\nTodos tienen CURP: su credencial ya está lista en el Portal del Alumno.') + (curpsInvalidas.length ? '\n\nSe omitieron ' + curpsInvalidas.length + ' fila(s) con CURP no válida (debe tener 18 caracteres): ' + curpsInvalidas.slice(0, 8).join(', ') + (curpsInvalidas.length > 8 ? '…' : '') + '. Corrígelas en el archivo y súbelo otra vez.' : ''));
+ if (sinCurp || curpsInvalidas.length) alert(_msgLista); else avisoRapido(_msgLista);   // lo importante (faltan CURP / filas omitidas) sigue como alerta; si todo salió bien, no bloquea la pantalla
  $('#archivo-lista').val('');
  }, msg => alert(msg));
 }
@@ -3400,7 +3509,7 @@ function borrarListaGrupo() {
  _postSync('eliminar_lista_grupo', {grado: g, grupo: n, turno: t}, 30000).then(r => {
   if (!r.ok) return Promise.reject();
   ids.forEach(id => _firmasGuardadas.delete(id));
-  alert('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
+  avisoRapido('Lista borrada: ' + lista.length + ' alumno(s) eliminados del ' + g + '° grado, grupo ' + n + ' (' + t + ').');
  }).catch(() => {
   const hay = new Set(db.alumnos.map(a => a.id));
   lista.forEach(a => { if (!hay.has(a.id)) db.alumnos.push(a); });
@@ -4004,6 +4113,7 @@ function subirPlantillaOficial(lado) {
    const fallo = res.find(x => !x.ok);
    if (fallo) throw fallo.error;
   }).then(() => {
+   _ignorarPlantillasHasta = Date.now() + 2500;   // el aviso de cambio de esta misma subida no hace falta: ya se ve en este equipo
    turnos.forEach(t => { origenPlantilla[t + '-' + lado] = 'servidor'; });
    actualizarBotonesPlantilla();
    caja.removeClass('text-muted text-danger').addClass('text-success')
@@ -4026,6 +4136,7 @@ function restaurarPlantillaOficial() {
  if (!lados.length) { alert('La plantilla original del turno ' + t + ' ya fue eliminada, por eso no se puede restaurar.'); return; }
  if (!confirm('¿Volver a la plantilla original del turno ' + t + '?')) return;
  const cab = {'Accept':'application/json','X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''};
+ _ignorarPlantillasHasta = Date.now() + 2500;   // este equipo ya se actualiza solo: no hace falta el aviso de su propio cambio
  Promise.all(lados.map(l => fetch('/api/sica/plantilla-oficial/' + t + '/' + l, {method:'DELETE', headers: cab}).catch(() => {})))
   .then(() => { plantillasDefault[t] = {frente: null, reverso: null}; cargarPlantillasDefault(true); });
  $('#resumen-plantilla-oficial').removeClass('text-danger').addClass('text-success').text('Se restauró la plantilla original del turno ' + t);
@@ -4053,6 +4164,9 @@ function eliminarPlantillaAnterior() {
   .catch(() => ({ok: false, mensaje: 'No hubo conexión con el servidor.'}))
  )).then(res => {
   const mal = res.filter(r => !r.ok);
+  // Se marca como eliminado AL INSTANTE lo que el servidor confirmó (antes se volvía a preguntar archivo por archivo y los botones tardaban en cambiar)
+  res.forEach((r, i) => { if (r.ok) existeOriginal[ARCHIVOS_PLANTILLA[t][lados[i]]] = false; });
+  actualizarBotonesPlantilla();
   revisarOriginales();
   if (mal.length) caja.removeClass('text-muted text-success').addClass('text-danger').text(mal.map(r => r.mensaje).filter((v, i, a) => a.indexOf(v) === i).join(' '));
   else caja.removeClass('text-muted text-danger').addClass('text-success').text('Listo: la plantilla anterior del turno ' + t + ' se eliminó para siempre. Sigue en uso la plantilla nueva.');
@@ -4203,7 +4317,7 @@ function guardarCambiosCredencial() {
  if (!confirm('¿Guardar los cambios de este alumno?\nNombre: ' + nombre + '\nCURP: ' + curp)) return;
  a.curp = curp; a.nombre = nombre; save();
  actualizarVistaPreviaCredencial();
- alert('Cambios guardados en la credencial.');
+ avisoRapido('Cambios guardados en la credencial.');
 }
 /*
  * Dibuja la vista previa en vivo de frente y reverso mientras se edita al alumno,
@@ -4464,8 +4578,60 @@ window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredencial
  */
 var _rafagaHasta = 0;
 function acelerarSync(ms) { _rafagaHasta = Math.max(_rafagaHasta, Date.now() + (ms || 6000)); }
+/*
+ * ---- Aviso instantáneo de cambios (pulso) ----
+ * Cada cambio que acepta el servidor (escaneo, guardado, borrado, plantilla subida, contraseña desbloqueada...) sube un contador que
+ * public/pulso.php entrega SIN arrancar Laravel ni tocar la base de datos (~1 ms). Cada equipo (computadora o celular) lo pregunta
+ * unas 2 veces por segundo y, en cuanto cambia, descarga SOLO lo que cambió. Resultado: los cambios se ven en menos de un segundo en todos los equipos.
+ * Si el aviso no responde (servidor viejo, sin red), todo sigue funcionando con las consultas de siempre (que quedan como respaldo).
+ */
+const PULSO_MS = ES_MOVIL ? 600 : 450, PULSO_OCULTA_MS = 3000, ESTADO_MIN_MS = 600;
+let _pulsoPrev = null, _pulsoEnCurso = false, _pulsoFallos = 0, _pulsoOkHasta = 0, _ignorarPlantillasHasta = 0;
+let _ultimoPedidoEstado = 0, _pedidoEstadoPend = null;
+function _pulsoVivo() { return _pulsoOkHasta > Date.now(); }
+/* Descarga el estado ya, pero no más de una vez cada ESTADO_MIN_MS (con muchos escaneos seguidos se juntan en una sola descarga) */
+function pedirEstadoYa() {
+ if (!rolActivo) return;
+ const falta = ESTADO_MIN_MS - (Date.now() - _ultimoPedidoEstado);
+ if (falta > 0) {
+  if (!_pedidoEstadoPend) _pedidoEstadoPend = setTimeout(() => { _pedidoEstadoPend = null; pedirEstadoYa(); }, falta);
+  return;
+ }
+ _ultimoPedidoEstado = Date.now();
+ acelerarSync();
+ Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {});
+}
+function alCambiarPulso(p) {
+ const a = _pulsoPrev; _pulsoPrev = p;
+ if (!a) return;   // primera lectura: solo se guarda como punto de partida
+ if (p.e !== a.e) pedirEstadoYa();
+ if (p.c !== a.c) { if (rolActivo === 'control') pedirClavesYa(); else if (!rolActivo) pedirOlvidosYa(); }
+ // Plantilla nueva subida o borrada desde otro equipo: se vuelve a leer (el teléfono del orientador solo escanea y no la usa)
+ if (p.p !== a.p && rolActivo && !(ES_MOVIL && rolActivo === 'orientador') && Date.now() > _ignorarPlantillasHasta) {
+  try { cargarPlantillasDefault(true); } catch (e) {}
+ }
+}
+function consultarPulso() {
+ if (_pulsoEnCurso) return;
+ _pulsoEnCurso = true;
+ fetchT('/pulso.php', {cache: 'no-store', credentials: 'omit'}, 4000)
+  .then(r => r.ok ? r.json() : Promise.reject(new Error('pulso')))
+  .then(p => {
+   if (!p || typeof p.e === 'undefined') throw new Error('pulso');
+   _pulsoFallos = 0; _pulsoOkHasta = Date.now() + 5000;
+   alCambiarPulso(p);
+  })
+  .catch(() => { if (++_pulsoFallos >= 3) _pulsoOkHasta = 0; })   // sin respuesta 3 veces: vuelven las consultas normales (más rápidas)
+  .then(() => { _pulsoEnCurso = false; });
+}
+function programarPulso() {
+ setTimeout(() => { consultarPulso(); programarPulso(); }, document.hidden ? PULSO_OCULTA_MS : PULSO_MS);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) consultarPulso(); });   // al volver a la pestaña se entera al momento
+window.addEventListener('online', () => { consultarPulso(); if (rolActivo) pedirEstadoYa(); });
 function programarConsulta() {
- const espera = Date.now() < _rafagaHasta ? 800 : (ES_MOVIL ? 1500 : 1500);
+ // Con el pulso activo esta consulta es solo un respaldo; sin él, se consulta seguido como antes
+ const espera = _pulsoVivo() ? 5000 : (Date.now() < _rafagaHasta ? 1200 : (ES_MOVIL ? 3500 : 3000));
  setTimeout(() => {
   const p = (rolActivo && !document.hidden) ? Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {}) : Promise.resolve();
   p.then(programarConsulta);
@@ -4501,6 +4667,7 @@ $(function () {
  // Todos los equipos consultan al servidor (computadoras cada 3 s, teléfonos cada 5 s) para ver los mismos datos;
  // se pausa si la pestaña está oculta para no gastar datos ni servidor
  programarConsulta();
+ consultarPulso(); programarPulso();   // aviso instantáneo de cambios (ver arriba)
  setInterval(() => { if (!document.hidden) vigilarPermanencia(); }, 20000);
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
@@ -4509,7 +4676,8 @@ $(function () {
   * Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde "sin cambios" (304) si nada cambió y
   * guarda la respuesta 1 s). Las otras pestañas del mismo equipo se enteran al instante por un canal interno.
   */
- consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 500);
+ // Con el aviso instantáneo (pulso) activo esta consulta es solo un respaldo (cada 6 s); sin él, sigue cada 2 s como antes
+ consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden && !_olvidoEnCurso && (!_pulsoVivo() || ++_tickOlvidos % 3 === 0)) consultarOlvidosInicio(); }, 2000);
  if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Modo sin internet (service worker): permite abrir el sistema sin internet (solo funciona en https o localhost)
@@ -4523,7 +4691,7 @@ $(function () {
    const bar = document.createElement('button');
    bar.id = 'barra-version-nueva'; bar.type = 'button';
    bar.textContent = 'Hay una versión nueva. Toca aquí para actualizar';
-   bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:2200;background:#800020;color:#fff;border:0;border-radius:.6rem;padding:.7rem 1.1rem;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:calc(100vw - 24px)';
+   bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:2200;background:#800020;color:#fff;border:0;border-radius:.3rem;padding:.7rem 1.1rem;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:calc(100vw - 24px)';
    bar.onclick = () => location.reload();
    document.body.appendChild(bar);
   };

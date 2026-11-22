@@ -6,7 +6,7 @@
  * - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
-const VERSION = 'sica-v37';
+const VERSION = 'sica-v38';
 const C_ESTATICOS = VERSION + '-estaticos';
 const C_PAGINAS = VERSION + '-paginas';
 
@@ -72,7 +72,7 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;   // siempre al servidor
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/') || url.pathname === '/pulso.php') return;   // siempre al servidor
 
   // Páginas: primero el servidor; si no hay internet, la copia guardada
   if (req.mode === 'navigate') {

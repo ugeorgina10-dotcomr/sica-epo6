@@ -33,7 +33,7 @@ class ControlEscolarController extends Controller
 
         // Cualquier cambio actualiza la marca de versión: los demás equipos ven el cambio en su próxima consulta
         $respuesta = $this->ejecutarAccion($validado, $esControl);
-        Cache::forget('sica.huella');
+        $this->olvidarMarcas();
 
         return $respuesta;
     }
@@ -292,12 +292,7 @@ class ControlEscolarController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'Datos de escaneo inválidos'], 422);
         }
 
-        if (!empty($d['curp'])) {
-            $alumno = $this->alumnosLote[$d['curp']] ?? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->where('matricula', $d['curp'])->first();
-        } else {
-            $id = $this->mapaQr()[substr(strtolower($d['qr']), 0, 16)] ?? null;   // acepta también los códigos largos (20) de la versión anterior
-            $alumno = $id ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->find($id) : null;
-        }
+        $alumno = $this->buscarAlumno($d);
         if (!$alumno) {
             return response()->json(['ok' => false, 'mensaje' => 'Alumno no encontrado'], 404);
         }
@@ -316,7 +311,7 @@ class ControlEscolarController extends Controller
 
         $hora      = $ahora->format('H:i');
         $fechaHora = $ahora->format('Y-m-d H:i:00');
-        $grupo     = $this->gruposLote[$alumno->grupo_id] ?? Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida')->find($alumno->grupo_id);
+        $grupo     = $this->gruposLote[$alumno->grupo_id] ?? $this->grupoCacheado((int) $alumno->grupo_id);
 
         $modo = $d['modo'] ?? 'Auto';
 
@@ -328,8 +323,12 @@ class ControlEscolarController extends Controller
             $hoy = collect($this->asistenciasDeLote($alumno->id))
                 ->filter(fn ($x) => substr($x->fecha_hora, 0, 10) === $dia)->sortBy('fecha_hora')->values();
         } else {
-            $hoy = Asistencia::where('alumno_id', $alumno->id)
-                ->whereDate('fecha_hora', $ahora->toDateString())->orderBy('fecha_hora')->get();
+            // Rango de fechas (en vez de whereDate): así la base de datos usa el índice (alumno_id, fecha_hora) y no recorre toda la tabla
+            $dia = $ahora->toDateString();
+            $hoy = collect(DB::table('asistencias')->where('alumno_id', $alumno->id)
+                ->where('fecha_hora', '>=', $dia . ' 00:00:00')
+                ->where('fecha_hora', '<', $ahora->copy()->addDay()->toDateString() . ' 00:00:00')
+                ->orderBy('fecha_hora')->get(['fecha_hora', 'estatus']));
         }
         $entrada = $hoy->first(fn ($x) => $x->estatus !== 'Salida');
         $salida  = $hoy->first(fn ($x) => $x->estatus === 'Salida');
@@ -364,9 +363,8 @@ class ControlEscolarController extends Controller
         }
 
         // Una salida en el mismo minuto que la entrada no debe pisarla: se anota un minuto después
-        $mismoMinutoEntrada = $this->enLote
-            ? collect($this->asistenciasDeLote($alumno->id))->contains(fn ($x) => $x->fecha_hora === $fechaHora && $x->estatus !== 'Salida')
-            : Asistencia::where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->where('estatus', '!=', 'Salida')->exists();
+        // (sin otra consulta: los registros de hoy ya están leídos arriba)
+        $mismoMinutoEntrada = $hoy->contains(fn ($x) => substr((string) $x->fecha_hora, 0, 19) === $fechaHora && $x->estatus !== 'Salida');
         if ($estatus === 'Salida' && $mismoMinutoEntrada) {
             $fechaHora = $ahora->copy()->addMinute()->format('Y-m-d H:i:00');
         }
@@ -387,17 +385,30 @@ class ControlEscolarController extends Controller
                 $this->nuevasLote[] = ['alumno_id' => $alumno->id, 'estatus' => $estatus, 'fecha_hora' => $fechaHora, 'created_at' => now(), 'updated_at' => now()];
             }
         } else {
-            // Si el teléfono reintenta el mismo escaneo no se duplica el registro (se actualiza el que ya existe)
-            Asistencia::updateOrCreate(
-                ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],
-                ['estatus' => $estatus]
-            );
+            // Si el teléfono reintenta el mismo escaneo no se duplica el registro (se actualiza el que ya existe).
+            // Antes eran 2 consultas (buscar + guardar); ahora el registro de hoy ya está leído y solo se hace UNA.
+            $existente = $hoy->first(fn ($x) => substr((string) $x->fecha_hora, 0, 19) === $fechaHora);
+            if (!$existente) {
+                DB::table('asistencias')->insert(['alumno_id' => $alumno->id, 'estatus' => $estatus, 'fecha_hora' => $fechaHora, 'created_at' => now(), 'updated_at' => now()]);
+            } elseif ($existente->estatus !== $estatus) {
+                DB::table('asistencias')->where('alumno_id', $alumno->id)->where('fecha_hora', $fechaHora)->update(['estatus' => $estatus, 'updated_at' => now()]);
+            }
         }
 
         $partes = $grupo ? explode(' ', $grupo->nombre) : [];
 
         // Retardo ya pasada la tolerancia del grupo: de entrada (al entrar) o de salida (al salir). 0 minutos = a tiempo.
-        $minutosRetardo = $grupo ? $grupo->minutosRetardo($modo, (int) $ahora->format('G') * 60 + (int) $ahora->format('i')) : 0;
+        // El aviso de retardo sale SOLO al final, cuando ya hay entrada y salida: al escanear la entrada no se avisa nada; al escanear la salida se
+        // avisa el retardo de entrada (si lo hubo) y el de salida (si lo hubo) en el mismo mensaje.
+        $minutosRetardo = 0;
+        $minutosRetardoEntrada = 0;
+        if ($grupo && $modo === 'Salida') {
+            $minutosRetardo = $grupo->minutosRetardo('Salida', (int) $ahora->format('G') * 60 + (int) $ahora->format('i'));
+            if ($entrada) {
+                $horaEntrada = Carbon::parse($entrada->fecha_hora);
+                $minutosRetardoEntrada = $grupo->minutosRetardo('Entrada', (int) $horaEntrada->format('G') * 60 + (int) $horaEntrada->format('i'));
+            }
+        }
 
         return response()->json([
             'ok'      => true,
@@ -405,7 +416,8 @@ class ControlEscolarController extends Controller
             'hora'    => $hora,
             'estatus' => $estatus,
             'modo'    => $modo,
-            'retardo' => $minutosRetardo > 0 ? ['tipo' => $modo === 'Salida' ? 'salida' : 'entrada', 'minutos' => $minutosRetardo] : null,
+            'retardo' => $minutosRetardo > 0 ? ['tipo' => 'salida', 'minutos' => $minutosRetardo] : null,
+            'retardo_entrada' => $minutosRetardoEntrada > 0 ? ['tipo' => 'entrada', 'minutos' => $minutosRetardoEntrada] : null,
             // A qué grupo se mandó el registro (para mostrarlo en el teléfono)
             'alumno'  => [
                 'nombre' => $alumno->nombre,
@@ -520,25 +532,109 @@ class ControlEscolarController extends Controller
         return hash_hmac('sha256', 'sica-qr-v1', (string) config('app.key'));
     }
 
-    /** código QR => id de alumno (se guarda unos minutos; solo cuenta la CURP de cada alumno) */
-    private function mapaQr(): array
-    {
-        // La llave depende SOLO de los alumnos (antes también de las asistencias, y cada escaneo obligaba a calcular de nuevo el código de todos los alumnos)
-        $h = DB::table('alumnos')->selectRaw('COUNT(*) c, MAX(id) i, MAX(updated_at) u')->first();
+    /** Llaves de caché que cambian con cualquier guardado (se borran en sync()) */
+    private const K_HUELLAS  = 'sica.huellas.v2';
+    private const K_HALU     = 'sica.halu.v1';
+    private const K_ORI_HASH = 'sica.orih.v1';
+    private const K_GRUPOS   = 'sica.grupos.v2';
 
-        return Cache::remember('sica.mapaqr.v3.' . md5(json_encode($h)), 1800, function () {
-            $mapa = [];
-            foreach (DB::table('alumnos')->whereNotNull('matricula')->where('matricula', '!=', '')->select('id', 'matricula')->cursor() as $a) {
-                $mapa[self::codigoQr($a->matricula)] = $a->id;
-            }
-            return $mapa;
-        });
+    /**
+     * Borra las marcas guardadas en este servidor. Las demás copias del sistema (por ejemplo la de Render, que comparte base de datos)
+     * las renuevan solas en pocos segundos, porque todas estas marcas duran muy poco.
+     */
+    private function olvidarMarcas(): void
+    {
+        foreach ([self::K_HUELLAS, self::K_HALU, self::K_ORI_HASH, self::K_GRUPOS] as $k) {
+            Cache::forget($k);
+        }
+    }
+
+    /** Marca de versión de la tabla de alumnos (se guarda 5 s: así un escaneo no la consulta cada vez) */
+    private function huellaAlumnos(bool $fresca = false): string
+    {
+        if (!$fresca && is_string($v = Cache::get(self::K_HALU))) {
+            return $v;
+        }
+        $h = DB::table('alumnos')->selectRaw('COUNT(*) c, MAX(id) i, MAX(updated_at) u')->first();
+        $v = md5(json_encode($h));
+        Cache::put(self::K_HALU, $v, 5);
+
+        return $v;
+    }
+
+    /**
+     * Índice de alumnos para escanear sin tocar la base de datos: código QR => id, CURP => id e id => [nombre, grupo, CURP].
+     * Se arma una vez y se renueva solo si la tabla de alumnos cambió (solo cuenta la CURP de cada alumno).
+     */
+    private function indiceAlumnos(bool $fresca = false): array
+    {
+        $h = $this->huellaAlumnos($fresca);
+        $c = Cache::get('sica.indice.v1');
+        if (is_array($c) && ($c['h'] ?? null) === $h) {
+            return $c;
+        }
+
+        $qr = $curp = $info = [];
+        foreach (DB::table('alumnos')->whereNotNull('matricula')->where('matricula', '!=', '')->select('id', 'matricula', 'nombre', 'grupo_id')->cursor() as $a) {
+            $id = (int) $a->id;
+            $qr[self::codigoQr($a->matricula)] = $id;
+            $curp[strtoupper($a->matricula)]   = $id;
+            $info[$id] = [$a->nombre, (int) $a->grupo_id, $a->matricula];
+        }
+        $c = ['h' => $h, 'qr' => $qr, 'curp' => $curp, 'info' => $info];
+        Cache::put('sica.indice.v1', $c, 1800);
+
+        return $c;
+    }
+
+    /**
+     * Alumno de un escaneo (por CURP o por código del QR) sin consultar la base de datos: sale del índice.
+     * Si no aparece (p. ej. se dio de alta hace unos segundos) se renueva el índice una vez antes de decir "no encontrado".
+     */
+    private function buscarAlumno(array $d): ?object
+    {
+        $porCurp = !empty($d['curp']);
+        if ($porCurp && isset($this->alumnosLote[$d['curp']])) {
+            return $this->alumnosLote[$d['curp']];
+        }
+
+        $buscar = function (array $indice) use ($d, $porCurp): ?int {
+            return $porCurp
+                ? ($indice['curp'][strtoupper((string) $d['curp'])] ?? null)
+                : ($indice['qr'][substr(strtolower((string) $d['qr']), 0, 16)] ?? null);   // acepta también los códigos largos (20) de la versión anterior
+        };
+
+        $id = $buscar($this->indiceAlumnos()) ?? null;
+        $indice = null;
+        if ($id === null) {
+            $indice = $this->indiceAlumnos(true);
+            $id = $buscar($indice);
+        }
+        if ($id === null) {
+            return null;
+        }
+
+        $info = ($indice ?? $this->indiceAlumnos())['info'][$id] ?? null;
+
+        return $info ? (object) ['id' => $id, 'nombre' => $info[0], 'grupo_id' => $info[1], 'matricula' => $info[2]] : null;
+    }
+
+    /** Grupos (con horarios) guardados 5 s: un escaneo no tiene que volver a pedirlos a la base de datos */
+    private function gruposCacheados(): array
+    {
+        return Cache::remember(self::K_GRUPOS, 5, fn () => Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida')->get()->keyBy('id')->all());
+    }
+
+    private function grupoCacheado(int $id): ?Grupo
+    {
+        return $this->gruposCacheados()[$id]
+            ?? Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida')->find($id);
     }
 
     /** Nombres de orientadores para la pantalla de inicio de sesión (se recalcula solo si la tabla cambió) */
     public static function orientadoresLogin(): array
     {
-        $h = DB::table('orientadores')->selectRaw('COUNT(*) c, MAX(updated_at) u')->first();
+        $h = Cache::remember(self::K_ORI_HASH, 5, fn () => DB::table('orientadores')->selectRaw('COUNT(*) c, MAX(updated_at) u')->first());
 
         return Cache::remember('sica.orientadores.' . md5(json_encode($h)), 600, fn () => DB::table('orientadores')
             ->select('id', 'nombre')->orderBy('nombre')->get()
@@ -546,41 +642,51 @@ class ControlEscolarController extends Controller
     }
 
     /**
-     * Marca de versión sencilla del estado: si no cambió nada, no se vuelve a calcular ni a armar la respuesta.
-     * Usa 5 consultas rápidas de conteo; cubre altas, bajas y cambios.
+     * Marcas de versión del estado: 'total' cambia con cualquier escaneo o cambio; 'base' solo cuando cambian alumnos, grupos, orientadores o permisos.
+     * Si no cambió nada, no se vuelve a calcular ni a armar la respuesta. UNA sola consulta (con la base de datos en la nube cada ida y vuelta pesa).
      */
-    private function huellaEstado(): string
+    private function huellas(): array
     {
-        return Cache::remember('sica.huella', 1, fn () => $this->calcularHuella());
+        return Cache::remember(self::K_HUELLAS, 1, fn () => $this->calcularHuellas());
     }
 
-    private function calcularHuella(): string
+    private function huellaEstado(): string
     {
-        // UNA sola consulta (antes eran 5): con la base de datos en la nube cada ida y vuelta al servidor tarda decenas de milisegundos
+        return $this->huellas()['total'];
+    }
+
+    private function calcularHuellas(): array
+    {
+        // En asistencias NO se cuenta (contar toda la tabla se vuelve lento al crecer): basta el último id y la última modificación.
+        // Las bajas de asistencias solo ocurren al borrar alumnos, y eso sí cambia el conteo de alumnos.
         $filas = DB::select(
-            "select 'asistencias' as t, count(*) as c, max(id) as i, max(updated_at) as u from asistencias
+            "select 'asistencias' as t, 0 as c, max(id) as i, max(updated_at) as u from asistencias
              union all select 'alumnos', count(*), 0, max(updated_at) from alumnos
              union all select 'grupos', count(*), 0, max(updated_at) from grupos
              union all select 'orientadores', count(*), 0, max(updated_at) from orientadores
              union all select 'permisos', count(*), 0, max(updated_at) from permisos"
         );
 
-        return md5(json_encode($filas));
+        return [
+            'total' => md5(json_encode($filas)),
+            'base'  => md5(json_encode(array_slice($filas, 1))),
+        ];
     }
 
     /** Todos los datos para que computadoras y teléfonos los descarguen */
     public function estado(Request $request): JsonResponse
     {
         // "-q2": si cambia la forma de los datos (llave del QR), los equipos con la versión anterior descargan todo de nuevo
-        $huella = $this->huellaEstado() . '-q2';
-        $etag   = '"' . $huella . '"';
+        $huellas = $this->huellas();
+        $huella  = $huellas['total'] . '-q2';
+        $etag    = '"' . $huella . '"';
 
         // Responde al instante "sin cambios" (304): el navegador ya tiene la versión actual (sin leer asistencias ni armar la respuesta)
         if ($request->header('If-None-Match') === $etag || $request->header('If-None-Match') === 'W/' . $etag) {
             return response()->json(null, 304)->setEtag($huella);
         }
 
-        $datos = Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado());
+        $datos = Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado($huellas['base']));
 
         $respuesta = response()->json($datos);
         $respuesta->setEtag($huella);
@@ -591,37 +697,88 @@ class ControlEscolarController extends Controller
     /** Lo mismo que /api/sica/estado, pero incluido en la página al abrirla con sesión iniciada (misma versión guardada y misma marca) */
     public function paraPagina(): array
     {
-        $huella = $this->huellaEstado() . '-q2';
+        $huellas = $this->huellas();
+        $huella  = $huellas['total'] . '-q2';
 
         return [
             'etag'  => '"' . $huella . '"',
-            'datos' => Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado()),
+            'datos' => Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado($huellas['base'])),
         ];
     }
 
-    private function construirEstado(): array
+    /** Deja listo todo lo que pide el primer visitante (al encender el servidor): despierta la base de datos y llena las cachés */
+    public function calentar(): void
+    {
+        DB::select('select 1');
+        $this->indiceAlumnos();
+        $this->gruposCacheados();
+        self::orientadoresLogin();
+        $this->paraPagina();
+    }
+
+    /**
+     * Entrada (la más temprana) y salida (la más tardía) por alumno y día, de las asistencias que cumplan la condición de fecha.
+     * El agrupado lo hace la base de datos: viaja una fila por alumno y día en vez de una por cada escaneo.
+     *
+     * @return array<int, array<string, array{entrada?: string, salida?: string}>>
+     */
+    private function agruparRegistros(string $operador, string $corte): array
+    {
+        $regs = [];
+        $filas = DB::table('asistencias')
+            ->where('fecha_hora', $operador, $corte)
+            ->selectRaw("alumno_id, DATE(fecha_hora) as dia, MIN(CASE WHEN estatus <> 'Salida' THEN fecha_hora END) as ent, MAX(CASE WHEN estatus = 'Salida' THEN fecha_hora END) as sal")
+            ->groupByRaw('alumno_id, DATE(fecha_hora)')
+            ->cursor();
+
+        foreach ($filas as $x) {
+            $r = [];
+            if ($x->ent !== null) {
+                $r['entrada'] = substr((string) $x->ent, 11, 5);
+            }
+            if ($x->sal !== null) {
+                $r['salida'] = substr((string) $x->sal, 11, 5);
+            }
+            $regs[(int) $x->alumno_id][substr((string) $x->dia, 0, 10)] = $r;
+        }
+
+        return $regs;
+    }
+
+    /**
+     * Registros de todos los alumnos. Los días ya cerrados (más de 5 días atrás) casi nunca cambian: se guardan armados y solo se
+     * vuelven a leer si cambiaron (se revisa con una consulta de conteo). Así cada escaneo solo obliga a leer los últimos días,
+     * y no todo el historial como antes.
+     */
+    private function registrosPorAlumno(): array
+    {
+        $corte = now()->subDays(5)->startOfDay()->format('Y-m-d H:i:s');
+        $h     = DB::selectOne('select count(*) as c, max(id) as i, max(updated_at) as u from asistencias where fecha_hora < ?', [$corte]);
+        $firma = md5($corte . '|' . json_encode($h));
+
+        $guardado = Cache::get('sica.estado.hist.v1');
+        if (is_array($guardado) && ($guardado['firma'] ?? null) === $firma) {
+            $regs = $guardado['datos'];
+        } else {
+            $regs = $this->agruparRegistros('<', $corte);
+            Cache::put('sica.estado.hist.v1', ['firma' => $firma, 'datos' => $regs], 172800);
+        }
+
+        foreach ($this->agruparRegistros('>=', $corte) as $alumnoId => $dias) {
+            foreach ($dias as $dia => $r) {
+                $regs[$alumnoId][$dia] = $r;
+            }
+        }
+
+        return $regs;
+    }
+
+    /** Lo que solo cambia si cambian alumnos, grupos, orientadores o permisos (sin asistencias) */
+    private function construirBase(): array
     {
         $grupos = DB::table('grupos')
             ->select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida', 'orientador_id')
             ->get()->keyBy('id');
-
-        // Entrada (la más temprana) y salida (la más tardía) por alumno y día.
-        // Se leen fila por fila: sin crear un objeto por cada asistencia y sin cargar todo en memoria.
-        $regs = [];
-        foreach (DB::table('asistencias')->select('alumno_id', 'estatus', 'fecha_hora')->orderBy('alumno_id')->cursor() as $x) {
-            $f = substr((string) $x->fecha_hora, 0, 10);
-            $h = substr((string) $x->fecha_hora, 11, 5);
-            $r = &$regs[$x->alumno_id][$f];
-
-            if ($x->estatus === 'Salida') {
-                if (empty($r['salida']) || $h > $r['salida']) {
-                    $r['salida'] = $h;
-                }
-            } elseif (empty($r['entrada']) || $h < $r['entrada']) {
-                $r['entrada'] = $h;
-            }
-            unset($r);
-        }
 
         $horarios = [];
         $info     = [];   // por grupo: [grado, grupo, turno] se calcula una sola vez
@@ -650,6 +807,7 @@ class ControlEscolarController extends Controller
             [$grado, $grupo, $turno] = $info[$a->grupo_id];
 
             $alumnos[] = [
+                'dbid'   => (int) $a->id,   // solo para unir sus registros; no se envía
                 // Alumno sin CURP: su id es el que le puso el navegador (así todos los equipos lo reconocen)
                 'id'     => ($a->matricula !== null && $a->matricula !== '') ? (string) $a->id : (string) ($a->client_key ?: 'srv-' . $a->id),
                 'curp'   => (string) ($a->matricula ?? ''),
@@ -658,7 +816,6 @@ class ControlEscolarController extends Controller
                 'grado'  => $grado,
                 'grupo'  => $grupo,
                 'turno'  => $turno,
-                'reg'    => (object) ($regs[$a->id] ?? []),
             ];
         }
 
@@ -676,6 +833,28 @@ class ControlEscolarController extends Controller
                 ->map(fn ($o) => ['id' => (string) $o->id, 'nombre' => $o->nombre])->values()->all(),
             'permisos'     => $permisos,
         ];
+    }
+
+    private function construirEstado(string $huellaBase): array
+    {
+        // La base (alumnos, horarios...) se guarda con su marca y solo se rehace si esas tablas cambiaron
+        $guardada = Cache::get('sica.estado.base.v1');
+        if (is_array($guardada) && ($guardada['firma'] ?? null) === $huellaBase) {
+            $base = $guardada['datos'];
+        } else {
+            $base = $this->construirBase();
+            Cache::put('sica.estado.base.v1', ['firma' => $huellaBase, 'datos' => $base], 172800);
+        }
+
+        $regs = $this->registrosPorAlumno();
+
+        foreach ($base['alumnos'] as &$a) {
+            $a['reg'] = (object) ($regs[$a['dbid']] ?? []);
+            unset($a['dbid']);
+        }
+        unset($a);
+
+        return $base;
     }
 
     /** Elimina un alumno (por CURP, o por su id si todavía no tiene CURP) junto con todos sus registros de asistencia */

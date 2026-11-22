@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use Illuminate\Foundation\Console\ServeCommand;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Sustituye a `php artisan serve` (se usa igual: --host, --port...) para que el sistema abra y responda más rápido:
@@ -33,16 +35,54 @@ class ServirRapido extends ServeCommand
         'memory_limit=256M',
     ];
 
-    public function handle()
+    /**
+     * Laravel decide cuántos procesos usar en initialize() (ANTES de handle()) y solo respeta PHP_CLI_SERVER_WORKERS si se usa --no-reload.
+     * Antes la variable se ponía en handle(), demasiado tarde: el servidor siempre atendía de UNO en UNO y una petición pesada
+     * (un guardado grande, una actualización) hacía esperar a la página y a los demás equipos. Aquí se activa en el momento correcto.
+     */
+    protected function initialize(InputInterface $input, OutputInterface $output)
     {
-        // Atiende a varias personas a la vez: sin esto, un guardado o una subida grande hacía esperar a los demás equipos
-        if (stripos(PHP_OS, 'WIN') !== 0 && empty($_ENV['PHP_CLI_SERVER_WORKERS']) && !getenv('PHP_CLI_SERVER_WORKERS')) {
-            $_ENV['PHP_CLI_SERVER_WORKERS'] = '4';
+        // Windows no permite varios procesos en el servidor de PHP; en Linux, Mac y Codespaces sí
+        if (stripos(PHP_OS, 'WIN') !== 0) {
+            if (empty($_ENV['PHP_CLI_SERVER_WORKERS']) && !getenv('PHP_CLI_SERVER_WORKERS')) {
+                $_ENV['PHP_CLI_SERVER_WORKERS'] = '64';
+                putenv('PHP_CLI_SERVER_WORKERS=64');
+            }
+            // Sin esto Laravel ignora los procesos extra (solo cambia que un cambio en .env pide reiniciar el sistema a mano)
+            if ($input->hasOption('no-reload')) {
+                $input->setOption('no-reload', true);
+            }
         }
 
+        // La conexión a la base de datos se mantiene abierta entre peticiones (con una base de datos en la nube, abrirla en cada
+        // visita tardaba cientos de milisegundos). Solo se activa al encender el sistema con este comando.
+        $_ENV['DB_PERSISTENT'] = 'true';
+        putenv('DB_PERSISTENT=true');
+        if (!in_array('DB_PERSISTENT', static::$passthroughVariables, true)) {
+            static::$passthroughVariables[] = 'DB_PERSISTENT';
+        }
+
+        parent::initialize($input, $output);
+    }
+
+    public function handle()
+    {
         // Deja las pantallas preparadas (si falla no pasa nada: se preparan al usarlas)
         try {
             $this->callSilently('view:cache');
+        } catch (\Throwable $e) {
+        }
+
+        // Aplica mejoras pendientes de la base de datos (por ejemplo índices nuevos); si no hay nada nuevo no hace nada
+        try {
+            $this->callSilently('migrate', ['--force' => true]);
+        } catch (\Throwable $e) {
+        }
+
+        // Despierta la base de datos y llena las cachés ANTES de abrir: así la primera visita en el navegador ya es rápida
+        $this->components->info('Preparando el sistema (despertando la base de datos)...');
+        try {
+            $this->callSilently('sica:calentar');
         } catch (\Throwable $e) {
         }
 

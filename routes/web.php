@@ -37,7 +37,7 @@ Route::post('/auth/login', [AuthController::class, 'login'])->middleware('thrott
 // por eso tiene un límite de 5 veces por minuto. Al no usar sesión, el sistema trabaja menos en cada petición.
 Route::post('/auth/olvide', [AuthController::class, 'olvide'])
     ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class])
-    ->middleware('throttle:5,1,olvide')
+    ->middleware(['throttle:5,1,olvide', 'pulso:c'])   // pulso:c = el aviso le llega a Control Escolar al instante
     ->name('auth.olvide');
 // Aviso para Control Escolar en la pantalla de inicio: quién pidió una contraseña nueva (burbuja y sonido). No necesita sesión, igual que /auth/olvide.
 Route::get('/api/sica/olvidos', [AuthController::class, 'olvidos'])
@@ -74,22 +74,23 @@ Route::middleware('auth')->group(function () {
     // Guardado general de datos (del navegador al servidor) y escaneos del teléfono.
     // El sistema revisa el rol y el permiso según lo que se quiera hacer.
     Route::post('/api/sica/sync', [ControlEscolarController::class, 'sync'])
-        ->middleware('sica:sync')
+        ->middleware(['sica:sync', 'pulso:sync'])
         ->name('sica.sync');
 
     // Plantilla oficial de credenciales (frente y reverso): solo Control Escolar
+    // (pulso:p = al subir o borrar, las demás computadoras y celulares ven la plantilla nueva al instante)
     Route::post('/api/sica/plantilla-oficial/{lado}', [ControlEscolarController::class, 'plantillaOficial'])
         ->whereIn('lado', ['frente', 'reverso'])
-        ->middleware('sica:control')
+        ->middleware(['sica:control', 'pulso:p'])
         ->name('sica.plantilla');
 
     Route::delete('/api/sica/plantilla-oficial/{turno}/{lado}', [ControlEscolarController::class, 'borrarPlantillaOficial'])
-        ->middleware('sica:control')
+        ->middleware(['sica:control', 'pulso:p'])
         ->name('sica.plantilla.borrar');
 
     // Borra PARA SIEMPRE el archivo de Word anterior (el original de public/plantillas) cuando ya se usa uno nuevo
     Route::delete('/api/sica/plantilla-oficial/{turno}/{lado}/anterior', [ControlEscolarController::class, 'eliminarPlantillaAnterior'])
-        ->middleware('sica:control')
+        ->middleware(['sica:control', 'pulso:p'])
         ->name('sica.plantilla.anterior');
 
     // Contraseñas: solo Control Escolar (cambiar la de cada rol y poner una propia a cada orientador).
@@ -98,7 +99,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('sica:control')->prefix('/api/sica/claves')->group(function () {
         Route::get('/', [ClavesController::class, 'index'])->middleware('throttle:300,1,claves-leer')->name('sica.claves');
 
-        Route::middleware('throttle:90,1,claves')->group(function () {
+        Route::middleware(['throttle:90,1,claves', 'pulso:c'])->group(function () {
             Route::post('/rol', [ClavesController::class, 'rol'])->name('sica.claves.rol');
             Route::post('/orientador', [ClavesController::class, 'orientador'])->name('sica.claves.orientador');
             Route::delete('/rol/{rol}', [ClavesController::class, 'borrarRol'])->name('sica.claves.borrar.rol');
