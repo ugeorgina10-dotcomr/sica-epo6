@@ -12,15 +12,13 @@
 <meta name="apple-mobile-web-app-title" content="SICA-EPO6">
 <link rel="apple-touch-icon" href="{{ asset('img/logo6.png') }}">
 <link rel="preload" as="image" href="{{ asset('img/logo6.png') }}">
-{{-- Fondo: WebP ligero con prioridad alta. Celular (pantalla angosta) baja una versión de ~40 KB; computadora, una de ~100 KB.
-     El JPG queda de respaldo para navegadores viejos. Mientras baja se ve una miniatura borrosa incrustada en el CSS (aparece al instante). --}}
+{{-- Fondo: imagen ligera (WebP) con prioridad alta. En celular baja una versión de ~40 KB; en computadora, una de ~100 KB. El JPG queda de respaldo para navegadores viejos. Mientras baja se ve una miniatura borrosa que aparece al instante. --}}
 <link rel="preload" as="image" href="{{ asset('img/epo6-movil.webp') }}" type="image/webp" media="(max-width: 820px)" fetchpriority="high">
 <link rel="preload" as="image" href="{{ asset('img/epo6.webp') }}" type="image/webp" media="(min-width: 821px)" fetchpriority="high">
-{{-- Librerías servidas desde public/vendor (sin CDN): así el sistema abre aunque no haya internet --}}
+{{-- Librerías guardadas en public/vendor (sin depender de internet): así el sistema abre aunque no haya conexión --}}
 <link href="{{ asset('vendor/bootstrap.min.css') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}">
-{{-- Todas las librerías empiezan a bajar YA, en paralelo con la página (antes esperaban a que se pintara y se bajaban por grupos).
-     Mismas URLs (?v=21) que usa el cargador de abajo: al pedirlas salen de aquí. Las fuentes de iconos también. --}}
+{{-- Todas las librerías empiezan a bajar YA, al mismo tiempo que la página (antes esperaban a que se mostrara y se bajaban por grupos). Usan las mismas direcciones (?v=21) que el cargador de más abajo, así que al pedirlas ya están listas. Las fuentes de iconos también. --}}
 @foreach (['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js', 'chart.umd.min.js', 'html5-qrcode.min.js'] as $lib)
 <link rel="preload" as="script" href="{{ asset('vendor/' . $lib) }}?v=21">
 @endforeach
@@ -38,11 +36,11 @@
 .bg-sin-reg{background:#ffc107 !important;color:#212529 !important}
 tr.fila-sin-reg>td{background:#fff3cd !important}
 body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;color:#333;margin:0}
-/* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del login, con brillo y color originales. */
+/* Fondo epo6.jpg: public/img/epo6.jpg. Se ve a partir del inicio de sesión, con brillo y color originales. */
 .bg-escuela{min-height:100vh;background-color:#757362 !important;background-position:center !important;background-size:cover !important;background-repeat:no-repeat !important;background-attachment:fixed !important;
  /* capas: 1) oscurecido leve, 2) foto, 3) miniatura borrosa de 32 px (la que se ve mientras la foto baja) */
  background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),url("{{ asset('img/epo6.jpg') }}"),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}
-/* Si el navegador sabe WebP usa la imagen ligera; si no entiende image-set() ignora estas reglas y queda el JPG de arriba */
+/* Si el navegador soporta WebP usa la imagen ligera; si no, ignora estas reglas y queda el JPG de arriba */
 .bg-escuela{background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),image-set(url("{{ asset('img/epo6.webp') }}") type("image/webp"),url("{{ asset('img/epo6.jpg') }}") type("image/jpeg")),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}
 @media (max-width:820px){.bg-escuela{background-image:linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.12)),image-set(url("{{ asset('img/epo6-movil.webp') }}") type("image/webp"),url("{{ asset('img/epo6.jpg') }}") type("image/jpeg")),url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAUACADASIAAhEBAxEB/8QAGAAAAwEBAAAAAAAAAAAAAAAAAAMEBgX/xAAnEAACAQQBAwIHAAAAAAAAAAABAgADBBESIhMhMSNRQWFxgZGh4f/EABYBAQEBAAAAAAAAAAAAAAAAAAIAA//EABgRAQEBAQEAAAAAAAAAAAAAAAIBACEx/9oADAMBAAIRAxEAPwCG3tqxuEFYdKk5BL/BfnNJReiMIayFQBz95w36pA2R8AYGYhrcbH03A+8EVPTqCP3aO7qW/QdeVQkYAXI/cz9SzYVgQxBY5y2OI94yz3pB15akg6kSiodyMUtu3kLkiFpXt1BDpqQ7ShXceHb8mEIlmc9GZsbMT9THDsP7CExW0m//2Q==") !important}}
 #input-clave::-ms-reveal,#input-clave::-ms-clear{display:none}
@@ -69,67 +67,48 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .tarjeta-grado:hover{box-shadow:0 6px 16px rgba(0,0,0,.12)}
 .tarjeta-grado.seleccionada{border:2px solid #800020 !important;background:#fdf8f8 !important}
 .tarjeta-grado.grado-desactivado{opacity:.4;pointer-events:none;cursor:not-allowed}
+/* Tarjetas de grado: en columna y centradas (grado arriba y luego asistencias, retardo entrada y retardo salida, uno debajo del otro) */
+#vista-sistema .btn.tarjeta-grado{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.25rem;text-align:center}
 .preview-credencial{width:100%;max-width:340px;border:1px solid #dee2e6;border-radius:10px;background:#eee;display:block;margin:0 auto}
 .preview-plantilla{height:240px;object-fit:contain;object-position:center;background:#fff}
 /* Vista previa de la plantilla oficial: frente y reverso con el mismo alto y alineados arriba */
 .slot-prev-plantilla{min-height:150px;display:flex;align-items:flex-start;justify-content:center}
 .slot-prev-plantilla canvas.preview-credencial{max-width:100%;margin:0}
-.badge-asignado{font-size:.7rem}
+.badge-asignado{font-size:.85rem}
 /* ===== Responsivo ===== */
 @media (max-width:767.98px){
-.form-control,.form-select{font-size:16px;min-height:46px} /* 16px evita el zoom automático de iPhone */
-.btn{min-height:44px}
+.form-control,.form-select{font-size:16px;min-height:46px} /* 16px evita que el iPhone haga zoom automático */
 .main-card,.login-card{padding:1.5rem !important;border-radius:16px}
 .institution-logo{width:90px;height:90px}
 .small-logo{width:55px;height:55px}
 h2.fw-bold{font-size:1.4rem}
-h5.fw-bold{font-size:1.05rem}
 #selector-pestanas-superior .profile-card{padding:.75rem !important}
 #selector-pestanas-superior .profile-card i{font-size:1.1rem !important}
-#selector-pestanas-superior .profile-card h6{font-size:.75rem}
 .camera-box-ref{max-width:100%}
-.table-responsive table{font-size:.75rem}
-.d-flex.justify-content-between.align-items-center.mb-2.flex-wrap.gap-2 .badge{font-size:.75rem}
-#stats-grados .grado-btn{font-size:.8rem}
 }
 @media (max-width:575.98px){
-.btn-lg.rounded-pill{padding:.75rem 1.25rem !important;font-size:1rem !important}
-.row.g-2.mb-4.justify-content-center .btn{font-size:.75rem}
 #vista-sistema .d-flex.justify-content-between.align-items-center.mb-2.flex-wrap.gap-2{flex-direction:column;align-items:flex-start !important;gap:.75rem !important}
 #vista-sistema .d-flex.align-items-center.gap-2{width:100%;justify-content:space-between}
-.d-flex.justify-content-center.gap-3.mb-3.flex-wrap .btn{flex:1 1 45%;font-size:.8rem;white-space:normal}
-.d-flex.gap-2.flex-wrap .btn{flex:1 1 100%}
 #panel-control .row.text-center.mb-4.g-3 > div{margin-bottom:.5rem}
 .card.main-card{padding:1rem !important}
 }
 @media (max-width:400px){
 .institution-logo{width:70px;height:70px}
 h2.fw-bold{font-size:1.15rem}
-.btn{font-size:.9rem}
 }
 canvas#grafica-asistencias{max-width:100%;height:auto !important}
 /* Botones: texto siempre centrado y del mismo alto, sin importar el ancho de la ventana (pantalla dividida incluida) */
-#vista-sistema .btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;text-align:center;line-height:1.25;white-space:normal;font-size:.95rem;font-weight:600;padding:.5rem 1rem;max-width:100%;overflow-wrap:break-word}
-#vista-sistema td .btn,#vista-sistema th .btn,#vista-sistema .table .btn{white-space:nowrap;overflow-wrap:normal;flex-shrink:0}
-#vista-sistema .btn.btn-sm{font-size:.875rem;padding:.4rem .8rem;min-height:38px}
-#vista-sistema .btn.small{font-size:.9rem}
 #vista-sistema .btn .fa,#vista-sistema .btn .fas,#vista-sistema .btn i{flex:0 0 auto}
 /* Celular y pantalla dividida: el botón que va solo en su columna ocupa todo el ancho, con la misma letra que los demás */
 @media (max-width:767.98px){
- #vista-sistema .row>[class*="col-"]>.btn:only-child,#vista-sistema .row>[class*="col-"]>button.btn{width:100%}
- #vista-sistema .btn{font-size:.95rem;min-height:44px}
- #vista-sistema .btn.btn-sm{font-size:.9rem;min-height:40px}
  .btn-cuenta{white-space:normal;text-align:left}
- .ori-hor .btn,.ori-hor .btn.btn-sm{flex:1 1 140px}
 }
 .grupo-botones{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
-.grupo-botones .btn{min-width:130px}
 .grupo-botones .form-select{width:auto}
 @media (max-width:991.98px){
  .cab-centrable{justify-content:center !important;text-align:center}
  .cab-centrable>*{justify-content:center}
  .grupo-botones{justify-content:center;width:100%}
- .grupo-botones .btn{flex:1 1 130px;max-width:240px}
  #stats-grados>div{flex:0 0 100%;max-width:100%}
  #panel-control .row.text-center>div{flex:0 0 100%;max-width:100%}
 }
@@ -175,7 +154,7 @@ body.modo-movil #bloque-tabla-orientador th:nth-child(3),body.modo-movil #bloque
 body.modo-movil #bloque-tabla-orientador th:nth-child(4),body.modo-movil #bloque-tabla-orientador td:nth-child(4),
 body.modo-movil #bloque-tabla-orientador th:nth-child(7),body.modo-movil #bloque-tabla-orientador td:nth-child(7),
 body.modo-movil #bloque-tabla-orientador th:nth-child(9),body.modo-movil #bloque-tabla-orientador td:nth-child(9){display:none}
-body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;padding:.9rem}
+body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem}
 /* ---- Orientadores: lista desplegable ---- */
 .ori-desplegable{border:1.5px solid #d9c3c8;border-radius:.75rem;background:#fff;overflow:hidden}
 .ori-desplegable>summary{cursor:pointer;padding:.55rem .9rem;font-weight:600;color:#5a1020;list-style:none}
@@ -218,7 +197,136 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .burbuja .burbuja-mudo{border:1px solid rgba(255,255,255,.7);background:transparent;color:#fff;border-radius:.5rem;font-size:.8rem;font-weight:600;padding:.2rem .6rem;cursor:pointer}
 .burbuja .burbuja-mudo:hover{background:rgba(255,255,255,.15)}
 .burbuja.silenciada{background:#5c1a2c}
+/* Avisos de guardado (horarios y tolerancias): misma burbuja que las alertas de cuentas */
+.burbuja.aviso-error{background:#b00020}
+.burbuja.aviso-ok .aviso-ico{margin-right:.4rem}
+/* Botón rojo con borde: siempre legible (antes se veía desvanecido) */
+.btn-outline-danger{color:#b00020;border-color:#b00020;background:#fff;opacity:1}
+.btn-outline-danger:hover,.btn-outline-danger:focus,.btn-outline-danger:focus-visible,.btn-outline-danger:active{color:#fff !important;background:#b00020 !important;border-color:#b00020 !important;opacity:1}
 @keyframes burbujaEntra{from{opacity:0;transform:translateY(-12px) scale(.95)}to{opacity:1;transform:none}}
+/* ===== ACCESIBILIDAD Y USABILIDAD =====
+   Botones y campos más grandes (objetivo táctil de 44-48 px), letra legible, foco visible con teclado, buen contraste y avisos claros. */
+.burbujas-claves{max-width:380px}
+/* Botones blancos con borde (turno no elegido, Entrada/Salida): al pasar el mouse o enfocarlos el texto se volvía blanco sobre blanco y no se leía */
+.btn-outline-dark.bg-white:hover,.btn-outline-dark.bg-white:focus,.btn-outline-dark.bg-white:focus-visible,.btn-outline-dark.bg-white:active{color:#212529 !important;background-color:#f3e3e7 !important;border-color:#800020 !important}
+#vista-sistema .form-control,#vista-sistema .form-select,.main-card .form-control,.main-card .form-select,.login-card .form-control,.login-card .form-select{min-height:48px;font-size:1rem}
+#vista-sistema .form-control-sm,#vista-sistema .form-select-sm,#vista-sistema .input-group-sm>.form-control,#vista-sistema .input-group-sm>.input-group-text{min-height:44px;font-size:1rem;padding-top:.4rem;padding-bottom:.4rem}
+#vista-sistema .form-check-input{width:1.4em;height:1.4em;margin-top:.15em}
+#vista-sistema .form-check-label{padding-left:.3rem}
+.text-muted{color:#505a63 !important}   /* contraste alto sobre fondo claro */
+.res-scan{min-height:28px;font-size:1.05rem;font-weight:700;line-height:1.4}
+.res-scan.text-success{color:#0b6b3a !important}
+.res-scan.text-danger{color:#b00020 !important}
+/* Aviso de retardo al escanear (entrada o salida) en ROJO, con ícono y borde para que no dependa solo del color */
+.res-retardo{color:#b00020;background:#fdecee;border-left:6px solid #b00020;border-radius:.4rem;padding:.55rem .8rem;font-size:1.15rem;font-weight:800}
+.hor-estado{font-size:.95rem}
+.hor-estado.text-success{color:#0b6b3a !important}
+.hor-estado.text-danger{color:#b00020 !important}
+.ori-hor [aria-invalid="true"]{border-color:#b00020;box-shadow:0 0 0 .2rem rgba(176,0,32,.2)}
+#lista-horarios-actual .ori-lista{max-height:70vh}
+.ori-desplegable>summary{min-height:48px;padding:.8rem 1rem;font-size:1rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.ori-desplegable>summary::after{float:none}
+.btn-cuenta{min-height:44px;font-size:.95rem}
+.dd-item{min-height:44px;font-size:1rem}
+.burbuja-x{width:44px;height:44px;top:0;right:0;font-size:1.7rem;opacity:1}
+.burbuja .burbuja-mudo{min-height:44px;font-size:.95rem;padding:.4rem .9rem}
+#selector-pestanas-superior .profile-card{min-height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.profile-card:hover{border-color:#800020}
+/* Foco claro al navegar con el teclado (Tab) */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,.profile-card:focus-visible,[tabindex]:focus-visible{outline:3px solid #1d4ed8 !important;outline-offset:2px;box-shadow:0 0 0 6px #fff !important}
+@media (max-width:767.98px){
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}
+
+/* ===== Retardo: todo el mensaje en rojo ===== */
+.res-scan.text-danger,.res-scan.text-danger *{color:#b00020 !important}
+.res-retardo{font-size:1.2rem}
+td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
+.txt-ret-ent,.txt-ret-sal{color:#b00020}
+/* ===== Botones más grandes ===== */
+/* ===== Pantalla dividida y celular: nada se sale ni se corta ===== */
+#vista-sistema :is(p,span,div,label,h1,h2,h3,h4,h5,h6,summary,li,small,.alert,.badge){overflow-wrap:anywhere}
+#bloque-tabla-orientador td,#bloque-tabla-orientador th,.table-responsive td,.table-responsive th{overflow-wrap:normal}
+.res-scan,.res-retardo,.hor-estado,.resumen-txt,[id^="resumen-"]{overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+#vista-sistema .row>*{min-width:0}
+#vista-sistema .input-group{flex-wrap:nowrap}
+#vista-sistema .input-group>.form-control{min-width:0}
+#vista-sistema .form-select{max-width:100%;text-overflow:ellipsis}
+#vista-sistema .btn{max-width:100%}
+@media (max-width:991.98px){
+ .ori-hor .col-xl-2,.ori-hor .col-xl-4{flex:0 0 auto;width:50%}
+ .ori-hor .col-xl-4{width:100%}
+ .ori-hor .col-12{width:100%}
+ .ori-item{flex-wrap:wrap}
+ .ori-item>.d-flex{width:100%}
+}
+@media (max-width:575.98px){
+ .ori-hor .col-xl-2{width:100%}
+ .res-retardo{font-size:1.05rem;padding:.5rem .6rem}
+ .res-scan{font-size:1rem}
+}
+
+/* =====================================================================
+   SISTEMA UNIFICADO DE BOTONES Y TEXTO  (una sola fuente de verdad)
+   Todo botón mide lo mismo y usa la misma letra, sin importar si trae btn-sm, btn-lg, py-*, px-*, fs-* o el ancho de la pantalla.
+   Para cambiar el tamaño de TODOS los botones o textos del sistema, solo se editan estas variables.
+   ===================================================================== */
+:root{
+ --btn-h:40px;          /* alto de todos los botones (objetivo táctil cómodo) */
+ --btn-fs:.95rem;        /* letra de todos los botones */
+ --btn-px:1.1rem;      /* relleno lateral */
+ --btn-radius:.6rem;
+ --btn-minw:0px;        /* sin ancho mínimo: cada botón mide lo que necesita su texto */
+ --fs-base:1rem;        /* texto normal, etiquetas, tablas */
+ --fs-small:.95rem;     /* texto secundario (.small) */
+ --fs-badge:.85rem;     /* etiquetas / insignias */
+}
+body{font-size:var(--fs-base);line-height:1.5}
+/* --- Texto: misma escala en todas las pantallas --- */
+body .small,body small,body .form-text{font-size:var(--fs-small) !important}
+body .form-label,body .form-check-label{font-size:var(--fs-base) !important}
+body .badge,body .badge-asignado{font-size:var(--fs-badge) !important;font-weight:600}
+body .table,body .table-responsive table{font-size:.95rem !important}
+body .table code,body .table .badge{font-size:inherit}
+body .table .badge{font-size:var(--fs-badge) !important}
+body h6,body .modal-cuenta-caja h6{font-size:1rem !important}
+body h5,body h5.fw-bold{font-size:1.15rem !important}
+body .cct-text,body .hor-estado,body #badge-rol-activo{font-size:var(--fs-small) !important}
+body .burbuja{font-size:var(--fs-base)}
+body .btn-cuenta .etq,body .dd-item .etq{font-size:var(--fs-badge) !important}
+body .dd-item,body .modal-cuenta-caja p{font-size:var(--fs-base)}
+/* --- Botones: mismo alto, misma letra, texto centrado --- */
+body .btn:not(.btn-close):not(.btn-icono),
+body .btn-cuenta,
+body .burbuja .burbuja-mudo{
+ display:inline-flex;align-items:center;justify-content:center;gap:.45rem;box-sizing:border-box;
+ height:auto;min-height:var(--btn-h) !important;
+ padding:.4rem var(--btn-px) !important;
+ font-family:inherit;font-size:var(--btn-fs) !important;font-weight:600 !important;line-height:1.25 !important;
+ letter-spacing:0 !important;text-transform:none !important;text-align:center;
+ border-radius:var(--btn-radius) !important;
+ white-space:normal;overflow-wrap:break-word;max-width:100%;
+}
+body .btn:not(.btn-close):not(.btn-icono){min-width:var(--btn-minw)}
+body .btn *{font-size:inherit !important;font-weight:inherit !important;line-height:inherit !important;letter-spacing:inherit !important;text-transform:none !important}
+body .btn .fa,body .btn .fas,body .btn .far,body .btn i{font-size:1.1em !important;width:auto;flex:0 0 auto}
+body .btn.btn-icono{display:inline-flex;align-items:center;justify-content:center;min-width:var(--btn-h) !important;width:var(--btn-h);min-height:var(--btn-h) !important;padding:0 !important;font-size:var(--btn-fs) !important;border-radius:var(--btn-radius) !important}
+.btn.rounded-pill{border-radius:var(--btn-radius) !important}
+/* En tablas el botón no se parte en dos líneas */
+#vista-sistema td .btn,#vista-sistema th .btn,#panel-cuenta-clave .btn{white-space:nowrap}
+/* Filas de botones: se reparten el ancho por igual y bajan de renglón si no caben (nada se corta) */
+.d-flex.flex-wrap{min-width:0}
+.btn-vinotinto,.btn-vinotinto:hover{color:#fff}
+/* Botones que van en pareja (turnos, Entrada/Salida, Excel/PDF, cámara): mismo ancho para que no varíen */
+body #btn-turno-matutino,body #btn-turno-vespertino,body #btn-turno-lector-matutino,body #btn-turno-lector-vespertino,body #btn-turno-cred-matutino,body #btn-turno-cred-vespertino,
+body #btn-modo-entrada,body #btn-modo-salida,body #btn-orient-entrada,body #btn-orient-salida,
+body .btn.btn[onclick^="descargarReporte"],body .btn.btn[onclick^="descargarGraficas"],body .btn.btn[onclick^="activarCamara"],body .btn.btn[onclick^="apagarCamara"],body .btn.btn[onclick^="detener("],body #btn-activar-camara-orientador{min-width:170px}
+/* Entrar al sistema: un poco más grande que el resto, es la acción principal */
+body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')"]{min-height:56px !important;font-size:1.2rem !important;padding:.6rem 1.5rem !important;border-radius:.7rem !important;width:100%}
+/* Avisos (burbujas): los botones de abajo ocupan todo el ancho y miden igual */
+.burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
+/* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
+a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:var(--fs-small);font-weight:400}
 </style>
 </head>
 <body id="cuerpo-contenedor" class="bg-login">
@@ -235,7 +343,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <p class="cct-text mb-0">C.C.T. 15EBH0008G (Matutino) &nbsp;|&nbsp; C.C.T. 15EBH0199N (Vespertino)</p>
 </div>
  <button onclick="mostrarSeccion('vista-login')" class="btn btn-vinotinto btn-lg rounded-pill py-3 px-5 shadow fs-5">
- INGRESAR AL SISTEMA
+ BIENVENIDO
 </button>
 </div>
 <!-- ============ LOGIN ============ -->
@@ -257,8 +365,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <option value="control">Encargado de Control Escolar</option>
  </select>
  </div>
- <!-- Solo aparece cuando el rol elegido es Orientador: selecciona su nombre de la lista que
- subió Control Escolar. El grupo se calcula solo, no lo elige el orientador. -->
+ <!-- Solo aparece cuando el rol elegido es Orientador: ahí se elige su nombre de la lista que subió Control Escolar. El grupo se calcula solo, el orientador no lo elige. -->
  <div id="campo-orientador-login" class="mb-3 d-none">
  <label class="form-label">Selecciona tu nombre</label>
  <select id="select-orientador-login" class="form-select shadow-sm">
@@ -311,8 +418,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="row g-2 text-center justify-content-center" id="fila-pestanas">
  @foreach([['alumno','fa-user-graduate','Portal del Alumno'],['lector','fa-qrcode','Lector Fijo (Entrada/Salida)'],['orientador','fa-users-rectangle','Panel de Orientadores'],['control','fa-user-gear','Control Escolar']] as $t)
  <div class="col-md-3 col-tab-pestana">
- <div id="tab-{{ $t[0] }}" onclick="seleccionarPerfil('{{ $t[0] }}')" class="profile-card p-3">
- <i class="fa-solid {{ $t[1] }} mb-1 text-secondary" style="font-size:1.4rem"></i>
+ <div id="tab-{{ $t[0] }}" role="button" tabindex="0" aria-pressed="false" onclick="seleccionarPerfil('{{ $t[0] }}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();seleccionarPerfil('{{ $t[0] }}')}" class="profile-card p-3">
+ <i class="fa-solid {{ $t[1] }} mb-1 text-secondary" style="font-size:1.4rem" aria-hidden="true"></i>
  <h6 class="fw-bold m-0 text-dark small">{{ $t[2] }}</h6>
  </div>
  </div>
@@ -435,26 +542,25 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <!-- ===== 2. LECTOR FIJO (no visible para Director/Subdirector) ===== -->
 <div id="panel-lector" class="panel-perfil d-none">
  <div class="p-3 bg-light rounded-4 border mb-3 text-center">
- <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Lector Fijo - Control de Entradas y Salidas</h6>
- {{-- Por defecto el modo es AUTOMÁTICO: el sistema detecta el grupo del alumno y, según el horario del grupo, registra Entrada o Salida.
-      Pulsar Entrada o Salida fuerza ese modo; pulsar el mismo botón otra vez regresa a Automático. --}}
+ <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020">Lector Fijo - Control de Entradas y Salidas</h6>
+ {{-- Por defecto el modo es AUTOMÁTICO: el sistema detecta el grupo del alumno y, según el horario del grupo, registra Entrada o Salida. Pulsar Entrada o Salida fuerza ese modo; pulsar el mismo botón otra vez regresa a Automático. --}}
  <div class="d-flex justify-content-center gap-2 mb-1 flex-wrap">
  <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
- <p id="txt-modo-lector" class="small fw-semibold mb-3" style="color:#198754">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
+ <p id="txt-modo-lector" class="small fw-semibold mb-3" style="color:#0b6b3a" role="status" aria-live="polite">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
  <div class="camera-box-ref mb-2 border shadow-sm">
  <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
- <div id="res-cam-fija" class="res-scan mb-2"></div>
+ <div id="res-cam-fija" class="res-scan mb-2" role="status" aria-live="polite"></div>
  <button onclick="activarCamaraFija()" class="btn btn-vinotinto px-4 py-2 rounded-pill shadow-sm small">Activar Cámara</button>
  <button onclick="apagarCamaraFija()" class="btn btn-dark py-2 px-3 rounded-pill small">Apagar</button>
  </div>
  <!-- SOLO CONTROL ESCOLAR: registros de entradas y salidas (el buscador y la tabla se pasan aquí desde el Panel de Orientadores) -->
  <div id="lector-registros-control" class="d-none">
  <div class="p-3 bg-light rounded-4 border shadow-sm mb-3">
- <h6 class="fw-bold mb-2 text-uppercase" style="color:#800020;font-size:.9rem">Registros de Entradas y Salidas</h6>
+ <h6 class="fw-bold mb-2 text-uppercase" style="color:#800020">Registros de Entradas y Salidas</h6>
  <div class="row g-2">
  <div class="col-12 d-flex justify-content-center gap-2 flex-wrap mb-1">
  <button onclick="setTurno('Matutino')" id="btn-turno-lector-matutino" class="btn btn-vinotinto px-4 py-2 fw-semibold shadow-sm small">Turno Matutino</button>
@@ -522,8 +628,9 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-12">
  <label class="form-label small">Orden de los nombres en el archivo</label>
  <select id="orden-nombre-lista" class="form-select form-select-sm">
- <option value="reordenar" selected>Vienen como Nombre(s) + Apellidos (reordenar a Apellido paterno, materno y nombre)</option>
+ <option value="auto" selected>Detectar solo (si ya trae un orden se respeta; si no, se acomoda con la CURP o se deja como viene)</option>
  <option value="tal-cual">Ya vienen como Apellido paterno, materno y nombre (no cambiar)</option>
+ <option value="reordenar">Vienen como Nombre(s) + Apellidos (reordenar a Apellido paterno, materno y nombre)</option>
  </select>
  </div>
  </div>
@@ -533,8 +640,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
  <h6 class="fw-bold mb-0" style="color:#800020">Grupos cargados</h6>
  <div class="d-flex flex-wrap gap-2">
- <button type="button" onclick="grpSeleccionarTodos(true)" class="btn btn-outline-dark btn-sm py-0 px-2">Seleccionar todos</button>
- <button type="button" onclick="grpSeleccionarTodos(false)" class="btn btn-outline-secondary btn-sm py-0 px-2">Quitar selección</button>
+ <button type="button" onclick="grpSeleccionarTodos(true)" class="btn btn-outline-dark btn-sm">Seleccionar todos</button>
+ <button type="button" onclick="grpSeleccionarTodos(false)" class="btn btn-outline-secondary btn-sm">Quitar selección</button>
  </div>
  </div>
  <div id="lista-grupos-cargados" class="small"></div>
@@ -551,7 +658,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div id="bloque-orientadores-control" class="p-3 bg-light rounded-4 border shadow-sm mb-4 d-none">
  <h6 class="fw-bold mb-2" style="color:#800020">Subir Lista de Orientadores</h6>
  <div class="row g-3 align-items-end mb-2">
- <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
+ <div class="col-md-8"><label class="form-label small" id="lbl-archivo-orientadores">Archivo del turno Matutino (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno, en cualquier orden (el turno es opcional; si no lo pones se usa Matutino)</label><input type="file" id="archivo-orientadores" class="form-control form-control-sm" accept=".xlsx,.xls,.csv,.pdf" multiple></div>
  <div class="col-md-4"><button onclick="subirOrientadores()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Subir Orientadores</button></div>
  </div>
  <div id="resumen-orientadores" class="small text-muted"></div>
@@ -567,18 +674,18 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  </div>
  <!-- Cámara (orientador / director / subdirector) -->
  <div id="bloque-camara-orientador" class="p-3 bg-light rounded-4 border mb-4 text-center">
- <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020;font-size:.9rem">Cámara de Escaneo (Entradas y Salidas)</h6>
+ <h6 class="fw-bold mb-3 text-uppercase" style="color:#800020">Cámara de Escaneo (Entradas y Salidas)</h6>
  <!-- CAMBIO: cualquier orientador puede registrar entrada o salida de cualquier alumno -->
  <div class="d-flex justify-content-center gap-2 mb-1 flex-wrap">
  <button onclick="setModoOrient('Entrada')" id="btn-orient-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoOrient('Salida')" id="btn-orient-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
- <p id="txt-modo-orient" class="small fw-semibold mb-3" style="color:#198754">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
+ <p id="txt-modo-orient" class="small fw-semibold mb-3" style="color:#0b6b3a" role="status" aria-live="polite">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
  <div class="camera-box-ref mb-2 border shadow-sm">
  <div class="cam-ph text-center text-warning"><span class="d-block small">Escáner apagado</span></div>
  <div id="cam-orient" style="width:100%"></div>
  </div>
- <div id="res-cam-orient" class="res-scan mb-2"></div>
+ <div id="res-cam-orient" class="res-scan mb-2" role="status" aria-live="polite"></div>
  <div id="aviso-camara-bloqueada" class="small text-danger fw-semibold mb-2 d-none">Necesitas autorización de Control Escolar para usar la cámara.</div>
  <button onclick="activarCamaraOrientador()" id="btn-activar-camara-orientador" class="btn btn-vinotinto px-4 py-2 rounded-pill shadow-sm small btn-accion-restringida">Activar Cámara</button>
  <button onclick="detener('cam-orient')" class="btn btn-dark py-2 px-3 rounded-pill small">Apagar</button>
@@ -589,6 +696,7 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="col-md-3">
  <label class="form-label">Período del reporte</label>
  <select id="sel-periodo-reporte" class="form-select shadow-sm">
+ <option value="dia">Día</option>
  <option value="semana" selected>Semana</option>
  <option value="mes">Mes</option>
  </select>
@@ -682,10 +790,10 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
    <div class="col-md-4"><label class="form-label small">Repite la contraseña nueva</label>
     <input type="password" id="clave-confirmar" class="form-control form-control-sm" autocomplete="new-password" maxlength="72" oninput="revisarRequisitosClave()">
    </div>
-   <div class="col-md-4 d-flex gap-2">
-    <button type="button" onclick="generarClave()" class="btn btn-outline-dark btn-sm py-2 text-nowrap" title="Crea una contraseña segura al azar">Generar</button>
-    <button type="button" onclick="guardarClave()" class="btn btn-vinotinto btn-sm w-100 py-2 fw-semibold">Guardar</button>
-    <button type="button" id="btn-generar-guardar" onclick="generarYGuardar()" class="btn btn-success btn-sm py-2 text-nowrap fw-semibold d-none" title="Crea una contraseña al azar, la guarda y la deja lista para entregar (no hace falta borrar la anterior)">Generar y guardar</button>
+   <div class="col-lg-4 d-flex flex-wrap gap-2">
+    <button type="button" onclick="generarClave()" class="btn btn-outline-dark btn-sm" title="Crea una contraseña segura al azar">Generar</button>
+    <button type="button" onclick="guardarClave()" class="btn btn-vinotinto btn-sm">Guardar</button>
+    <button type="button" id="btn-generar-guardar" onclick="generarYGuardar()" class="btn btn-success btn-sm d-none" title="Crea una contraseña al azar, la guarda y la deja lista para entregar (no hace falta borrar la anterior)">Generar y guardar</button>
    </div>
   </div>
   <div class="form-check mt-2 small"><input class="form-check-input" type="checkbox" id="ver-claves" onchange="verClavesNuevas()"><label class="form-check-label" for="ver-claves">Mostrar lo que escribo</label></div>
@@ -733,11 +841,13 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 <div id="canvas-temporal" style="position:absolute;left:-9999px;top:-9999px;"></div>
 <script src="{{ asset('vendor/jquery.min.js') }}"></script>
 <script>
-/* Librerías pesadas: se cargan en segundo plano para que la pantalla aparezca de inmediato (el service worker las guarda,
-   así que desde la segunda visita salen del equipo). Lo que tarda en estar listo se avisa con libsOk(). */
+/*
+ * Librerías pesadas: se cargan en segundo plano para que la pantalla aparezca de inmediato (el modo sin internet las guarda,
+ * así que desde la segunda visita salen del propio equipo). Cuando están listas se avisa con libsOk().
+ */
 (function(){
  const base = "{{ asset('vendor') }}/";
- window.SICA_VENDOR_BASE = base;   // la compresión de PDF baja pdf-lib solo cuando hace falta, desde esta misma ruta
+ window.SICA_VENDOR_BASE = base;   // la reducción de PDF baja pdf-lib solo cuando hace falta, desde esta misma ruta
  const grupos = [
   ['jszip.min.js', 'qrious.min.js', 'sica-docx.js', 'sica-compresion.js'],   // lo mínimo para dibujar credenciales (lector de Word + QR) y reducir el peso de lo que se sube
   ['html5-qrcode.min.js', 'chart.umd.min.js'],                        // escáner y gráficas
@@ -772,20 +882,24 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 })();
 </script>
 <script>
-/* Lo incrusta el servidor al abrir la página: quién tiene sesión y la lista de nombres de orientadores.
-   Así al abrir NO hace falta pedir /auth/me ni /api/sica/orientadores (arranque más rápido).
-   OJO: esto solo sirve para mostrar la pantalla; los permisos reales los decide siempre el servidor. */
+/*
+ * Lo incluye el servidor al abrir la página: quién tiene sesión y la lista de nombres de orientadores.
+ * Así, al abrir, NO hace falta pedir /auth/me ni /api/sica/orientadores (el arranque es más rápido).
+ * OJO: esto solo sirve para mostrar la pantalla; los permisos reales los decide siempre el servidor.
+ */
 window.SICA_SESION = @json($sesion ?? null);
 window.SICA_ORIENTADORES = @json($orientadoresLogin ?? []);
-window.SICA_CLAVES = @json($claves ?? null);   // solo Control Escolar con sesión: estado de las contraseñas ya dibujable
-window.SICA_ESTADO = @json($estado ?? null);   // solo con sesión iniciada: listas, horarios y asistencias ya vienen en la página
+window.SICA_CLAVES = @json($claves ?? null);   // solo Control Escolar con sesión: el estado de las contraseñas ya se puede mostrar
+window.SICA_ESTADO = @json($estado ?? null);   // solo con sesión iniciada: listas, horarios y asistencias ya vienen incluidos en la página
 </script>
 <script>
-/* ============ DATOS (localStorage del navegador) ============ */
+/* ============ DATOS (guardados en el navegador) ============ */
 const LS = 'sica_epo6_v4';
-/* Limpieza única de datos guardados en el navegador.
- Para volver a borrar en el futuro, cambia '_3' por '_4'.
- (Se subió a _3 porque cambió el formato de las claves de horario y de plantillas: ahora llevan turno.) */
+/*
+ * Limpieza única de los datos guardados en el navegador.
+ * Para volver a borrar en el futuro, cambia '_3' por '_4'.
+ * (Se subió a _3 porque cambió el formato de las claves de horario y de plantillas: ahora llevan turno.)
+ */
 const LIMPIEZA = 'sica_epo6_limpieza_3';
 if (!localStorage.getItem(LIMPIEZA)) {
  localStorage.removeItem(LS);
@@ -801,7 +915,7 @@ const nombresRoles = {orientador:'Orientador',director:'Director',subdirector:'S
 const ordenPaneles = ['orientador','lector','alumno'];
 let db = JSON.parse(localStorage.getItem(LS) || 'null') || {
  permisos: {orientador:'editar', director:'ver', subdirector:'ver'},
- plantillas: {}, // claveGrupo -> {frente:{img,fmt}, reverso:{img,fmt}} (override opcional por grupo)
+ plantillas: {}, // claveGrupo -> {frente:{img,fmt}, reverso:{img,fmt}} (plantilla propia opcional por grupo)
  horarios: {}, // claveGrupo ("Turno-grado-grupo") -> {entrada, salida, orientadorId, tolEntrada, tolSalida (minutos)}
  orientadores: [], // {id, nombre}
  alumnos: []
@@ -819,9 +933,11 @@ Object.keys(db.horarios).forEach(k => {
  h.orientadorId = o.id;
  }
 });
-/* Guarda SOLO orientadores y grupos en el servidor (rápido, sin mandar alumnos ni plantillas) y avisa si quedó guardado.
-   Es lo que hace que los orientadores aparezcan en la pantalla de inicio (lista de nombres) en cualquier equipo. */
-/* Mientras se guardan orientadores/horarios (o justo después), una consulta de sincronización más vieja no debe pisarlos */
+/*
+ * Guarda SOLO orientadores y grupos en el servidor (rápido, sin mandar alumnos ni plantillas) y avisa si quedó guardado.
+ * Esto hace que los orientadores aparezcan en la pantalla de inicio (lista de nombres) en cualquier equipo.
+ */
+/* Mientras se guardan orientadores y horarios (o justo después), una consulta de actualización más vieja no debe sobrescribirlos */
 let _oriGuardando = 0, _oriUltimoCambio = 0;
 function guardarOrientadoresServidor() {
  localStorage.setItem(LS, JSON.stringify(db));
@@ -843,31 +959,35 @@ function guardarOrientadoresServidor() {
   return false;
  }).finally(() => { _oriGuardando--; _oriUltimoCambio = Date.now(); });
 }
-// El teléfono nunca sobrescribe toda la base en el servidor: solo envía cada escaneo (registrar_asistencia).
+// El teléfono nunca sobrescribe toda la base de datos del servidor: solo envía cada escaneo (registrar_asistencia).
 let _temporizadorSave = null;
 const save = () => {
  try { localStorage.setItem(LS, JSON.stringify(db)); } catch (e) {}
  if (ES_MOVIL) return;
- // Varias acciones seguidas (subir lista, escanear varios QR...) se envían al servidor en UNA sola petición.
+ // Varias acciones seguidas (subir lista, escanear varios QR...) se envían al servidor todas juntas, de una sola vez.
  // Mientras tanto queda la marca de pendiente: si se cierra la página antes, se envía al volver a abrir.
  try { localStorage.setItem(PEND_TODO, '1'); } catch (e) {}
  clearTimeout(_temporizadorSave);
  acelerarSync();   // se está trabajando: se consulta más seguido durante unos segundos
  _temporizadorSave = setTimeout(() => { _temporizadorSave = null; enviarTodo(); }, 300);
 };
-/* Envía YA lo guardado (sin esperar el medio segundo de agrupación de save()). Para acciones grandes y únicas, como subir una lista. */
+/* Envía YA lo guardado (sin esperar el medio segundo de espera de save()). Para acciones grandes y únicas, como subir una lista. */
 const guardarYa = () => { if (ES_MOVIL) return; clearTimeout(_temporizadorSave); _temporizadorSave = null; enviarTodo(); };
-/* ============ SINCRONIZACIÓN CON EL SERVIDOR (MySQL vía Laravel) ============
- Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
- Si el backend no responde, falla en silencio y el sistema sigue con localStorage. */
+/*
+ * ============ SINCRONIZACIÓN CON EL SERVIDOR (se guarda en la base de datos) ============
+ * Envía {accion, datos} a /api/sica/sync (ControlEscolarController@sync).
+ * Si el servidor no responde, no muestra error y el sistema sigue funcionando con lo guardado en el navegador.
+ */
 let _ultimoAvisoPermiso = 0;
 function avisoPermiso(mensaje) {
  if (Date.now() - _ultimoAvisoPermiso < 5000) return;   // un solo aviso cada 5 s
  _ultimoAvisoPermiso = Date.now();
  alert(mensaje || 'No tienes permiso para realizar esta acción.');
 }
-/* fetch con tiempo límite: con señal mala (o sin internet "a medias") una petición puede quedarse esperando
-   para siempre y atorar la cola de escaneos. Pasados los segundos indicados se corta y cuenta como "sin conexión". */
+/*
+ * Petición con tiempo límite: con señal mala (o con internet "a medias") una petición puede quedarse esperando
+ * para siempre y detener la cola de escaneos. Pasados los segundos indicados se corta y cuenta como "sin conexión".
+ */
 function fetchT(url, opciones, ms) {
  if (typeof AbortController === 'undefined') return fetch(url, opciones);
  const ctl = new AbortController();
@@ -875,8 +995,10 @@ function fetchT(url, opciones, ms) {
  return fetch(url, Object.assign({}, opciones, {signal: ctl.signal}))
   .then(r => { clearTimeout(reloj); return r; }, e => { clearTimeout(reloj); throw e; });
 }
-/* Pide al service worker guardar la página de inicio YA CON la sesión iniciada: así, al abrir el sistema sin
-   internet, entra directo (sin esto aparecía "Sin conexión" si no se había recargado la página con internet). */
+/*
+ * Pide al modo sin internet que guarde la página de inicio YA CON la sesión iniciada: así, al abrir el sistema sin
+ * internet, entra directo (sin esto aparecía "Sin conexión" si no se había recargado la página con internet).
+ */
 function guardarPaginaOffline() {
  try {
   if (!navigator.serviceWorker) return;
@@ -884,11 +1006,13 @@ function guardarPaginaOffline() {
  } catch (e) {}
 }
 const PEND_TODO = 'sica_epo6_pend_todo';   // marca: hay cambios guardados solo en este equipo (se hicieron sin internet)
-/* ---- Guardado de todo (alumnos, asistencias, horarios) ----
-   Antes se reenviaba TODA la base (todos los alumnos con todo su historial) en cada cambio: con listas grandes la petición
-   pesaba megas, tardaba y el servidor podía rechazarla por tamaño sin avisar. Ahora:
-   - solo se envían los alumnos que cambiaron desde la última vez que el servidor los guardó (se compara su "firma"),
-   - y se mandan por lotes chicos, uno tras otro. */
+/*
+ * ---- Guardado de todo (alumnos, asistencias, horarios) ----
+ * Antes se reenviaba TODA la base (todos los alumnos con todo su historial) en cada cambio: con listas grandes el envío
+ * pesaba megas, tardaba y el servidor podía rechazarlo por tamaño sin avisar. Ahora:
+ * - solo se envían los alumnos que cambiaron desde la última vez que el servidor los guardó (se compara su "firma"),
+ * - y se mandan por lotes chicos, uno tras otro.
+ */
 const LOTE_ALUMNOS = 250;
 const _firmasGuardadas = new Map();   // id del alumno -> firma de lo que ya tiene el servidor
 const firmaAlumno = a => JSON.stringify([a.curp, a.nombre, a.grado, a.grupo, a.turno, a.reg]);
@@ -900,7 +1024,7 @@ function _postSyncBase(accion, datos, ms) {
   body: JSON.stringify({ accion: accion, datos: datos })
  }, ms || 60000).then(r => {
   if (r.status !== 419) return r;
-  // el token CSRF venció: se pide uno nuevo y se reintenta UNA vez
+  // el código de seguridad (token CSRF) venció: se pide uno nuevo y se reintenta UNA vez
   return refrescarCsrf().then(() => fetchT('/api/sica/sync', {
    method: 'POST',
    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || '' },
@@ -908,12 +1032,14 @@ function _postSyncBase(accion, datos, ms) {
   }, ms || 60000));
  });
 }
-/* Toda escritura confirmada por el servidor (guardar, borrar, subir lista...) avisa a las otras pestañas de este equipo para que
-   se actualicen AL INSTANTE (no esperan su próxima consulta), y acelera la consulta de este equipo unos segundos. */
+/*
+ * Todo cambio confirmado por el servidor (guardar, borrar, subir lista...) avisa a las otras pestañas de este equipo para que
+ * se actualicen AL INSTANTE (sin esperar su próxima consulta), y hace que este equipo consulte más seguido unos segundos.
+ */
 function _postSync(accion, datos, ms) {
  return _postSyncBase(accion, datos, ms).then(r => { if (r && r.ok) { acelerarSync(); avisarEstado(); } return r; });
 }
-/* sinVacios = true: si no hay ningún alumno distinto al del servidor, no manda nada. Devuelve una promesa con true/false. */
+/* sinVacios = true: si no hay ningún alumno distinto al del servidor, no manda nada. Devuelve true o false al terminar. */
 function enviarTodo(sinVacios) {
  if (_enviando) { _hayOtroEnvio = true; return Promise.resolve(false); }
  const cambiados = db.alumnos.filter(a => _firmasGuardadas.get(a.id) !== firmaAlumno(a));
@@ -948,11 +1074,13 @@ function sincronizarConServidor(accion, datos, reintento) {
   _postSync(accion, datos, 30000).then(r => {
    if (r.status === 401) { sesionExpirada(); return; }
    if (r.status === 403) return r.json().then(d => avisoPermiso(d && d.mensaje)).catch(() => avisoPermiso());
-  }).catch(() => { /* sin conexión: localStorage sigue funcionando */ });
- } catch (err) { /* entorno sin fetch: se ignora */ }
+  }).catch(() => { /* sin conexión: lo guardado en el navegador sigue funcionando */ });
+ } catch (err) { /* si el navegador no puede hacer peticiones: se ignora */ }
 }
-/* Mezcla el estado del servidor con el local sin perder entradas/salidas ya registradas.
- Los alumnos se emparejan por CURP (el id del servidor es distinto al id local). */
+/*
+ * Mezcla los datos del servidor con los de este equipo sin perder entradas/salidas ya registradas.
+ * Los alumnos se emparejan por CURP (el id del servidor es distinto al id de este equipo).
+ */
 function fusionarServidor(s, inicioConsulta) {
  if (!s || !Array.isArray(s.alumnos)) return;
  let corregidos = 0;
@@ -996,14 +1124,14 @@ function autoSubirPendientes() {
  _autoSubiendo = true;
  enviarTodo(true).then(() => { _autoSubiendo = false; });
 }
-/* Pide un token CSRF nuevo (cuando la sesión venció, el anterior ya no sirve) */
+/* Pide un código de seguridad (token CSRF) nuevo (cuando la sesión venció, el anterior ya no sirve) */
 function refrescarCsrf() {
  return fetchT('/auth/me', {headers:{'Accept':'application/json'}}, 8000)
  .then(r => r.json())
  .then(d => { if (d && d.csrf) $('meta[name="csrf-token"]').attr('content', d.csrf); })
  .catch(() => {});
 }
-/* Lista de nombres de orientadores para la pantalla de login (no incluye alumnos ni CURP) */
+/* Lista de nombres de orientadores para la pantalla de inicio de sesión (no incluye alumnos ni CURP) */
 function cargarOrientadoresLogin() {
  return fetch('/api/sica/orientadores', {headers:{'Accept':'application/json'}})
  .then(r => r.ok ? r.json() : null)
@@ -1034,9 +1162,11 @@ function cargarDesdeServidor() {
  }
  return descargarEstadoServidor();
 }
-/* El navegador convierte solo los 304 en 200 y entregaba todo el estado cada 3 s: había que volver a leerlo,
-   fusionarlo, guardarlo y redibujar la tabla aunque nada hubiera cambiado. Ahora se manda el ETag a mano
-   (cache:'no-store') para recibir el 304 de verdad y no hacer nada cuando no hay cambios. */
+/*
+ * El navegador convierte solo las respuestas "sin cambios" (304) en respuestas normales (200) y entregaba todos los datos cada 3 s: había que leerlos,
+ * mezclarlos, guardarlos y redibujar la tabla aunque nada hubiera cambiado. Ahora se manda la marca de versión (ETag) a mano
+ * (cache:'no-store') para recibir de verdad el "sin cambios" y no hacer nada cuando no hay cambios.
+ */
 let _etagEstado = null, _descargandoEstado = false;
 function descargarEstadoServidor() {
  if (_descargandoEstado) return Promise.resolve();   // no se amontonan consultas si el servidor tarda
@@ -1085,7 +1215,7 @@ let turnoCred = 'Matutino'; // turno elegido en el Portal del Alumno (credencial
 let orientadorActivo = null; // {id, nombre} cuando el rol activo es 'orientador'
 let gruposDelOrientador = []; // [{turno,grado,grupo}] calculados a partir de db.horarios
 const scanners = {}; let ultimo = {t:'', ts:0};
-// dataURL cacheado de la plantilla oficial de cada turno
+// imagen de la plantilla oficial de cada turno, guardada para no pedirla otra vez (dataURL)
 const plantillasDefault = {Matutino:{frente:null, reverso:null}, Vespertino:{frente:null, reverso:null}};
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm = t => (t||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -1109,8 +1239,10 @@ const generarId = () => 'id_' + Date.now().toString(36) + Math.random().toString
 const LIM = {Matutino:{retardo:430,fin:840}, Vespertino:{retardo:790,fin:1200}}; // 7:10-14:00 / 13:10-20:00 (por defecto)
 const nomGrado = ['', 'Primero', 'Segundo', 'Tercero'];
 const ROMANOS = ['', 'I', 'II', 'III', 'IV']; // grupo en número romano para la credencial
-/* Tolerancia (minutos) de cada grupo: entrada = después de la hora límite sigue sin ser retardo (0 si no se configura);
-   salida = después de la hora de cierre sigue sin ser retardo (30 si no se configura: se escanea la salida justo después del cierre) */
+/*
+ * Tolerancia (minutos) de cada grupo: entrada = pasada la hora límite, todavía no cuenta como retardo (0 si no se configura);
+ * salida = pasada la hora de cierre, todavía no cuenta como retardo (30 si no se configura: se escanea la salida justo después del cierre)
+ */
 const TOL_DEF = {entrada: 0, salida: 30};
 const tolDe = (h, k, def) => (h && h[k] != null && h[k] !== '' && !isNaN(h[k])) ? Math.max(0, Number(h[k])) : def;
 /* retardo = hora límite de entrada + tolerancia de entrada; fin = hora de cierre + tolerancia de salida */
@@ -1125,6 +1257,7 @@ function limiteDe(a) {
    (salió después del cierre + tolerancia, o hoy todavía no sale y ya pasó ese límite) */
 function retrasosDe(a, r, fecha) {
  const res = {entrada: 0, salida: 0, sinSalida: false};
+ if (r && !r.entrada && r.salida) { res.salida = Math.max(0, toMin(r.salida) - limiteDe(a).fin); return res; }   // salió sin entrada registrada: igual lleva su retardo de salida
  if (!r || !r.entrada) return res;
  const l = limiteDe(a);
  res.entrada = Math.max(0, toMin(r.entrada) - l.retardo);
@@ -1139,20 +1272,30 @@ function conteoDe(a, f) {
  const t = retrasosDe(a, r, f), re = t.entrada > 0 ? 1 : 0, rs = t.salida > 0 ? 1 : 0;
  return {as: (re || rs) ? 0 : 1, re: re, rs: rs};
 }
+/* Duración: menos de una hora en minutos ("13 min"); de una hora en adelante horas y minutos ("1 hr", "1 hr 15 min", "2 hrs 5 min") */
+function durMin(n) {
+ n = Math.max(0, Math.round(Number(n) || 0));
+ if (n < 60) return n + ' min';
+ const h = Math.floor(n / 60), m = n % 60;
+ return h + (h === 1 ? ' hr' : ' hrs') + (m ? ' ' + m + ' min' : '');
+}
 /* Texto de las columnas "Retardo entrada" y "Retardo salida" (tabla, Excel y PDF). "—" = no vino. */
 function textoRetardo(a, r, f) {
- if (!r || !r.entrada) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
+ if (!r || (!r.entrada && !r.salida)) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
  const t = retrasosDe(a, r, f);
+ if (!r.entrada) return {t: t, ent: '—', sal: t.salida > 0 ? durMin(t.salida) : 'Sin retardo'};
  return {t: t,
-  ent: t.entrada > 0 ? t.entrada + ' min' : 'Sin retardo',
-  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (' + t.salida + ' min)' : t.salida + ' min') : (r.salida ? 'Sin retardo' : 'Pendiente')};
+  ent: t.entrada > 0 ? durMin(t.entrada) : 'Sin retardo',
+  sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (' + durMin(t.salida) + ')' : durMin(t.salida)) : (r.salida ? 'Sin retardo' : 'Pendiente')};
 }
 function celdasRetardo(a, r, f) {
  const x = textoRetardo(a, r, f);
  return {ent: '<span class="' + (x.t.entrada > 0 ? 'txt-ret-ent' : 'text-muted small') + '">' + esc(x.ent) + '</span>',
-         sal: '<span class="' + (x.t.salida > 0 ? 'txt-ret-sal' : 'text-muted small') + '">' + esc(x.sal) + '</span>'};
+         sal: '<span class="' + (x.t.salida > 0 ? 'txt-ret-sal' : 'text-muted small') + '">' + esc(x.sal) + '</span>',
+         lateEnt: x.t.entrada > 0, lateSal: x.t.salida > 0};
 }
 function estatusDe(a, r, fecha) {
+ if (r && !r.entrada && r.salida) return retrasosDe(a, r, fecha).salida > 0 ? 'Retardo salida' : 'Sin registro';
  if (!r || !r.entrada) return 'Sin registro';
  const t = retrasosDe(a, r, fecha);
  if (t.entrada > 0 && t.salida > 0) return 'Retardo entrada y salida';
@@ -1276,12 +1419,16 @@ function _acomodarConCurp(nombre, c) {
  })();
  return mejor ? [].concat.apply([], mejor.perm).join(' ') : nombre;
 }
-/* ============ LECTURA DE ARCHIVOS (Excel / CSV / PDF) ============
- Punto único para leer listas de nombres: si es .xlsx/.xls/.csv usa SheetJS (como antes);
- si es .pdf usa pdf.js y trata cada línea de texto del PDF como una fila (una sola columna).
- callback(filas) recibe un arreglo de arreglos, igual que sheet_to_json({header:1}). */
-/* Varios archivos a la vez: se leen UNO POR UNO (así no se satura la memoria ni se traba la pantalla), a cada uno se le quita su
-   fila de encabezados y todas las filas se juntan en una sola lista. extensiones = regex de los tipos válidos. */
+/*
+ * ============ LECTURA DE ARCHIVOS (Excel / CSV / PDF) ============
+ * Un solo lugar para leer listas de nombres: si es .xlsx/.xls/.csv usa SheetJS (como antes);
+ * si es .pdf usa pdf.js y trata cada línea de texto del PDF como una fila (una sola columna).
+ * callback(filas) recibe una lista de filas, igual que sheet_to_json({header:1}).
+ */
+/*
+ * Varios archivos a la vez: se leen UNO POR UNO (así no se satura la memoria ni se traba la pantalla), a cada uno se le quita su
+ * fila de encabezados y todas las filas se juntan en una sola lista. extensiones = tipos de archivo válidos.
+ */
 const MAX_ARCHIVOS = 30, MAX_MB_ARCHIVO = 30, MAX_MB_TOTAL = 100;   // límites para que el navegador no se trabe
 function leerFilasVarios(input, tipos, esEncabezado, callback, onError) {
  // El mismo archivo elegido dos veces (mismo nombre y peso) se lee una sola vez
@@ -1291,7 +1438,7 @@ function leerFilasVarios(input, tipos, esEncabezado, callback, onError) {
  if (archivos.length > MAX_ARCHIVOS) { input.value = ''; onError && onError('Elegiste ' + archivos.length + ' archivos y el máximo es ' + MAX_ARCHIVOS + ' a la vez. Súbelos en dos tandas.'); return; }
  if (grande) { input.value = ''; onError && onError('"' + grande.name + '" pesa ' + (grande.size / 1048576).toFixed(1) + ' MB y el máximo por archivo es ' + MAX_MB_ARCHIVO + ' MB.'); return; }
  if (total > MAX_MB_TOTAL * 1048576) { input.value = ''; onError && onError('Los archivos juntos pesan ' + (total / 1048576).toFixed(0) + ' MB y el máximo es ' + MAX_MB_TOTAL + ' MB. Súbelos en varias tandas.'); return; }
- // Línea de avance debajo del cuadro de archivos (se crea la primera vez)
+ // Barra de avance debajo del cuadro de archivos (se crea la primera vez)
  let caja = $(input).nextAll('.avance-archivos').first();
  if (!caja.length) caja = $('<div class="form-text avance-archivos" role="status"></div>').insertAfter(input);
  caja.text(archivos.length > 1 ? 'Revisando ' + archivos.length + ' archivos…' : '');
@@ -1367,7 +1514,7 @@ function leerFilasDesdeArchivo(file, callback, onError) {
  rd.readAsArrayBuffer(file);
  }
 }
-/* CSV: respeta los acentos (UTF-8 o, si no lo es, Windows-1252 de Excel) y detecta la coma, el punto y coma o el tabulador. */
+/* CSV: respeta los acentos y reconoce si las columnas se separan con coma, punto y coma o tabulador. */
 function leerLibroCSV(buffer) {
  const bytes = new Uint8Array(buffer);
  let texto = new TextDecoder('utf-8').decode(bytes);
@@ -1386,7 +1533,7 @@ function filasDeLibro(wb) {
  }
  return [];
 }
-/* Hora de una celda -> "HH:MM". Acepta 7:10, 07:10, 7:10 AM, 1:10 pm, 13.10, 7h10 y la hora de Excel (fracción del día). Devuelve "" si no es válida. */
+/* Hora de una celda -> "HH:MM". Acepta 7:10, 07:10, 7:10 AM, 1:10 pm, 13.10, 7h10 y la hora tal como la guarda Excel. Devuelve vacío ("") si no es válida. */
 function horaDe(v) {
  if (v == null || v === "") return "";
  if (v instanceof Date) return isNaN(v) ? "" : p2(v.getHours()) + ':' + p2(v.getMinutes());
@@ -1420,13 +1567,43 @@ const turnoDe = v => /ambos|ambas|mixto/i.test(String(v)) ? 'Ambos' : /vesp/i.te
 /* Una fila del archivo -> {nombre, grado, grupo, turno}.
    Excel/CSV: columnas Nombre | Grado | Grupo | Turno (opcional).
    PDF o una sola columna: "Nombre ... 1 2 Matutino" al final de la línea (el turno es opcional). */
-function leerFilaOrientador(r) {
- let nombre = String(r[0] == null ? '' : r[0]).trim(), grado = 0, grupo = 0, turno = '';
- const hayMasColumnas = r.slice(1).some(x => x != null && String(x).trim() !== '');
- if (hayMasColumnas) {
-  grado = numeroDe(r[1]); grupo = numeroDe(r[2]);
-  if (r[3] != null && String(r[3]).trim()) turno = turnoDe(r[3]);
+/* Las columnas pueden venir en CUALQUIER orden (Grado | Grupo | Nombre, Nombre | Grado | Grupo, etc.):
+   - si el archivo trae encabezados (Grado, Grupo, Turno), se usan para saber cuál es cuál;
+   - si no, cada celda se reconoce por lo que contiene: "Matutino/Vespertino/Ambos" es el turno, un número (1, 2°, Primero) es grado o grupo
+     (el primer número es el grado y el segundo el grupo) y el texto con letras es el nombre (si viene en varias columnas, se unen en orden). */
+const ORI_ES_NUM = t => /^\d{1,2}\s*[°º.]?$/.test(t) || /^(primer[o]?|segund[o]|tercer[o]?)(\s+grado)?$/.test(norm(t));
+const ORI_ES_TURNO = t => /^(matutino|vespertino|ambos(\s+turnos)?|ambas|mixto)$/.test(norm(t));
+const ORI_CEL = r => (r || []).slice(0, 8).map(x => x == null ? '' : String(x).trim());
+function esEncabezadoOri(r) {
+ const c = ORI_CEL(r).filter(Boolean);
+ return c.some(t => /nombre|orientador|apellido|grado|grupo|turno/.test(norm(t))) && !c.some(t => ORI_ES_NUM(t) || ORI_ES_TURNO(t));
+}
+function mapaEncabezadoOri(r) {
+ const m = {grado: -1, grupo: -1, turno: -1};
+ ORI_CEL(r).forEach((x, i) => { const t = norm(x); if (/grado/.test(t) && m.grado < 0) m.grado = i; else if (/grupo/.test(t) && m.grupo < 0) m.grupo = i; else if (/turno/.test(t) && m.turno < 0) m.turno = i; });
+ return m;
+}
+function leerFilaOrientador(r, mapa) {
+ const cel = ORI_CEL(r);
+ let nombre = cel[0], grado = 0, grupo = 0, turno = '';
+ if (cel.filter(Boolean).length > 1) {
+  const usadas = new Set(), nums = [], nom = [];
+  if (mapa) {
+   if (mapa.grado > -1) { grado = numeroDe(cel[mapa.grado]); usadas.add(mapa.grado); }
+   if (mapa.grupo > -1) { grupo = numeroDe(cel[mapa.grupo]); usadas.add(mapa.grupo); }
+   if (mapa.turno > -1) { if (cel[mapa.turno]) turno = turnoDe(cel[mapa.turno]); usadas.add(mapa.turno); }
+  }
+  cel.forEach((t, i) => {
+   if (!t || usadas.has(i)) return;
+   if (ORI_ES_TURNO(t)) { if (!turno) turno = turnoDe(t); }
+   else if (ORI_ES_NUM(t)) nums.push(numeroDe(t));
+   else nom.push(t);
+  });
+  if (!grado) grado = nums.shift() || 0;
+  if (!grupo) grupo = nums.shift() || 0;
+  nombre = nom.join(' ');
  } else {
+  nombre = cel.find(Boolean) || '';
   const m = nombre.replace(/\s+/g, ' ').match(/^(.*?)[\s,;|\-]+([1-9])[\s,;|\-°º]*([1-9])(?:[\s,;|\-]+(matutino|vespertino|ambos(?:\s+turnos)?))?\s*$/i);
   if (m) { nombre = m[1].trim(); grado = Number(m[2]); grupo = Number(m[3]); if (m[4]) turno = turnoDe(m[4]); }
  }
@@ -1437,14 +1614,16 @@ function subirOrientadores() {
  const inp = $('#archivo-orientadores')[0];
  if (!inp.files.length) { alert('Selecciona un archivo con los orientadores (nombre, grado, grupo y turno).'); return; }
  if (!confirm('¿Subir ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' con orientadores?\nSe darán de alta los que falten y se asignarán a sus grupos.')) return;
- leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /nombre|orientador/i.test(String(r[0] == null ? '' : r[0])), rows => {
-  rows = rows.filter(r => r[0] && String(r[0]).trim());
-  if (rows.length && /nombre|orientador/i.test(rows[0][0])) rows.shift();
-  if (!rows.length) { alert('El archivo no trae orientadores. Revisa que el nombre esté en la primera columna.'); return; }
+ let mapaEnc = null;   // columnas según el encabezado del archivo (si lo trae); si no, se reconocen por su contenido, en cualquier orden
+ const esEnc = r => { if (!esEncabezadoOri(r)) return false; if (!mapaEnc) mapaEnc = mapaEncabezadoOri(r); return true; };
+ leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], esEnc, rows => {
+  rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
+  if (rows.length && esEnc(rows[0])) rows.shift();
+  if (!rows.length) { alert('El archivo no trae orientadores. Pon el nombre, el grado y el grupo en columnas (en cualquier orden).'); return; }
   let nuevos = 0, existentes = 0, asignados = 0, iguales = 0;
   const avisos = [];
   rows.forEach(r => {
-   const f = leerFilaOrientador(r);
+   const f = leerFilaOrientador(r, mapaEnc);
    if (!f.nombre) return;
    let o = db.orientadores.find(x => norm(x.nombre) === norm(f.nombre));
    if (o) existentes++; else { o = {id: generarId(), nombre: f.nombre}; db.orientadores.push(o); nuevos++; }
@@ -1487,13 +1666,22 @@ function renderListaOrientadores() {
     ' <a href="#" class="text-danger text-decoration-none ms-1" title="Quitar de este grupo" data-o="' + esc(o.id) + '" data-k="' + esc(k) + '" onclick="quitarGrupoOrientador(this.dataset.o, this.dataset.k); return false;">&times;</a></span>'; });
   return '<div class="ori-item"><div><div class="fw-semibold">' + esc(o.nombre) + '</div>' +
    '<div class="small ' + (chips.length ? '' : 'text-danger') + '">' + (chips.length ? chips.join('') : 'Sin grupo asignado') + '</div></div>' +
-   '<div class="d-flex gap-1 flex-shrink-0"><button type="button" data-o="' + esc(o.id) + '" onclick="editarOrientador(this.dataset.o)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Cambiar grados y grupos">Editar</button>' +
-   '<button type="button" data-o="' + esc(o.id) + '" onclick="eliminarOrientador(this.dataset.o)" class="btn btn-outline-danger btn-sm py-0 px-2" title="Eliminar orientador">Eliminar</button></div></div>' + (oriEditando && oriEditando.id === o.id ? htmlEditorOrientador(oriEditando) : '');
+   '<div class="d-flex gap-1 flex-shrink-0"><button type="button" data-o="' + esc(o.id) + '" onclick="editarOrientador(this.dataset.o)" class="btn btn-outline-secondary btn-sm" title="Cambiar grados y grupos">Editar</button>' +
+   '<button type="button" data-o="' + esc(o.id) + '" onclick="eliminarOrientador(this.dataset.o)" class="btn btn-outline-danger btn-sm" title="Eliminar orientador">Eliminar</button></div></div>' + (oriEditando && oriEditando.id === o.id ? htmlEditorOrientador(oriEditando) : '');
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver orientadores dados de alta (' + db.orientadores.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
 }
 /* Lista desplegable de horarios: un renglón por orientador(a) con SUS grupos. Se elige el grupo, se cambia la hora y se guarda ahí mismo. */
 let _horSel = {};   // grupo elegido en cada orientador(a) de esta lista
+let _horEstado = {};   // último aviso de guardado de cada grupo: {clave: {clase, txt}} (así no desaparece cuando la lista se vuelve a dibujar)
+const htmlEstadoHor = k => { const e = _horEstado[k]; return '<span class="hor-estado fw-semibold ' + (e ? e.clase : '') + '" role="status" aria-live="polite">' + (e ? esc(e.txt) : '') + '</span>'; };
+/* Avisos con el cuadro normal del navegador ("127.0.0.1 dice ... Aceptar"), como los de dar acceso a una cuenta.
+   Mientras se escribe se guarda en silencio; el cuadro sale al terminar de escribir (o con «Guardar ahora»). */
+function ponerEstadoHor(it, k, clase, txt, avisar) {
+ _horEstado[k] = {clase: '', txt: ''};
+ it.find('.hor-estado').text('');
+ if (avisar && (clase === 'text-success' || clase === 'text-danger')) alert(txt);
+}
 function renderListaHorarios() {
  renderGruposCargados();
  const caja = $('#lista-horarios-actual');
@@ -1514,8 +1702,8 @@ function renderListaHorarios() {
  porOri.push({id: '', nombre: 'Sin orientador(a)', gr: grupos.filter(x => !x.h.orientadorId || !idsOri.has(x.h.orientadorId))});
  const items = porOri.filter(o => o.gr.length);
  if (!items.length) { caja.html('<span class="text-muted">Aún no hay grupos con alumnos en el turno ' + esc(turnoActivo) + '. Sube la lista de un grupo y aparecerá aquí para ponerle su horario.</span>'); return; }
- const filas = items.map(o => {
-  const llaves = o.gr.map(x => x.k);
+ const filas = items.map((o, n) => {
+  const llaves = o.gr.map(x => x.k), uid = 'hor' + n;
   let sel = _horSel[o.id];
   if (!sel || llaves.indexOf(sel) < 0) sel = o.gr[0].k;
   _horSel[o.id] = sel;
@@ -1525,14 +1713,16 @@ function renderListaHorarios() {
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
-   '<div class="col-12 col-xl-4"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
-   '<div class="col-12 d-flex flex-wrap gap-1">' +
-   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
-   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
+   '<div class="col-12 col-xl-4"><label class="small text-muted d-block" for="' + uid + '-grupo">Grupo</label><select id="' + uid + '-grupo" class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
+   // Los cambios se guardan SOLOS al escribirlos (ver horarioCambiado): ya no hace falta pulsar Guardar ni confirmar
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-ent">Entrada</label><input type="time" id="' + uid + '-ent" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-sal">Cierre</label><input type="time" id="' + uid + '-sal" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-te" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" inputmode="numeric" min="0" max="180" step="1" id="' + uid + '-te" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-ts" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" inputmode="numeric" min="0" max="180" step="1" id="' + uid + '-ts" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-12 d-flex flex-wrap gap-2 align-items-center">' +
+   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm" title="Guardar la hora de este grupo ahora mismo">Guardar ahora</button>' +
+   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
+   htmlEstadoHor(sel) +
    '</div></div></div></div>';
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios del turno ' + esc(turnoActivo) + ' por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
@@ -1544,23 +1734,59 @@ function cargarHorarioInline(sel) {
  _horSel[it.attr('data-o')] = sel.value;
  it.find('.hor-ent').val(h.entrada || ''); it.find('.hor-sal').val(h.salida || '');
  it.find('.hor-tol-ent').val(tolDe(h, 'tolEntrada', TOL_DEF.entrada)); it.find('.hor-tol-sal').val(tolDe(h, 'tolSalida', TOL_DEF.salida));
+ it.find('.hor-tol-ent,.hor-tol-sal').attr('aria-invalid', 'false');
+ const e = _horEstado[sel.value]; it.find('.hor-estado').removeClass('text-success text-danger text-muted').addClass(e ? e.clase : '').text(e ? e.txt : '');
 }
-/* Guarda la hora del grupo elegido en el renglón del orientador(a) */
+/*
+ * GUARDADO INMEDIATO de horario y tolerancias: en cuanto se cambia una hora o una tolerancia (y es válida) se aplica YA en este equipo,
+ * así el siguiente escaneo ya la respeta, y se manda al servidor sin pedir confirmación. Los demás equipos la reciben en su próxima consulta.
+ * Si el dato no es válido no se guarda y se explica abajo del renglón (en rojo).
+ */
+let _horTimer = null, _horPend = [];   // _horPend: renglones editados que esperan el guardado (se avisa en todos, no solo en el último)
+function leerHorarioInline(it) {
+ const num = (v, d) => String(v).trim() === '' ? d : Number(v);   // vacío = valor por defecto
+ const e = it.find('.hor-ent').val(), s = it.find('.hor-sal').val();
+ const te = num(it.find('.hor-tol-ent').val(), TOL_DEF.entrada), ts = num(it.find('.hor-tol-sal').val(), TOL_DEF.salida);
+ let error = '';
+ if (![te, ts].every(v => Number.isInteger(v) && v >= 0 && v <= 180)) error = 'La tolerancia debe ser un número entero de minutos, de 0 a 180.';
+ else if (!e || !s) error = 'Indica la hora límite de entrada y la hora de cierre.';
+ else if (toMin(s) <= toMin(e)) error = 'La hora de cierre debe ser posterior a la hora límite de entrada.';
+ it.find('.hor-tol-ent').attr('aria-invalid', !Number.isInteger(te) || te < 0 || te > 180 ? 'true' : 'false');
+ it.find('.hor-tol-sal').attr('aria-invalid', !Number.isInteger(ts) || ts < 0 || ts > 180 ? 'true' : 'false');
+ return {e: e, s: s, te: te, ts: ts, error: error};
+}
+function horarioCambiado(input, ya) {
+ if (rolActivo !== 'control') return;
+ const it = $(input).closest('.ori-hor'), k = it.find('select').val();
+ if (!k) return;
+ const v = leerHorarioInline(it);
+ if (v.error) {   // mientras se escribe solo se avisa que falta; al terminar (change) se explica el problema en rojo
+  if (ya) ponerEstadoHor(it, k, 'text-danger', v.error + ' Todavía no se ha guardado.', true);
+  return;
+ }
+ const h = db.horarios[k] = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''};
+ h.entrada = v.e; h.salida = v.s; h.tolEntrada = v.te; h.tolSalida = v.ts;   // ya vale para el siguiente escaneo
+ try { localStorage.setItem(LS, JSON.stringify(db)); } catch (x) {}
+ const antes = _horPend.find(x => x.k === k);
+ _horPend = _horPend.filter(x => x.k !== k).concat([{it: it, k: k, v: v, ya: !!ya || !!(antes && antes.ya)}]);
+ clearTimeout(_horTimer);
+ _horTimer = setTimeout(() => {
+  _horTimer = null;
+  const lote = _horPend; _horPend = [];
+  guardarOrientadoresServidor().then(ok => lote.forEach(x => {
+   const c = parseClave(x.k);
+   if (ok) {
+    ponerEstadoHor(x.it, x.k, 'text-success', 'Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ').\nTolerancia de entrada ' + x.v.te + ' min y de salida ' + x.v.ts + ' min.', x.ya);
+    $('#resumen-horario-grupo').text('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ') de ' + h12(x.v.e) + ' a ' + h12(x.v.s) + ' · tolerancia de entrada ' + x.v.te + ' min, de salida ' + x.v.ts + ' min.');
+   } else ponerEstadoHor(x.it, x.k, 'text-danger', 'No se pudo guardar en el servidor. El cambio ya funciona en este equipo; revisa tu conexión y pulsa «Guardar ahora».', true);
+  }));
+  renderTablaPronto();
+ }, ya ? 0 : 600);
+}
+/* Botón «Guardar ahora»: igual que el guardado automático, pero al momento y sin cuadro de confirmación */
 function guardarHorarioInline(btn) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede cambiar horarios.'); return; }
- const it = $(btn).closest('.ori-hor'), k = it.find('select').val();
- const e = it.find('.hor-ent').val(), s = it.find('.hor-sal').val();
- const num = (v, d) => String(v).trim() === '' ? d : Number(v);   // vacío = valor por defecto
- const te = num(it.find('.hor-tol-ent').val(), TOL_DEF.entrada), ts = num(it.find('.hor-tol-sal').val(), TOL_DEF.salida);
- if (!k || !db.horarios[k]) return;
- if (![te, ts].every(v => Number.isInteger(v) && v >= 0 && v <= 180)) { alert('La tolerancia debe ser un número entero de minutos, de 0 a 180.'); return; }
- if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
- if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
- { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' (tolerancia ' + te + ' min) y cierre a las ' + h12(s) + ' (tolerancia ' + ts + ' min).')) return; }
- db.horarios[k].entrada = e; db.horarios[k].salida = s; db.horarios[k].tolEntrada = te; db.horarios[k].tolSalida = ts;
- const c = parseClave(k);
- guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
- $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + ' · tolerancia de entrada ' + te + ' min, de salida ' + ts + ' min.');
+ horarioCambiado($(btn).closest('.ori-hor').find('.hor-ent')[0], true);
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -1596,12 +1822,12 @@ function htmlEditorOrientador(e) {
   '<select class="form-select form-select-sm" style="max-width:140px" onchange="oriEditando.filas[' + i + '].turno=this.value">' + opt(['Matutino', 'Vespertino'], f.turno) + '</select>' +
   '<select class="form-select form-select-sm" style="max-width:120px" onchange="oriEditando.filas[' + i + '].grado=Number(this.value)">' + opt([1, 2, 3], f.grado, v => v + '° grado') + '</select>' +
   '<select class="form-select form-select-sm" style="max-width:120px" onchange="oriEditando.filas[' + i + '].grupo=Number(this.value)">' + opt([1, 2, 3, 4], f.grupo, v => 'Grupo ' + v) + '</select>' +
-  '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" title="Quitar este grupo" onclick="oriEditando.filas.splice(' + i + ',1); renderListaOrientadores()">&times;</button></div>').join('');
+  '<button type="button" class="btn btn-outline-danger btn-sm btn-icono" title="Quitar este grupo" aria-label="Quitar este grupo" onclick="oriEditando.filas.splice(' + i + ',1); renderListaOrientadores()">&times;</button></div>').join('');
  return '<div class="p-2 border-bottom" style="background:#fdf3f5"><div class="small fw-semibold mb-2">Grados y grupos de este orientador(a)</div>' +
   (filas || '<div class="small text-muted mb-2">Sin grupos: quedará sin grupo asignado.</div>') +
-  '<div class="d-flex gap-2 mt-1"><button type="button" class="btn btn-outline-dark btn-sm py-0 px-2" onclick="oriEditando.filas.push({turno:turnoActivo,grado:1,grupo:1}); renderListaOrientadores()">+ Agregar grupo</button>' +
-  '<button type="button" class="btn btn-vinotinto btn-sm py-0 px-3" onclick="guardarGruposOrientador()">Guardar</button>' +
-  '<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="oriEditando=null; renderListaOrientadores()">Cancelar</button></div></div>';
+  '<div class="d-flex gap-2 mt-1"><button type="button" class="btn btn-outline-dark btn-sm" onclick="oriEditando.filas.push({turno:turnoActivo,grado:1,grupo:1}); renderListaOrientadores()">+ Agregar grupo</button>' +
+  '<button type="button" class="btn btn-vinotinto btn-sm" onclick="guardarGruposOrientador()">Guardar</button>' +
+  '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="oriEditando=null; renderListaOrientadores()">Cancelar</button></div></div>';
 }
 function guardarGruposOrientador() {
  if (!oriEditando || rolActivo !== 'control') return;
@@ -1698,7 +1924,7 @@ function intentarEntrar(reintento) {
  .then(r => r.json().catch(() => ({})).then(d => ({status: r.status, ...d})))
  .then(d => {
  listo();
- // 419: la página llevaba mucho abierta y su token venció -> se pide uno nuevo y se reintenta UNA vez, sin que la persona haga nada
+ // Error 419: la página llevaba mucho abierta y su código de seguridad venció -> se pide uno nuevo y se reintenta UNA vez, sin que la persona haga nada
  if (d.status === 419 && !reintento) { orientadorActivo = null; return refrescarCsrf().then(() => intentarEntrar(true)); }
  if (d.status === 429 && !d.mensaje) d.mensaje = 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.';
  if (!d.ok) {
@@ -1709,7 +1935,7 @@ function intentarEntrar(reintento) {
  }
  if (d.csrf) $('meta[name="csrf-token"]').attr('content', d.csrf);
  aplicarPrecarga(d);   // estado completo + contraseñas (Control Escolar) llegan con el inicio de sesión
- // El rol real lo dice el SERVIDOR. Si no coincide con el elegido (alguien tocó la página con F12), se cierra la sesión.
+ // El rol real lo dice el SERVIDOR. Si no coincide con el elegido (alguien modificó la página desde las herramientas del navegador), se cierra la sesión.
  if (d.rol !== rol) {
  orientadorActivo = null;
  fetch('/auth/logout', {method:'POST', headers:{'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''}})
@@ -1769,9 +1995,11 @@ function mostrarSeccion(id) {
  if (ES_MOVIL && rol === 'orientador') setTimeout(activarCamaraOrientador, 400);
  }
 }
-/* Recarga completa del sistema: borra la copia guardada de la página (así no se queda una versión vieja o trabada),
-   pide al service worker que busque actualización y vuelve a abrir desde el inicio con un token de sesión nuevo.
-   NO borra datos: la sesión del servidor y los registros/escaneos pendientes del equipo se conservan. */
+/*
+ * Recarga completa del sistema: borra la copia guardada de la página (así no se queda una versión vieja o trabada),
+ * pide al modo sin internet que busque una versión nueva y vuelve a abrir desde el inicio con un código de sesión nuevo.
+ * NO borra datos: la sesión del servidor y los registros/escaneos pendientes del equipo se conservan.
+ */
 let _recargando = false;
 function recargarSistema(btn) {
  if (_recargando) return;
@@ -1783,7 +2011,7 @@ function recargarSistema(btn) {
   const tareas = [];
   try {
    if (window.caches) tareas.push(caches.keys().then(ks => Promise.all(ks.filter(k => k.indexOf('sica-') === 0 && k.indexOf('-paginas') > -1).map(k => caches.delete(k)))));
-   // La búsqueda de actualización del service worker va por red: se lanza SIN esperarla (antes la recarga aguardaba hasta 2 s por ella)
+   // La búsqueda de una versión nueva usa internet: se lanza SIN esperarla (antes la recarga esperaba hasta 2 s)
    if (navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {});
   } catch (e) {}
   return Promise.all(tareas.map(t => t.catch(() => {})));
@@ -1796,7 +2024,7 @@ function recargarSistema(btn) {
 }
 function cerrarSesion() {
  Object.keys(scanners).forEach(detener);
- // El service worker guarda la página de inicio para abrir sin internet: al cerrar sesión se borra esa copia
+ // El modo sin internet guarda la página de inicio para abrir sin conexión: al cerrar sesión se borra esa copia
  try { if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage('limpiar-paginas'); } catch (e) {}
  localStorage.removeItem('sica_orientador');
  orientadorActivo = null;
@@ -1815,8 +2043,8 @@ function cerrarSesion() {
 function seleccionarPerfil(perfil) {
  Object.keys(scanners).forEach(detener);
  gradoSeleccionado = null;
- $('.profile-card').removeClass('active'); $('.panel-perfil').addClass('d-none');
- $('#tab-' + perfil).addClass('active'); $('#panel-' + perfil).removeClass('d-none');
+ $('.profile-card').removeClass('active').attr('aria-pressed', 'false'); $('.panel-perfil').addClass('d-none');
+ $('#tab-' + perfil).addClass('active').attr('aria-pressed', 'true'); $('#panel-' + perfil).removeClass('d-none');
  if (perfil === 'orientador') { configurarPanelOrientador(); renderTabla(); }
  if (perfil === 'control') renderStats();
  // La cámara del lector fijo ya NO se enciende sola: solo con el botón "Encender / Apagar Cámara". El lector físico funciona sin cámara.
@@ -1881,7 +2109,7 @@ function llamarClaves(url, metodo, cuerpo, reintento) {
   if (r.status === 419 && !reintento) return refrescarCsrf().then(() => llamarClaves(url, metodo, cuerpo, true));
   if (r.status === 401) { sesionExpirada(); return {ok:false, mensaje:'Tu sesión expiró.'}; }
   return r.json().catch(() => ({})).then(d => {
-   // Laravel responde los errores de validación con {message, errors}
+   // Los errores de datos incorrectos llegan como {message, errors}
    if (!r.ok && !d.mensaje) d.mensaje = (d.errors && Object.values(d.errors)[0][0]) || d.message || 'No se pudo guardar.';
    return {...d, ok: r.ok && d.ok !== false};
   });
@@ -1896,8 +2124,10 @@ let temporizadorClaves = null;
 function etiquetaCuenta(borrada, bloqueada) {
  return bloqueada ? '<span class="etq mal">Bloqueada</span>' : borrada ? '<span class="etq mal">Sin contraseña</span>' : '<span class="etq bien">Activa</span>';
 }
-/* Control Escolar revisa cada 2 s si alguien pulsó "¿Olvidaste tu contraseña?". Se manda el ETag a mano para que,
-   si nada cambió, el servidor responda 304 sin cuerpo y no se vuelva a dibujar nada (así se puede revisar seguido sin costo). */
+/*
+ * Control Escolar revisa cada 2 s si alguien pulsó "¿Olvidaste tu contraseña?". Se manda la marca de versión (ETag) a mano para que,
+ * si nada cambió, el servidor responda "sin cambios" (304) y no se vuelva a dibujar nada (así se puede revisar seguido sin costo).
+ */
 let _etagClaves = null, _cargandoClaves = false;
 let _versionClaves = 0;     // sube con cada cambio hecho aquí: una consulta que salió antes ya trae datos viejos y se descarta
 let _accionesClaves = 0;    // acciones (desbloquear, borrar, guardar...) que siguen en camino al servidor
@@ -2030,10 +2260,12 @@ $(document).on('click', function (e) {
 });
 /* Burbujas para Control Escolar: aparecen cuando otra cuenta pulsa "¿Olvidaste tu contraseña?" */
 let burbujasVistas = {};
-/* ---- Avisos entre pestañas del mismo navegador ----
-   Cuando sale un aviso (como "X solicita su nueva contraseña"), las demás pestañas que siguen en la pantalla de inicio
-   lo reciben y ENTRAN SOLAS al sistema con la sesión que ya está abierta, para que el aviso no se quede sin verse.
-   Usa BroadcastChannel (y localStorage como respaldo en navegadores viejos); la sesión sigue siendo la del servidor. */
+/*
+ * ---- Avisos entre pestañas del mismo navegador ----
+ * Cuando sale un aviso (como "X solicita su nueva contraseña"), las demás pestañas que siguen en la pantalla de inicio
+ * lo reciben y ENTRAN SOLAS al sistema con la sesión que ya está abierta, para que el aviso no se quede sin verse.
+ * Usa un canal de comunicación entre pestañas (y, como respaldo en navegadores viejos, lo guardado en el navegador); la sesión sigue siendo la del servidor.
+ */
 const _canalAvisos = ('BroadcastChannel' in window) ? new BroadcastChannel('sica_avisos') : null;
 function avisarOtrasPestanas(msg) {
  try {
@@ -2189,12 +2421,14 @@ function pintarBurbujas(roles, orientadores, avisar) {
  if (hayNueva) sonarAviso(VECES_PRIMER_AVISO);
  vigilarRepeticion();
 }
-/* ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
-   Mientras haya una burbuja sin atender y sin silenciar, el sonido es CONSTANTE: una tanda detrás de otra (cada REPETIR_AVISO_MS) hasta que la silencien o den acceso.
-   La burbuja se va sola en cuanto Control Escolar le da acceso a esa cuenta (la consulta ya no la trae) y con ella se detiene el sonido.
-   El botón "Silenciar" apaga el sonido de ESA alerta (la burbuja se queda a la vista); se guarda en este navegador (localStorage),
-   así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
-   "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar. */
+/*
+ * ---- Repetir el sonido mientras nadie atienda la alerta, y poder silenciarla ----
+ * Mientras haya una burbuja sin atender y sin silenciar, el sonido es CONSTANTE: una tanda detrás de otra (cada REPETIR_AVISO_MS) hasta que la silencien o den acceso.
+ * La burbuja se va sola en cuanto Control Escolar le da acceso a esa cuenta (la consulta ya no la trae) y con ella se detiene el sonido.
+ * El botón "Silenciar" apaga el sonido de ESA alerta (la burbuja se queda a la vista); se guarda en este navegador,
+ * así sigue en silencio aunque se recargue la página o haya otras pestañas abiertas. Si la misma persona vuelve a pulsar
+ * "¿Olvidaste tu contraseña?" es una solicitud nueva (otra hora) y vuelve a sonar.
+ */
 const REPETIR_AVISO_MS = 1600;   // = lo que dura una tanda de VECES_REPETICION: una empieza justo cuando termina la anterior, sin silencios largos
 const VECES_PRIMER_AVISO = 2;   // cada vez = par de tonos de 0.8 s
 const VECES_REPETICION = 2;     // 2 x 0.8 s = 1.6 s por tanda
@@ -2217,7 +2451,7 @@ function fijarMudo(k, mudo) {
   localStorage.setItem(CLAVE_MUDOS, JSON.stringify(m));
  } catch (e) {}
 }
-function pintarMudo(b) {   // b = burbuja (jQuery): el texto del botón y su aspecto siguen al estado guardado
+function pintarMudo(b) {   // b = burbuja: el texto del botón y su aspecto siguen al estado guardado
  const mudo = estaMudo(b.attr('data-k'));
  b.toggleClass('silenciada', mudo);
  b.find('.burbuja-mudo')
@@ -2260,7 +2494,7 @@ function avisarOlvido() { try { if (_canalOlvidos) _canalOlvidos.postMessage(Dat
 function consultarOlvidosInicio() {
  if (rolActivo || _consultandoOlvidos) return;
  _consultandoOlvidos = true;
- // Se manda el ETag a mano: si nada cambió el servidor responde 304 sin cuerpo (se consulta cada 1.5 s en cada equipo)
+ // Se manda la marca de versión (ETag) a mano: si nada cambió, el servidor responde "sin cambios" (304) y sin datos (se consulta cada 1.5 s en cada equipo)
  const cab = {'Accept': 'application/json'};
  if (_etagOlvidos) cab['If-None-Match'] = _etagOlvidos;
  fetchT('/api/sica/olvidos', {headers: cab, cache: 'no-store'}, 6000)
@@ -2333,7 +2567,7 @@ function limpiarCamposClave() {
  $('#clave-actual,#clave-nueva,#clave-confirmar').val('');
  $('#ver-claves').prop('checked', false); verClavesNuevas(); revisarRequisitosClave();
 }
-/* Genera una contraseña segura al azar con el generador criptográfico del navegador (sin letras ni números que se confunden) */
+/* Genera una contraseña segura al azar con el generador seguro del navegador (sin letras ni números que se confundan) */
 function generarClave() {
  const may = 'ABCDEFGHJKLMNPQRSTUVWXYZ', min = 'abcdefghijkmnpqrstuvwxyz', num = '23456789', todo = may + min + num;
  const al = n => { const b = new Uint32Array(1), lim = Math.floor(0x100000000 / n) * n; let x; do { crypto.getRandomValues(b); x = b[0]; } while (x >= lim); return x % n; };
@@ -2509,10 +2743,10 @@ function confirmarOlvido(reintento) {
   body: JSON.stringify({email: email, orientador: o ? o.nombre : null})
  }, 10000).then(r => r.json().catch(() => ({})).then(d => ({status: r.status, ...d})))
  .then(d => {
-  // 419: la página llevaba mucho tiempo abierta y su token venció (pasa en computadoras) -> se pide uno nuevo y se reintenta UNA vez
+  // Error 419: la página llevaba mucho tiempo abierta y su código de seguridad venció (pasa en computadoras) -> se pide uno nuevo y se reintenta UNA vez
   if (d.status === 419 && !reintento) return refrescarCsrf().then(() => confirmarOlvido(true));
   _olvidoEnCurso = false;
-  btn.prop('disabled', false);   // (el modal siguiente reemplaza los botones)
+  btn.prop('disabled', false);   // (la ventana siguiente reemplaza los botones)
   $('#input-clave').val('');
   if (d.ok === false || !d.mensaje) {
    let msg = d.mensaje;
@@ -2521,7 +2755,7 @@ function confirmarOlvido(reintento) {
     else if (d.status === 419) msg = 'La página estuvo abierta demasiado tiempo. Recárgala (F5) e inténtalo de nuevo.';
     else if (d.status === 422) msg = 'No se pudo identificar tu cuenta. Recarga la página (F5), elige tu rol y vuelve a intentarlo.';
     else if (d.status >= 500) {
-     // Error interno del servidor. Con APP_DEBUG=true (modo local) Laravel manda la causa real en d.message; en producción solo dice "Server Error".
+     // Error interno del servidor. Con APP_DEBUG=true (modo local) llega la causa real en d.message; en el sitio publicado solo dice "Server Error".
      msg = 'Error del servidor (' + d.status + ')' + (d.message && d.message !== 'Server Error' ? ': ' + String(d.message).slice(0, 300) : '. Revisa el registro del servidor (storage/logs/laravel.log).');
     }
     else msg = 'No se pudo completar (error ' + d.status + '). Inténtalo de nuevo.';
@@ -2600,7 +2834,7 @@ function vaciarCola() {
     return r.json().catch(() => ({})).then(d => {
      const res = (d && d.resultados) || [];
      if (res.length !== lote.length) { lote.forEach(it => { it.diferido = true; }); _errCola = 'respuesta incompleta del servidor, reintentando'; terminar(huboExito); return reintentarColaPronto(); }
-     // Cada escaneo sale de la cola cuando el servidor lo atendió; los rechazados de forma definitiva (403/404/409/422) se descartan para no atorarla
+     // Cada escaneo sale de la cola cuando el servidor lo atendió; los que el servidor rechazó de forma definitiva (errores 403/404/409/422) se descartan para no detener la cola
      const ids = new Set(lote.map(it => it.id));
      colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id));
      _errCola = ''; _demoraCola = 1500;
@@ -2610,7 +2844,7 @@ function vaciarCola() {
     });
    }
    if (r.status >= 500 || r.status === 429) { lote.forEach(it => { it.diferido = true; }); _errCola = 'el servidor respondió con error ' + r.status + ', reintentando'; terminar(huboExito); return reintentarColaPronto(); }
-   // 403 / 404 / 422 de toda la petición: se descarta el lote para no atorar la cola
+   // Error 403 / 404 / 422 en toda la petición: se descarta el lote para no detener la cola
    const ids = new Set(lote.map(it => it.id));
    colaEscaneos = colaEscaneos.filter(it => !ids.has(it.id)); guardarCola();
    return r.json().catch(() => ({})).then(d => {
@@ -2624,7 +2858,15 @@ function vaciarCola() {
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
 const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
+/* Aviso en ROJO cuando el escaneo ya pasó la tolerancia del grupo: "Retardo de entrada" o "Retardo de salida", con los minutos y (si se sabe) la hora límite.
+   Devuelve '' si llegó a tiempo o dentro de la tolerancia. */
+function avisoRetardo(modo, minutos, limiteMin) {
+ if (!(minutos > 0)) return '';
+ const hh = limiteMin == null ? '' : ' (límite ' + h12(p2(Math.floor(limiteMin / 60)) + ':' + p2(limiteMin % 60)) + ', ya con la tolerancia)';
+ return 'Retardo de ' + (modo === 'Salida' ? 'salida' : 'entrada') + ': ' + durMin(minutos) + ' tarde' + hh;
+}
 /* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (y el retardo de entrada o de salida, si lo hubo) */
+const parRetardo = (modo, minutos) => minutos > 0 ? ' (Retardo de ' + (modo === 'Salida' ? 'salida' : 'entrada') + ': ' + durMin(minutos) + ')' : '';
 function detalleRegistro(tipo, a, hora, extra) {
  // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
  let ori = '';
@@ -2651,13 +2893,13 @@ function iniciarScanner(el, modoFn) {
  alert('No se pudo abrir la cámara (requiere permiso y https o localhost): ' + e);
  };
  // Enfoque automático continuo (si la cámara lo permite) y resolución según cómo se lee el QR:
- //  - Con lector nativo del navegador (BarcodeDetector: Chrome en Android, Mac...) se usa 1080p: lo decodifica el sistema, es rápido y alcanza de más lejos.
- //  - Con el lector en JavaScript (iPhone, Windows, la mayoría de computadoras) 1080p tarda más del doble por cuadro que 720p (medido: ~75 ms contra ~33 ms),
+ //  - Con el lector del propio navegador (BarcodeDetector: Chrome en Android, Mac...) se usa 1080p: lo lee el sistema operativo, es rápido y alcanza de más lejos.
+ //  - Con el lector propio del sistema (iPhone, Windows, la mayoría de computadoras) 1080p tarda más del doble por cuadro que 720p (medido: ~75 ms contra ~33 ms),
  //    así que se pide 720p: lee el QR en menos tiempo cuando se acerca la credencial a la cámara.
  const nativo = typeof window.BarcodeDetector !== 'undefined';
  const resolucion = nativo ? {width:{ideal:1920}, height:{ideal:1080}} : {width:{ideal:1280}, height:{ideal:720}};
  const mejorarImagen = () => { try { s.applyVideoConstraints(Object.assign({advanced:[{focusMode:'continuous'}]}, resolucion)).catch(() => {}); } catch (e) {} setTimeout(precalentarIndiceQr, 0); };
- const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).then(mejorarImagen).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
+ const probar = (intentos, i) => s.start(intentos[i], cfg, alLeer).then(() => { mejorarImagen(); mensajePrevioEscaneo(el, 'Cámara lista: acerca el código QR de la credencial.'); }).catch(e => (i + 1 < intentos.length) ? probar(intentos, i + 1) : fallo(e));
  if (!ES_MOVIL) { probar([{facingMode:'user'}], 0); return; } // Computadora: cámara frontal
  // Teléfono/tablet: SIEMPRE trasera. Se busca en la lista real de cámaras la que se llame back/rear/trasera...
  const reTrasera = /back|rear|trasera|posterior|traseira|environment|arri[eè]re/i, reExtra = /ultra|wide|tele|macro|depth|front|frontal|delantera/i;
@@ -2676,13 +2918,14 @@ let modoOrient = 'Auto';
 /* Texto y color del modo: Automático (verde) o forzado a mano (rojo), con la indicación de cómo volver */
 function pintarModo(m, idTxt) {
  const el = $('#' + idTxt);
- if (m === 'Auto') el.css('color', '#198754').text('Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.');
- else el.css('color', '#dc3545').text('Modo MANUAL: todo escaneo se registra como ' + m.toUpperCase() + '. Vuelve a pulsar «' + m + '» para regresar al modo automático.');
+ if (m === 'Auto') el.css('color', '#0b6b3a').text('Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.');
+ else el.css('color', '#b00020').text('Modo MANUAL: todo escaneo se registra como ' + m.toUpperCase() + '. Vuelve a pulsar «' + m + '» para regresar al modo automático.');
 }
 function setModoOrient(m) {
  modoOrient = (modoOrient === m) ? 'Auto' : m;   // pulsar otra vez el mismo botón = volver a Automático
  $('#btn-orient-entrada').toggleClass('btn-success', modoOrient === 'Entrada').toggleClass('btn-outline-dark bg-white', modoOrient !== 'Entrada');
  $('#btn-orient-salida').toggleClass('btn-vinotinto', modoOrient === 'Salida').toggleClass('btn-outline-dark bg-white', modoOrient !== 'Salida');
+ $('#btn-orient-entrada').attr('aria-pressed', modoOrient === 'Entrada'); $('#btn-orient-salida').attr('aria-pressed', modoOrient === 'Salida');
  pintarModo(modoOrient, 'txt-modo-orient');
 }
 function activarCamaraOrientador() { if (!permisoPermite()) return; iniciarScanner('cam-orient', () => modoOrient); }
@@ -2698,18 +2941,30 @@ function claveDeLectura(txt) {
  return m ? 'SICA' + m[1].slice(0, 16) : String(txt).trim().toUpperCase();
 }
 const esClaveQr = c => /^SICA[0-9A-F]{16}$/.test(c);
+/* Mensaje previo al escaneo (neutro, ni verde ni rojo): la cámara está lista o se está buscando al alumno */
+function mensajePrevioEscaneo(el, txt) {
+ $('#res-' + el).removeClass('text-success text-danger').text(txt);
+}
 function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
  const mostrar = r => {
-  $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok ? 'text-success' : 'text-danger').text(r.msg);
-  if (navigator.vibrate) navigator.vibrate(r.ok ? 150 : [100,60,100]);
+  // Verde = registrado. Rojo = hubo un error. Si además pasó la tolerancia, abajo aparece en ROJO el aviso "Retardo de entrada / de salida".
+  // Con retardo TODO el texto (nombre, grupo, hora...) sale en rojo y abajo van los minutos u horas de retraso
+  const caja = $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok && !r.retardo ? 'text-success' : 'text-danger').empty();
+  $('<span>').text(r.msg).appendTo(caja);
+  // Si ya tenía ese registro (entrada o salida), se avisa clarito debajo con la hora en que quedó
+  if (!r.ok && /ya estaba registrada|ya tiene entrada/i.test(r.msg || '')) $('<span class="res-retardo d-block mt-2">').text('✔ Ya está el registro: no se registró de nuevo.').appendTo(caja);
+  if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
  };
  const r = registrarPorCurp(curp, modo);
  if (r && typeof r.then === 'function') {   // alumno que este equipo aún no tiene: lo busca el servidor
-  $('#res-' + el).removeClass('text-success text-danger').text('Buscando alumno…');
+  mensajePrevioEscaneo(el, 'Buscando alumno…');
   r.then(mostrar);
- } else mostrar(r);
+ } else {   // el alumno ya está en este equipo: igual se ve primero "Buscando alumno…" y enseguida el resultado
+  mensajePrevioEscaneo(el, 'Buscando alumno…');
+  setTimeout(() => mostrar(r), 400);
+ }
 }
 let _guardarPend = null;
 /* Varios escaneos seguidos se juntan: como máximo cada 300 ms se guarda una copia local y se repinta la tabla.
@@ -2761,13 +3016,16 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
  guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
- const tr = retrasosDe(a, r, f);
- const extraRet = modo === 'Entrada' ? (tr.entrada > 0 ? 'Retardo de entrada: ' + tr.entrada + ' min' : '') : (tr.salida > 0 ? 'Retardo de salida: ' + tr.salida + ' min' : '');
- return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), extraRet) +
+ // Retardo = pasó la hora límite del grupo MÁS su tolerancia: de entrada al entrar, de salida al salir (aunque no tenga entrada registrada)
+ const lim = limiteDe(a), limiteMin = modo === 'Entrada' ? lim.retardo : lim.fin;
+ const minRet = toMin(modo === 'Entrada' ? r.entrada : r.salida) - limiteMin;
+ return {ok:true, retardo: avisoRetardo(modo, minRet, limiteMin), msg:detalleRegistro(modo, a, horaAhora(), '') + parRetardo(modo, minRet) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
-/* Índice código-del-QR -> alumno. Antes, cada lectura calculaba el código (un hash) de los alumnos uno por uno hasta dar con el correcto;
-   ahora se arma una sola vez (al encender la cámara) y cada lectura es una búsqueda directa. */
+/*
+ * Índice código-del-QR -> alumno. Antes, cada lectura calculaba el código de los alumnos uno por uno hasta dar con el correcto;
+ * ahora se arma una sola vez (al encender la cámara) y cada lectura es una búsqueda directa.
+ */
 let _idxQr = {lista: null, n: -1, clave: null, mapa: new Map()};
 function construirIndiceQr() {
  const m = new Map();
@@ -2801,7 +3059,9 @@ function registrarDesconocido(curp, modo) {
   if (r.ok && d && d.ok) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
-   return {ok:true, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '')};
+   // El servidor avisa si ya pasó la tolerancia del grupo (de entrada o de salida)
+   const aviso = d.retardo ? avisoRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '';
+   return {ok:true, retardo: aviso, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '') + (d.retardo ? parRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '')};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
@@ -2818,6 +3078,7 @@ function setModoEscaneo(m) {
  modoEscaneo = (modoEscaneo === m) ? 'Auto' : m;   // pulsar otra vez el mismo botón = volver a Automático
  $('#btn-modo-entrada').toggleClass('btn-success', modoEscaneo === 'Entrada').toggleClass('btn-outline-dark bg-white', modoEscaneo !== 'Entrada');
  $('#btn-modo-salida').toggleClass('btn-vinotinto', modoEscaneo === 'Salida').toggleClass('btn-outline-dark bg-white', modoEscaneo !== 'Salida');
+ $('#btn-modo-entrada').attr('aria-pressed', modoEscaneo === 'Entrada'); $('#btn-modo-salida').attr('aria-pressed', modoEscaneo === 'Salida');
  $('#lbl-modo').text(modoEscaneo === 'Auto' ? 'Automático' : modoEscaneo);
  pintarModo(modoEscaneo, 'txt-modo-lector');
 }
@@ -2832,12 +3093,14 @@ function toggleCamaraFija() {
 }
 function activarCamaraFija() { if (!scanners['cam-fija']) toggleCamaraFija(); }
 function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
-/* ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth HID) ----
-   Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
-   Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
-   subdirector, con el mismo permiso que pide la cámara). Se ignora lo que se escribe a mano en cualquier campo, salvo el
-   buscador de alumnos: ahí, una ráfaga rápida de teclas seguida de Enter se toma como lectura y se borra del buscador.
-   Si el lector está configurado "sin terminador", la lectura se da por terminada tras una breve pausa. */
+/*
+ * ---- Lector físico (pistola USB, receptor 2.4G o Bluetooth) ----
+ * Estos lectores funcionan como un teclado: "teclean" el texto del QR (la CURP) y terminan con Enter.
+ * Funciona en el Lector Fijo (Control Escolar) y en la Cámara de Escaneo del panel de Orientadores (orientador, director y
+ * subdirector, con el mismo permiso que pide la cámara). Se ignora lo que se escribe a mano en cualquier campo, salvo el
+ * buscador de alumnos: ahí, una ráfaga rápida de teclas seguida de Enter se toma como lectura y se borra del buscador.
+ * Si el lector está configurado "sin terminador", la lectura se da por terminada tras una breve pausa.
+ */
 (function () {
  let buf = '', ultimaTecla = 0, pausa = null, campo = null;
  // A dónde va la lectura según el panel que se está viendo (null = ninguno)
@@ -2912,7 +3175,7 @@ function apagarCamaraFija() { if (scanners['cam-fija']) toggleCamaraFija(); }
 function actualizarTextosTurno() {
  const t = turnoActivo;
  $('.txt-turno-activo').text(t);
- $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno (opcional; si no lo pones se usa ' + t + ')');
+ $('#lbl-archivo-orientadores').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): Nombre completo, Grado, Grupo y Turno, en cualquier orden (el turno es opcional; si no lo pones se usa ' + t + ')');
  $('#lbl-archivo-lista').text('Archivo del turno ' + t + ' (.xlsx/.xls/.csv/.pdf): CURP y nombre');
 }
 function pintarBotonesTurno() {
@@ -2922,6 +3185,7 @@ function pintarBotonesTurno() {
  $('#btn-turno-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
  $('#btn-turno-lector-matutino').toggleClass('btn-vinotinto', t === 'Matutino').toggleClass('btn-outline-dark bg-white', t !== 'Matutino');
  $('#btn-turno-lector-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
+ ['', '-lector'].forEach(x => { $('#btn-turno' + x + '-matutino').attr('aria-pressed', t === 'Matutino'); $('#btn-turno' + x + '-vespertino').attr('aria-pressed', t === 'Vespertino'); });
  $('#titulo-tabla-orientador').text('Turno ' + t);
  sincronizarFiltroLector();
 }
@@ -3009,7 +3273,7 @@ function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
  const r = a.reg[f] || {}, e = estatusDe(a, r, f), rt = celdasRetardo(a, r, f), dis = (r.salida || f !== hoy()) ? 'disabled' : '';
- return `<tr${e === 'Sin registro' ? ' class="fila-sin-reg"' : ''}><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
+ return `<tr${e === 'Sin registro' ? ' class="fila-sin-reg"' : ''}><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td${rt.lateEnt ? ' class="txt-ret-ent"' : ''}>${r.entrada ? h12(r.entrada) : '—'}</td><td${rt.lateSal ? ' class="txt-ret-sal"' : ''}>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="registroRapido(this.dataset.c)" class="btn ${r.entrada ? 'btn-outline-dark' : 'btn-vinotinto'} btn-sm btn-rapido btn-accion-restringida" ${dis}>${r.salida ? 'Completo' : (r.entrada ? 'Registrar salida' : 'Registrar entrada')}</button></td></tr>`;
  }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
@@ -3023,6 +3287,16 @@ function aplicarPermisosSolo() {
  bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
 }
+/* Registro rápido: UN solo toque, sin confirmación. Sin entrada hoy -> registra la entrada; con entrada -> registra la salida.
+   Avisa con una burbuja y, si ya pasó la tolerancia del grupo, con el retardo en rojo. */
+function registroRapido(id) {
+ if (!permisoPermite()) return;
+ const al = db.alumnos.find(x => x.id === id); if (!al) return;
+ const r0 = al.reg[hoy()] || {};
+ const r = registrarPorId(id, r0.entrada ? 'Salida' : 'Entrada', true);
+ if (!r.ok) alert(r.msg);
+ else if (r.retardo) alert(r.msg);   // sin retardo no estorba: la fila se actualiza sola
+}
 function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida', true); if (!r.ok) alert(r.msg); }
 function subirLista() {
  if (!permisoPermite()) return;
@@ -3030,22 +3304,40 @@ function subirLista() {
  const inp = $('#archivo-lista')[0];
  if (!inp.files.length) { alert('Selecciona un archivo para la lista.'); return; }
  if (!confirm('¿Cargar ' + inp.files.length + (inp.files.length === 1 ? ' archivo' : ' archivos') + ' en el ' + filtro.grado + '° grado, grupo ' + filtro.grupo + ' (' + turnoActivo + ')?\nSe agregan los alumnos nuevos y se actualizan los que ya existan.')) return;
- const modo = $('#orden-nombre-lista').val();
+ const modo = $('#orden-nombre-lista').val() || 'auto';   // auto = no hace falta elegir el orden: se respeta el del archivo y, si trae CURP, se acomoda solo
  const RX_CURP = /^[A-Z]{4}\d{6}[HMX][A-Z]{5}[A-Z0-9]\d$/i;
- leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], r => /curp|matr|nombre|apellido/i.test(String(r[0] == null ? '' : r[0])), rows => {
- rows = rows.filter(r => r && r[0] != null && String(r[0]).trim());
- if (rows.length && /curp|matr|nombre|apellido/i.test(String(rows[0][0]))) rows.shift();
- if (!rows.length) { alert('El archivo no trae alumnos. Pon la CURP en la columna A y el nombre en la B.'); return; }
+ // Encabezado: alguna de las primeras celdas dice CURP / Nombre / Apellido... (y la fila no trae ya una CURP real)
+ const esEncabezado = r => !!r && !r.slice(0, 8).some(x => RX_CURP.test(String(x == null ? '' : x).trim())) && r.slice(0, 8).some(x => /curp|matr|nombre|apellido|paterno|materno/i.test(String(x == null ? '' : x)));
+ leerFilasVarios(inp, ['xlsx', 'xls', 'csv', 'pdf'], esEncabezado, rows => {
+ rows = rows.filter(r => r && r.some(x => x != null && String(x).trim() !== ''));
+ if (rows.length && esEncabezado(rows[0])) rows.shift();
+ if (!rows.length) { alert('El archivo no trae alumnos. Pon el nombre y la CURP en columnas (en cualquier orden: CURP y nombre, o nombre y CURP).'); return; }
  let nuevos = 0, actualizados = 0;
  const curpsInvalidas = [];
  rows.forEach(r => {
  let curp = '', fila = r, desde = 0;
- const c0 = String(r[0]).trim();
- if (RX_CURP.test(c0)) { curp = c0.toUpperCase(); desde = 1; }   // Excel: CURP en columna A
- else { const m = c0.match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/); if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; } else if (/^[A-Za-z0-9]{10,25}$/.test(c0) && /\d/.test(c0) && /[A-Za-z]/.test(c0)) { curpsInvalidas.push(c0 + ' (' + (c0.length === CURP_LARGO ? 'formato no válido' : curpDiferencia(c0).toLowerCase()) + ')'); return; } }   // PDF: "CURP Nombre"; si parece CURP pero no es válida, se omite
+ const cel = r.slice(0, 8).map(x => String(x == null ? '' : x).trim());
+ if (!cel.some(Boolean)) return;
+ const k = cel.findIndex(c => RX_CURP.test(c));   // la CURP puede estar en cualquier columna: antes o después del nombre
+ if (k > -1) {
+ curp = cel[k].toUpperCase();
+ const antes = cel.slice(0, k);
+ while (antes.length && (/^\d{1,4}$/.test(antes[0]) || ORI_ES_NUM(antes[0]) || ORI_ES_TURNO(antes[0]))) antes.shift();   // columnas de No. de lista, grado, grupo o turno antes del nombre
+ const hayNombreAntes = antes.some(c => c.length > 1 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(c));
+ if (hayNombreAntes) { fila = antes; desde = 0; }   // Excel: Nombre y luego CURP
+ else { fila = r; desde = k + 1; while (desde < 8 && cel[desde] && (ORI_ES_NUM(cel[desde]) || ORI_ES_TURNO(cel[desde]))) desde++; }   // Excel: CURP y luego Nombre (se saltan columnas de grado/grupo)
+ } else {
+ const m = cel[0].match(/^([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)\s+(.+)$/), m2 = cel[0].match(/^(.+?)\s+([A-Za-z]{4}\d{6}[HMXhmx][A-Za-z]{5}[A-Za-z0-9]\d)$/);
+ if (m) { curp = m[1].toUpperCase(); fila = [m[2]]; }          // PDF: "CURP Nombre"
+ else if (m2) { curp = m2[2].toUpperCase(); fila = [m2[1]]; }   // PDF: "Nombre CURP"
+ else {
+ const mala = cel.find(c => /^[A-Za-z0-9]{10,25}$/.test(c) && /\d/.test(c) && /[A-Za-z]/.test(c));   // parece CURP pero no es válida: se omite la fila
+ if (mala) { curpsInvalidas.push(mala + ' (' + (mala.length === CURP_LARGO ? 'formato no válido' : curpDiferencia(mala).toLowerCase()) + ')'); return; }
+ }
+ }
  let nombre = armarNombre(fila, desde, modo);
  if (!nombre) return;
- if (curp) nombre = acomodarConCurp(nombre, curp);   // con la CURP se sabe cuál es paterno, materno y nombre aunque la lista venga revuelta
+ if (curp && modo !== 'tal-cual') nombre = acomodarConCurp(nombre, curp);   // en automático o reordenar: con la CURP se sabe cuál es paterno, materno y nombre (si ya está bien no se mueve; si no cuadra, queda como viene). Con "no cambiar" el nombre queda tal cual viene
  let a = curp ? db.alumnos.find(x => x.curp === curp) : null;
  if (!a) a = db.alumnos.find(x => x.grado === filtro.grado && x.grupo === filtro.grupo && x.turno === turnoActivo && (!curp ? true : !x.curp) && norm(x.nombre) === norm(nombre));
  if (a) { if (curp) a.curp = curp; a.nombre = nombre; a.grado = filtro.grado; a.grupo = filtro.grupo; a.turno = turnoActivo; actualizados++; }
@@ -3170,7 +3462,7 @@ function borrarGruposCargados(todos) {
   alert('No se pudieron borrar los grupos en el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
 }
-/* Descargas (Excel / PDF reales) */
+/* Descargas de archivos reales (Excel y PDF) */
 /* Colores de las listas descargadas: retardo en rojo, sin registro en ámbar */
 const COLOR_DESCARGA = {
  sinRegistro: {fondo: 'FFFFF3CD', texto: 'FF664D03', rgbFondo: [255,243,205], rgbTexto: [102,77,3]},
@@ -3184,12 +3476,21 @@ function colorDeCelda(o, k) {
  if (k === 'Estatus' && /^Retardo/.test(est)) return COLOR_DESCARGA.retardo;
  return null;
 }
+/* titulo: texto o lista de líneas (1.ª = título del reporte; las demás = turno y período). Se escriben arriba de la tabla en Excel y en PDF */
 async function descargar(nombre, filas, formato, titulo) {
  if (!filas.length) { alert('No hay datos para descargar.'); return; }
  if (!libsOk(formato === 'Excel' ? 'ExcelJS' : 'jspdf')) return;
  const k = Object.keys(filas[0]);
+ const lineas = Array.isArray(titulo) ? titulo : [titulo];
  if (formato === 'Excel') {
   const wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Reporte');
+  lineas.forEach((t, i) => {
+   const fr = ws.addRow([t]);
+   ws.mergeCells(fr.number, 1, fr.number, k.length);
+   fr.getCell(1).font = {bold:true, size: i === 0 ? 15 : 12, color:{argb:'FF800020'}};
+   fr.getCell(1).alignment = {horizontal:'left'};
+  });
+  ws.addRow([]);
   const enc = ws.addRow(k);
   enc.eachCell(c => { c.font = {bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF800020'}}; c.alignment = {horizontal:'center'}; });
   filas.forEach(o => {
@@ -3197,7 +3498,7 @@ async function descargar(nombre, filas, formato, titulo) {
    k.forEach((x, i) => { const c = colorDeCelda(o, x); if (c) { const cel = fila.getCell(i + 1); cel.fill = {type:'pattern', pattern:'solid', fgColor:{argb:c.fondo}}; cel.font = {color:{argb:c.texto}, bold:true}; } });
   });
   k.forEach((x, i) => { ws.getColumn(i + 1).width = Math.min(Math.max(Math.max(String(x).length, ...filas.map(o => String(o[x] == null ? '' : o[x]).length)) + 3, 12), 40); });
-  ws.views = [{state:'frozen', ySplit:1}];
+  ws.views = [{state:'frozen', ySplit: enc.number}];
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre + '.xlsx';
@@ -3205,8 +3506,9 @@ async function descargar(nombre, filas, formato, titulo) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
  } else {
   const d = new window.jspdf.jsPDF({orientation:'landscape'});
-  d.setFontSize(13); d.text(titulo, 14, 14);
-  d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY:20, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]},
+  lineas.forEach((t, i) => { d.setFontSize(i === 0 ? 15 : 11); d.setFont(undefined, i === 0 ? 'bold' : 'normal'); d.text(t, 14, 14 + i * 7); });
+  d.setFont(undefined, 'normal');
+  d.autoTable({head:[k], body:filas.map(o => k.map(x => o[x])), startY: 14 + (lineas.length - 1) * 7 + 6, styles:{fontSize:8}, headStyles:{fillColor:[128,0,32]},
    didParseCell: data => {
     if (data.section !== 'body') return;
     const c = colorDeCelda(filas[data.row.index], k[data.column.index]);
@@ -3220,20 +3522,30 @@ function descargarReporte(formato) {
  const periodo = $('#sel-periodo-reporte').val() || 'semana';
  const ref = $('#calendario-orientador').val() || hoy();
  const dias = diasDePeriodo(periodo, ref);
- const tp = tituloPeriodo(periodo, ref);
- const nombreArchivo = 'asistencia_' + (periodo === 'mes' ? ref.slice(0,7) : dias[0]);
+ const dma = f => f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4);   // 2026-11-18 -> 18/11/2026 (día, mes y año)
+ const ini = dias[0], fin = dias[dias.length - 1];
+ let tp, tag;
+ if (periodo === 'mes') {
+  const mes = new Date(ref + 'T12:00:00').toLocaleDateString('es-MX', {month:'long', year:'numeric'});
+  tp = 'Mes de ' + mes + ' (del ' + dma(ini) + ' al ' + dma(fin) + ')'; tag = 'Mes_' + dma(ini).replace(/\//g, '-') + '_al_' + dma(fin).replace(/\//g, '-');
+ } else if (periodo === 'semana') {
+  tp = 'Semana del ' + dma(ini) + ' al ' + dma(fin); tag = 'Semana_' + dma(ini).replace(/\//g, '-') + '_al_' + dma(fin).replace(/\//g, '-');
+ } else {
+  tp = 'Día: ' + dma(ini); tag = 'Dia_' + dma(ini).replace(/\//g, '-');
+ }
+ const nombreArchivo = 'Reporte_asistencia_' + turnoActivo + '_' + tag;
  const filas = [];
  const lista = filtrados(), hoyF = hoy();
  // Los alumnos sin registro también salen en la lista (en otro color), pero solo en días de clases que ya pasaron y en los que alguien del grupo sí vino
  const diaConClase = {};
  dias.forEach(f => { const d = new Date(f + 'T12:00:00').getDay(); diaConClase[f] = f <= hoyF && d !== 0 && d !== 6 && lista.some(a => a.reg[f] && (a.reg[f].entrada || a.reg[f].salida)); });
- lista.forEach(a => dias.forEach(f => {
-  const r = a.reg[f], base = {Fecha:f, CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno};
+ // Primero por fecha y, dentro de cada fecha, el orden de la lista de alumnos
+ dias.forEach(f => lista.forEach(a => {
+  const r = a.reg[f], base = {Fecha:dma(f), CURP:a.curp, Alumno:a.nombre, Grado:a.grado, Grupo:a.grupo, Turno:a.turno};
   if (r && (r.entrada || r.salida)) filas.push(Object.assign(base, {Entrada:r.entrada ? h12(r.entrada) : '—', Salida:r.salida ? h12(r.salida) : 'Pendiente', 'Retardo entrada':textoRetardo(a, r, f).ent, 'Retardo salida':textoRetardo(a, r, f).sal, Estatus:estatusDe(a, r, f)}));
   else if (diaConClase[f]) filas.push(Object.assign(base, {Entrada:'—', Salida:'—', 'Retardo entrada':'—', 'Retardo salida':'—', Estatus:'Sin registro'}));
  }));
- filas.sort((x, y) => x.Fecha < y.Fecha ? -1 : x.Fecha > y.Fecha ? 1 : 0);   // (el orden alfabético de alumnos se conserva dentro de cada fecha)
- descargar(nombreArchivo, filas, formato, 'Reporte de asistencia - Turno ' + turnoActivo + ' - ' + tp);
+ descargar(nombreArchivo, filas, formato, ['Reporte de asistencia', 'Turno ' + turnoActivo, tp]);
 }
 /* ============ CONTROL ESCOLAR: ESTADÍSTICAS Y GRÁFICA ============ */
 function statsGrados(periodo) {
@@ -3351,7 +3663,7 @@ async function descargarExcelConGraficas(nombre, titulo, filas, imagenes) {
  const largo = Math.max(String(k).length, ...filas.map(o => String(o[k] == null ? '' : o[k]).length));
  ws.getColumn(i + 1).width = Math.min(Math.max(largo + 3, 12), 40);
  });
- let fila = ws.rowCount + 1;   // fila (base 0) donde empieza la primera gráfica, con una fila en blanco de separación
+ let fila = ws.rowCount + 1;   // fila (la primera es la 0) donde empieza la primera gráfica, con una fila en blanco de separación
  imagenes.forEach(im => {
  const idImg = wb.addImage({base64: im.img, extension: 'png'});
  const W = 640, H = Math.round(W * im.alto / im.ancho);
@@ -3445,7 +3757,7 @@ const errorPlantilla = {};   // 'Matutino-frente' -> texto del problema, si lo h
 const origenPlantilla = {};  // 'Matutino-frente' -> 'servidor' (la que subió Control Escolar) | 'original' (el Word de public/plantillas)
 const existeOriginal = {};   // 'FrenteMatutino.docx' -> true/false (false = ya se eliminó para siempre)
 try { localStorage.removeItem('sica_epo6_plantilla_oficial'); } catch (e) {}   // ya no se guardan imágenes de plantilla en el navegador
-/* Lee y analiza un Word/PDF de plantilla UNA sola vez (url -> promesa). Se usa al iniciar y también por adelantado en la pantalla de login. */
+/* Lee y analiza un Word/PDF de plantilla UNA sola vez (por cada dirección url). Se usa al iniciar y también por adelantado en la pantalla de inicio de sesión. */
 const _plantillasLeidas = {};
 const _plantillasFirma = {};   // url -> {firma, modelo}: si el archivo no cambió, no se vuelve a analizar (analizar un Word es lo más lento)
 function firmaBuffer(buf) {
@@ -3455,7 +3767,7 @@ function firmaBuffer(buf) {
 }
 function leerPlantilla(url, forzar) {
  if (!forzar && _plantillasLeidas[url]) return _plantillasLeidas[url];
- return _plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revalida (304) en vez de bajar el archivo otra vez
+ return _plantillasLeidas[url] = fetch(url, {credentials: 'same-origin', cache: 'no-cache'})   // no-cache: revisa si hay cambios (304) en vez de bajar el archivo otra vez
   .then(r => r.ok ? r.arrayBuffer() : Promise.reject('no-esta'))
   .then(buf => {
    const firma = firmaBuffer(buf), previa = _plantillasFirma[url];
@@ -3717,8 +4029,10 @@ function eliminarPlantillaAnterior() {
  });
 }
 /* ============ PORTAL DEL ALUMNO / CREDENCIALES ============ */
-/* ---- Código del QR de la credencial (se calcula a partir de la CURP; igual que en el servidor) ----
-   SHA-256 y HMAC en JavaScript simple (la API del navegador es asíncrona y no sirve para dibujar la credencial). */
+/*
+ * ---- Código del QR de la credencial (se calcula a partir de la CURP; igual que en el servidor) ----
+ * Se calcula con una fórmula de seguridad (SHA-256 y HMAC) escrita en JavaScript simple: la que trae el navegador es asíncrona y no sirve para dibujar la credencial.
+ */
 const _K256 = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
 function _sha256(bytes) {
  const l = bytes.length, n = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(n);
@@ -3751,7 +4065,7 @@ function _hmacSha256Hex(clave, texto) {
 /* Texto del QR: nombre corto de la escuela (lo que ve cualquier otra app de escaneo, sin enlace) y al final el código propio del alumno. Total: 25 caracteres, igual de simple que el QR con la CURP */
 const QR_TEXTO_ESCUELA = 'EPO6 ';   // corto a propósito: un QR pequeño (poco texto) lo lee el lector desde más lejos y sin fallar
 const _memoQr = new Map();
-/* Código opaco del QR de una CURP ('' si este equipo aún no recibió la llave del servidor) */
+/* Código del QR de una CURP (vacío si este equipo aún no recibió la llave del servidor) */
 function qrCodigo(curp) {
  if (!curp || !db.qrClave) return '';
  const k = db.qrClave + '|' + curp, v = _memoQr.get(k);
@@ -3770,6 +4084,7 @@ function setTurnoCred(t) {
  turnoCred = t;
  $('#btn-turno-cred-matutino').toggleClass('btn-vinotinto', t === 'Matutino').toggleClass('btn-outline-dark bg-white', t !== 'Matutino');
  $('#btn-turno-cred-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
+ $('#btn-turno-cred-matutino').attr('aria-pressed', t === 'Matutino'); $('#btn-turno-cred-vespertino').attr('aria-pressed', t === 'Vespertino');
  refrescarPreviewPlantillaOficial();    // cambia la vista previa de frente y reverso
  if (credSel) selCred(credSel.grado, credSel.grupo);
 }
@@ -3860,8 +4175,10 @@ function guardarCambiosCredencial() {
  actualizarVistaPreviaCredencial();
  alert('Cambios guardados en la credencial.');
 }
-/* Dibuja la vista previa en vivo (canvas) de frente y reverso mientras se edita al alumno,
- usando siempre los datos que hay en los inputs (aunque no se hayan guardado todavía). */
+/*
+ * Dibuja la vista previa en vivo de frente y reverso mientras se edita al alumno,
+ * usando siempre los datos que hay en los cuadros de texto (aunque no se hayan guardado todavía).
+ */
 function actualizarVistaPreviaCredencial() {
  actualizarContadorCurp();
  const a = db.alumnos.find(x => x.id === idEditando);
@@ -3888,8 +4205,10 @@ function datosCredencial(a) {
   grupo: ROMANOS[a.grupo] || String(a.grupo || ''), turno: a.turno || ''
  };
 }
-/* Dibuja una credencial (frente o reverso) en un <canvas> sobre la plantilla (Word o PDF) del turno del alumno.
-   Es la misma función de la vista previa y del PDF, así lo que se ve es lo que se imprime. */
+/*
+ * Dibuja una credencial (frente o reverso) en pantalla sobre la plantilla (Word o PDF) del turno del alumno.
+ * Es la misma función de la vista previa y del PDF, así lo que se ve es lo que se imprime.
+ */
 function pintarCredencialCanvas(canvas, a, lado, onListo, ancho) {
  if (!canvas) return;
  const m = plantillaDe(a.turno, lado);
@@ -4052,9 +4371,9 @@ function entrarAlSistema(restaurando) {
   // Si el tope de 10 s se cumplió antes de que llegara todo, lo que falte se completa solo cuando llegue
   todo.then(() => { if (rolActivo) prepararPanelesOcultos(true); });
   if (window.SICA_LIBS_LISTAS) window.SICA_LIBS_LISTAS.then(() => { if (rolActivo) { renderStats(); prepararPanelesOcultos(true); } });
-  // Sincroniza con el servidor en segundo plano (primera consulta: 304 si el estado ya venía en el login)
+  // Se actualiza con el servidor en segundo plano (primera consulta: "sin cambios" (304) si el estado ya venía en el inicio de sesión)
   cargarDesdeServidor();
-  // Al recargar, el service worker ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
+  // Al recargar, el modo sin internet ya guardó la página con la sesión: no hace falta pedirla otra vez (era una petición de más)
   if (!restaurando) setTimeout(guardarPaginaOffline, 4000);   // al iniciar sesión sí: así se puede abrir sin internet
  });
 }
@@ -4069,7 +4388,7 @@ function pantallaCarga(mostrar) {
  el.innerHTML = '<div class="spinner-border" role="status" style="color:#800020"></div><div>Cargando el sistema…</div>';
  document.body.appendChild(el);
 }
-/* Empieza a leer las plantillas de Word al entrar (una sola vez) y devuelve la promesa de que ya están listas. */
+/* Empieza a leer las plantillas de Word al entrar (una sola vez) y avisa cuando ya están listas. */
 let _promesaPlantillas = null;
 function precargarPlantillasEntrada() {
  if (_promesaPlantillas) return _promesaPlantillas;
@@ -4105,12 +4424,14 @@ function restaurarSesion(S) {
 }
 // Computadoras: al volver con "atrás" o recargar, el navegador restaura el rol elegido SIN avisar a la página -> se vuelve a sincronizar el correo
 window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredenciales(); });
-/* ---- Qué tan rápido se ven los cambios ----
-   Antes: cada equipo consultaba cada 3 s (computadoras) o 5 s (teléfonos). Ahora:
-   - consulta normal cada 1.5 s (computadoras) / 2.5 s (teléfonos); si no hubo cambios el servidor responde 304 casi sin trabajo;
-   - "ráfaga": 0.8 s mientras se está trabajando (se guardó, borró, escaneó, o llegaron cambios de otro equipo) y 6 s después del último movimiento;
-   - las otras pestañas del MISMO equipo se enteran al instante por BroadcastChannel (sin esperar consulta);
-   - se espera a que termine una consulta antes de programar la siguiente (no se amontonan si el servidor tarda). */
+/*
+ * ---- Qué tan rápido se ven los cambios ----
+ * Antes: cada equipo consultaba cada 3 s (computadoras) o 5 s (teléfonos). Ahora:
+ * - consulta normal cada 1.5 s (computadoras) / 2.5 s (teléfonos); si no hubo cambios el servidor responde "sin cambios" (304) casi sin trabajo;
+ * - "ráfaga": 0.8 s mientras se está trabajando (se guardó, borró, escaneó, o llegaron cambios de otro equipo) y 6 s después del último movimiento;
+ * - las otras pestañas del MISMO equipo se enteran al instante por un canal interno (sin esperar consulta);
+ * - se espera a que termine una consulta antes de programar la siguiente (no se amontonan si el servidor tarda).
+ */
 var _rafagaHasta = 0;
 function acelerarSync(ms) { _rafagaHasta = Math.max(_rafagaHasta, Date.now() + (ms || 6000)); }
 function programarConsulta() {
@@ -4142,7 +4463,7 @@ $(function () {
  precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
  try { if (location.search.indexOf('r=') > -1) history.replaceState(null, '', '/'); } catch (e) {}   // quita el ?r= de la recarga
  if (Array.isArray(window.SICA_ORIENTADORES)) db.orientadores = window.SICA_ORIENTADORES;   // ya vienen en la página
- // Con sesión abierta el estado completo ya viene dentro de la página: se usa al instante y la primera consulta al servidor responde 304
+ // Con sesión abierta el estado completo ya viene dentro de la página: se usa al instante y la primera consulta al servidor responde "sin cambios" (304)
  if (window.SICA_SESION) aplicarPrecarga({estado: window.SICA_ESTADO, claves: window.SICA_CLAVES});   // estado + contraseñas ya vienen en la página
  actualizarCredenciales();
  $('#calendario-orientador').val(hoy());
@@ -4154,12 +4475,14 @@ $(function () {
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
- /* Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde 304 sin cuerpo si nada cambió y
-    guarda la respuesta 1 s en caché). Las otras pestañas del mismo equipo se enteran al instante por BroadcastChannel. */
+ /*
+  * Burbuja y sonido en la pantalla de inicio: se consulta cada 1 s (casi gratis: el servidor responde "sin cambios" (304) si nada cambió y
+  * guarda la respuesta 1 s). Las otras pestañas del mismo equipo se enteran al instante por un canal interno.
+  */
  consultarOlvidosInicio(); setInterval(() => { if (!rolActivo && !document.hidden) consultarOlvidosInicio(); }, 500);
  if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
- // Service worker: permite abrir el sistema sin internet (solo funciona en https o localhost)
+ // Modo sin internet (service worker): permite abrir el sistema sin internet (solo funciona en https o localhost)
  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
  document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo) cargarDesdeServidor(); });
 });

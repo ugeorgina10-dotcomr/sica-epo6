@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /** Índices para que /api/sica/estado y cada escaneo respondan rápido aunque crezcan las asistencias. */
+    /** Índices (atajos de búsqueda) para que /api/sica/estado y cada escaneo respondan rápido aunque crezcan las asistencias. */
     public function up(): void
     {
         Schema::table('asistencias', function (Blueprint $table) {

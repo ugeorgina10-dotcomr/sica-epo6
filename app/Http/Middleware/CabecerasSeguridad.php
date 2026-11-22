@@ -12,19 +12,19 @@ class CabecerasSeguridad
     {
         $respuesta = $next($request);
 
-        $respuesta->headers->set('X-Frame-Options', 'SAMEORIGIN');            // nadie puede incrustar el sistema en otra página
+        $respuesta->headers->set('X-Frame-Options', 'SAMEORIGIN');            // nadie puede mostrar el sistema dentro de otra página
         $respuesta->headers->set('X-Content-Type-Options', 'nosniff');
         $respuesta->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        // La cámara solo se permite en este mismo sitio (escaneo de credenciales)
+        // La cámara solo se permite en este mismo sitio (para escanear credenciales)
         $respuesta->headers->set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
 
         if ($request->isSecure()) {
             $respuesta->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 
-        // Nunca guardar en caché del navegador lo que cambia por sesión (páginas y API)
+        // No se guarda en el navegador lo que cambia según la persona (páginas y datos), para que nadie vea información vieja o ajena
         if ($request->is('vendor/*', 'img/*', 'build/*')) {
-            // Archivos estáticos (librerías, imágenes): el navegador los reutiliza 30 días sin volver a pedirlos
+            // Imágenes y librerías: el navegador las guarda 30 días para no descargarlas cada vez
             $respuesta->headers->set('Cache-Control', 'public, max-age=2592000, immutable');
         } else {
             $respuesta->headers->set('Cache-Control', 'no-cache, private');

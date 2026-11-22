@@ -4,12 +4,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default Queue Connection Name
+    | Cola de tareas por defecto
     |--------------------------------------------------------------------------
     |
-    | Laravel's queue supports a variety of backends via a single, unified
-    | API, giving you convenient access to each backend using identical
-    | syntax for each. The default queue connection is defined below.
+    | Una "cola" guarda tareas pendientes para hacerlas después, sin hacer esperar a la persona.
+    | Aquí se indica cuál se usa normalmente.
     |
     */
 
@@ -17,15 +16,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Queue Connections
+    | Conexiones de la cola
     |--------------------------------------------------------------------------
     |
-    | Here you may configure the connection options for every queue backend
-    | used by your application. An example configuration is provided for
-    | each backend supported by Laravel. You're also free to add more.
-    |
-    | Drivers: "sync", "database", "beanstalkd", "sqs", "redis",
-    |          "deferred", "background", "failover", "null"
+    | Aquí se configuran los lugares donde se guardan las tareas pendientes.
+    | Opciones: "sync", "database", "beanstalkd", "sqs", "redis", "deferred", "background", "failover", "null".
     |
     */
 
@@ -93,12 +88,10 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Job Batching
+    | Tareas en grupo (lotes)
     |--------------------------------------------------------------------------
     |
-    | The following options configure the database and table that store job
-    | batching information. These options can be updated to any database
-    | connection and table which has been defined by your application.
+    | Indica dónde se guarda la información de las tareas agrupadas en lotes.
     |
     */
 
@@ -109,14 +102,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Failed Queue Jobs
+    | Tareas que fallaron
     |--------------------------------------------------------------------------
     |
-    | These options configure the behavior of failed queue job logging so you
-    | can control how and where failed jobs are stored. Laravel ships with
-    | support for storing failed jobs in a simple file or in a database.
-    |
-    | Supported drivers: "database-uuids", "dynamodb", "file", "null"
+    | Indica dónde se anotan las tareas que fallaron.
+    | Opciones: "database-uuids", "dynamodb", "file", "null".
     |
     */
 

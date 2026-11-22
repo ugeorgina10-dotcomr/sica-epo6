@@ -3,9 +3,9 @@
 return [
 
     /*
-    | Algoritmo de las contraseñas. Con rounds=10 guardar y revisar una contraseña tarda ~4 veces menos que con 12
-    | (más rápido al entrar). Las contraseñas ya guardadas con otro costo se actualizan solas la próxima vez que
-    | esa persona inicia sesión (ver AuthController::usuarioValido). Para volver al costo anterior: BCRYPT_ROUNDS=12 en .env
+    | Forma en que se protegen las contraseñas. Con rounds=10 guardar y revisar una contraseña tarda unas 4 veces menos que con 12
+    | (se entra más rápido). Las contraseñas ya guardadas con otro nivel se actualizan solas la próxima vez que
+    | esa persona inicia sesión (ver AuthController::usuarioValido). Para volver al nivel anterior: BCRYPT_ROUNDS=12 en .env
     */
     'driver' => 'bcrypt',
 

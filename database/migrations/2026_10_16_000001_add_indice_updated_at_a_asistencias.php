@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /** MAX(updated_at) de /api/sica/estado usa este índice en vez de recorrer toda la tabla. */
+    /** La fecha de última modificación que usa /api/sica/estado ahora se busca con este atajo (índice) en vez de recorrer toda la tabla. */
     public function up(): void
     {
         Schema::table('asistencias', function (Blueprint $table) {

@@ -1,7 +1,8 @@
-/* SICA-EPO6 — Lector de plantillas de Word (.docx) para las credenciales.
+/*
+ * SICA-EPO6 — Lector de plantillas de Word (.docx) para las credenciales.
  *
- * Lee el archivo de Word (cuadros de texto, grupos, imágenes, líneas, tablas, párrafos con tabuladores),
- * lo acomoda en "puntos" (1 pt = 1/72 de pulgada, igual que Word) y lo dibuja en un <canvas>.
+ * Lee el archivo de Word (cuadros de texto, grupos, imágenes, líneas, tablas y párrafos),
+ * lo acomoda en "puntos" (1 pt = 1/72 de pulgada, igual que Word) y lo dibuja en pantalla.
  * Encuentra solo:
  *   - el cuadro "QR"            -> ahí se coloca el código QR del alumno
  *   - las etiquetas NOMBRE / CURP / GRADO / GRUPO / TURNO -> los datos se escriben junto a cada una
@@ -10,10 +11,10 @@
  * También lee plantillas en PDF (necesita pdf.js, vendor/pdf.min.js): el PDF se usa como fondo y se buscan, por la
  * posición del texto, las mismas etiquetas y los cuadros "QR" y "FOTOGRAFÍA".
  *
- * Necesita JSZip (vendor/jszip.min.js). Uso:
+ * Necesita JSZip (vendor/jszip.min.js). Cómo se usa:
  *   const m = await SicaDocx.cargar(arrayBuffer);        // lee y acomoda el Word (.docx) o el PDF
  *   SicaDocx.dibujar(canvas, m, datos|null, {ancho:760}); // datos = {nombre, curp, grado, grupo, turno}
- *   m.ancho / m.alto = tamaño real en puntos de la credencial
+ *   m.ancho / m.alto = tamaño real de la credencial en puntos
  */
 (function (global) {
  'use strict';
@@ -28,10 +29,10 @@
   mc: 'http://schemas.openxmlformats.org/markup-compatibility/2006',
   r: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
  };
- const EMU = 12700;           // 1 pt = 12700 EMU
+ const EMU = 12700;           // equivalencia de medidas: 1 pt = 12700 EMU (la unidad que usa Word por dentro)
  const num = (v, d) => { const n = parseFloat(v); return isNaN(n) ? (d === undefined ? 0 : d) : n; };
 
- /* ---------- ayudas de XML ---------- */
+ /* ---------- ayudas para leer el XML (el formato interno de Word) ---------- */
  const kids = (el, ns, name) => {
   const out = [];
   if (!el) return out;
@@ -45,14 +46,14 @@
  const at = (el, name) => el ? (el.getAttribute(name) || '') : '';
  const parseXml = s => new DOMParser().parseFromString(s, 'application/xml');
  const boolVal = e => { if (!e) return undefined; const v = wa(e, 'val'); return !(v === '0' || v === 'false' || v === 'off'); };
- /* descendiente directo o profundo por nombre local */
+ /* busca un elemento dentro de otro por su nombre (directo o más adentro) */
  const deep = (el, name, ns) => {
   if (!el) return null;
   const l = el.getElementsByTagNameNS(ns ? NS[ns] : '*', name);
   return l.length ? l[0] : null;
  };
 
- /* ---------- medición de texto ---------- */
+ /* ---------- medir el texto ---------- */
  const mcanvas = document.createElement('canvas');
  const mctx = mcanvas.getContext('2d');
  function familia(n) {
@@ -71,7 +72,7 @@
  }
  const medirSimple = (txt, tam, negrita, fuente) => medir(txt, {size: tam, b: negrita, font: fuente || 'Arial'});
 
- /* ---------- propiedades de texto y de párrafo ---------- */
+ /* ---------- propiedades del texto y del párrafo ---------- */
  function parseRPr(el) {
   const o = {};
   if (!el) return o;
@@ -153,7 +154,7 @@
  }
 
  /* =====================================================================
-    Acomodo (layout)
+    Acomodo de los elementos en la página
     ===================================================================== */
  function acomodar(doc, sty, imgs) {
   const S = {out: [], boxes: {}, labels: [], avisos: [], ph: null};
@@ -227,7 +228,7 @@
    return (contenidoW - sep * (n - 1)) / n;
   }
 
-  /* ----- salida de operaciones ----- */
+  /* ----- lista de elementos por dibujar ----- */
   const emitir = op => { if (op.layer === undefined) op.layer = 1; if (S.ph && op.t === 't') op.ph = S.ph; S.out.push(op); };
   function conSalida(fn) { const guardada = S.out; S.out = []; const r = fn(); const tmp = S.out; S.out = guardada; return {r, ops: tmp}; }
   function mover(op, dy) {
@@ -684,7 +685,7 @@
   try {
    const page = await pdf.getPage(1);
    const v1 = page.getViewport({scale: 1});
-   // resolución: la mayor que quepa en ~4000 px (entre 2 y 8 px por pt)
+   // calidad de la imagen: la mayor que quepa en ~4000 px (entre 2 y 8 px por pt)
    const ESC = Math.max(2, Math.min(8, 4000 / Math.max(v1.width, v1.height)));
    const vp = page.getViewport({scale: ESC});
    const full = document.createElement('canvas');
@@ -738,7 +739,7 @@
      mapa.push({ini: texto.length, it: it});
      texto += it.s;
     });
-    // x de un carácter dentro del renglón (reparte el ancho del bloque de texto según el ancho de las letras)
+    // posición horizontal (x) de cada letra dentro del renglón (reparte el ancho del texto según lo que mide cada letra)
     const xDe = pos => {
      let m = mapa[0];
      for (const e of mapa) if (e.ini <= pos) m = e;
@@ -814,7 +815,7 @@
  }
 
  /* =====================================================================
-    Dibujo en canvas
+    Dibujo en pantalla
     ===================================================================== */
  const DASH = {sysDot: [1, 1], dot: [1, 2], sysDash: [3, 1], dash: [4, 3], lgDash: [8, 3], sysDashDot: [3, 1, 1, 1]};
  function pintar(ctx, o) {

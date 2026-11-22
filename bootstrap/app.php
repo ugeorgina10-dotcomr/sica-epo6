@@ -14,23 +14,23 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Si hay un proxy delante (Nginx, Apache...) Laravel confía en él para saber si es HTTPS
-        // y para ver la IP real de cada persona (límite de intentos de login).
+        // Si el sistema está detrás de otro servidor (como en Render), confía en él para saber si la conexión es segura (HTTPS)
+        // y para conocer la IP real de cada persona (se usa para limitar los intentos de inicio de sesión).
         $middleware->trustProxies(at: '*');
 
-        // Cabeceras de seguridad en todas las respuestas
+        // Protecciones de seguridad en todas las respuestas
         $middleware->append(CabecerasSeguridad::class);
 
-        // Si alguien sin sesión pide una página, se le manda al inicio (ahí está el login)
+        // Si alguien sin sesión pide una página, se le manda al inicio (ahí está el inicio de sesión)
         $middleware->redirectGuestsTo('/');
 
-        // Guardia de permisos por rol: sica:control  /  sica:sync
+        // Revisión de permisos por rol: sica:control / sica:sync
         $middleware->alias([
             'sica' => VerificarPermisoSica::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // /api/* y /auth/* siempre responden JSON (401, 403, 419, 422, 429...) y nunca redirigen
+        // Los datos (/api/*) y el inicio de sesión (/auth/*) siempre responden con mensajes de error y nunca mandan a otra página
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request, Throwable $e) => $request->is('api/*', 'auth/*') || $request->expectsJson()
         );

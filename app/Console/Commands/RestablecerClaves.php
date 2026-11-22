@@ -45,7 +45,7 @@ class RestablecerClaves extends Command
         }
 
         foreach ($usuarios as $u) {
-            $u->password = $nuevas[$u->id];   // el modelo la guarda con hash
+            $u->password = $nuevas[$u->id];   // el modelo la guarda protegida (cifrada)
             $u->save();
             $this->info("Lista: {$u->rol} | {$u->email}");
         }

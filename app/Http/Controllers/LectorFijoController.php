@@ -10,7 +10,7 @@ use Carbon\Carbon;
 
 class LectorFijoController extends Controller
 {
-    // Muestra la vista principal del panel de lectura/accesos
+    // Muestra la pantalla principal del panel de lectura y accesos
     public function index(Request $request)
     {
         $query = Asistencia::with('alumno.grupo');
@@ -18,7 +18,7 @@ class LectorFijoController extends Controller
         if ($request->filled('buscar')) {
             $busqueda = $request->buscar;
             $query->whereHas('alumno', function($q) use ($busqueda) {
-                // En Postgres LIKE distingue mayúsculas (en MySQL no): se compara siempre en minúsculas para que busque igual en ambos
+                // Se busca siempre en minúsculas para que encuentre el nombre sin importar cómo esté escrito (funciona igual en MySQL y en Render)
                 $patron = '%' . mb_strtolower($busqueda) . '%';
                 $q->whereRaw('LOWER(matricula) LIKE ?', [$patron])
                   ->orWhereRaw('LOWER(nombre) LIKE ?', [$patron]);
@@ -27,11 +27,11 @@ class LectorFijoController extends Controller
 
         $asistencias = $query->orderBy('fecha_hora', 'desc')->paginate(15);
         
-        // Asegúrate de que la vista apunte a tu carpeta o archivo existente
+        // Revisa que la vista corresponda a un archivo que exista
         return view('sica.asistencias', compact('asistencias'));
     }
 
-    // Registra la entrada o salida mediante el lector fijo o escáner.
+    // Registra la entrada o salida desde el lector fijo o el escáner.
     // Sin tipo_movimiento (o con "Auto") el sistema decide solo, según el horario del grupo del alumno.
     public function registrar(Request $request)
     {

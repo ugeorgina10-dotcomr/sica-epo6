@@ -1,16 +1,16 @@
 <?php
 /*
- * Arranque rápido de SICA-EPO6 (Windows, Linux, Codespaces y VS Code).
+ * Abre SICA-EPO6 de forma rápida (Windows, Linux, Codespaces y VS Code).
  *
  *   php rapido.php          (o:  composer rapido)
  *
- * Qué hace, en orden:
- *  1) Guarda ya compiladas la configuración y las vistas (el sistema abre y responde más rápido).
- *  2) Enciende PHP con opcache (el código queda compilado en memoria) y compresión de las respuestas.
- *  3) En Linux / Codespaces / Mac atiende varias peticiones a la vez (en Windows PHP no lo permite).
+ * Qué hace:
+ *  1) Deja todo preparado de antemano para que el sistema abra y responda más rápido.
+ *  2) Enciende el sistema con ajustes que lo hacen más ligero.
+ *  3) En Linux, Mac y Codespaces atiende a varias personas a la vez (en Windows no es posible).
  *
- * Si cambias archivos .php o el .env, detén el servidor (Ctrl+C) y vuelve a ejecutarlo: así toma los cambios.
- * No toca tu .env.
+ * Si cambias algún archivo .php o el .env, ciérralo (Ctrl+C) y vuelve a ejecutarlo para que tome los cambios.
+ * No modifica tu archivo .env.
  */
 chdir(__DIR__);
 

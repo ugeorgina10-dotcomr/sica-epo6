@@ -7,13 +7,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default Database Connection Name
+    | Conexión principal a la base de datos
     |--------------------------------------------------------------------------
     |
-    | Here you may specify which of the database connections below you wish
-    | to use as your default connection for database operations. This is
-    | the connection which will be utilized unless another connection
-    | is explicitly specified when you execute a query / statement.
+    | Indica cuál de las conexiones de abajo se usa normalmente.
+    | En tu computadora es MySQL; en Render es pgsql (Postgres).
     |
     */
 
@@ -21,12 +19,10 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Database Connections
+    | Conexiones a la base de datos
     |--------------------------------------------------------------------------
     |
-    | Below are all of the database connections defined for your application.
-    | An example configuration is provided for each database system which
-    | is supported by Laravel. You're free to add / remove connections.
+    | Aquí están las conexiones posibles para cada tipo de base de datos. Puedes agregar o quitar las que necesites.
     |
     */
 
@@ -116,12 +112,10 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Migration Repository Table
+    | Tabla de migraciones
     |--------------------------------------------------------------------------
     |
-    | This table keeps track of all the migrations that have already run for
-    | your application. Using this information, we can determine which of
-    | the migrations on disk haven't actually been run on the database.
+    | Esta tabla recuerda qué cambios a la base de datos ya se aplicaron, para saber cuáles faltan.
     |
     */
 
@@ -132,12 +126,10 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Redis Databases
+    | Redis
     |--------------------------------------------------------------------------
     |
-    | Redis is an open source, fast, and advanced key-value store that also
-    | provides a richer body of commands than a typical key-value system
-    | such as Memcached. You may define your connection settings here.
+    | Configuración de Redis (un almacén de datos muy rápido). Este sistema no lo usa por ahora.
     |
     */
 

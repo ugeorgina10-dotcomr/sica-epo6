@@ -1,13 +1,14 @@
-/* SICA-EPO6: reduce el peso de los archivos ANTES de usarlos o subirlos, y los sube en cola, para que el sistema no se trabe.
+/*
+ * SICA-EPO6: reduce el peso de los archivos ANTES de usarlos o subirlos, y los sube de pocos en pocos, para que el sistema no se trabe.
  *
- *  SicaCompresion.comprimirArchivo(file, alProgreso) -> Promise<File>
- *      Word (.docx)  : reduce las imágenes que lleva adentro y vuelve a armar el archivo
- *      PDF           : reduce las fotos que lleva adentro; el texto NO se toca (sigue seleccionable)
- *      Excel (.xlsx) : reduce las imágenes que lleva adentro
- *      CSV / TXT     : quita las filas vacías (solo comas o espacios)
- *      Otros         : se devuelven igual
- *  SicaCompresion.validar(file, tipos) / validarVarios(archivos, tipos) -> Promise<null | texto del problema>   (tipo real y no dañado)
- *  SicaCompresion.cola(tareas, opciones) -> Promise<[{ok, valor|error}]>   (pocas a la vez, con reintentos)
+ * SicaCompresion.comprimirArchivo(file, alProgreso) -> Promise<File>
+ *     Word (.docx)  : reduce las imágenes que lleva adentro y vuelve a armar el archivo
+ *     PDF           : reduce las fotos que lleva adentro; el texto NO se toca (sigue seleccionable)
+ *     Excel (.xlsx) : reduce las imágenes que lleva adentro
+ *     CSV / TXT     : quita las filas vacías (solo comas o espacios)
+ *     Otros         : se devuelven igual
+ * SicaCompresion.validar(file, tipos) / validarVarios(archivos, tipos) -> Promise<null | texto del problema>   (revisa que sea del tipo real y no esté dañado)
+ * SicaCompresion.cola(tareas, opciones) -> Promise<[{ok, valor|error}]>   (pocas a la vez, con reintentos)
  *
  * Nunca empeora un archivo: si el resultado no pesa claramente menos, se devuelve el original.
  * Si algo falla (navegador viejo, archivo raro o protegido), también se devuelve el original: comprimir es una ayuda, no un requisito.
@@ -33,9 +34,11 @@
   });
  }
 
- /* Reduce una imagen (Blob) a MAX_LADO px y la vuelve a codificar.
-    tipoPreferido: 'image/jpeg' o 'auto' (JPEG si no tiene transparencia; si tiene, PNG).
-    Devuelve {blob, tipo, ancho, alto} o null si no se pudo. */
+ /*
+  * Reduce una imagen (Blob) a MAX_LADO px y la vuelve a codificar.
+  * tipoPreferido: 'image/jpeg' o 'auto' (JPEG si no tiene transparencia; si tiene, PNG).
+  * Devuelve {blob, tipo, ancho, alto}, o null (vacío) si no se pudo.
+  */
  function reducir(blob, tipoPreferido) {
   return cargarBitmap(blob).then(function (bmp) {
    var w = bmp.width, h = bmp.height, esc = Math.min(1, MAX_LADO / Math.max(w, h));
@@ -63,7 +66,7 @@
   }).catch(function () { return null; });
  }
 
- /* ---------- Word (.docx) y Excel (.xlsx): son un zip; lo que más pesa son las imágenes de word/media o xl/media ---------- */
+ /* ---------- Word (.docx) y Excel (.xlsx): son archivos comprimidos (zip); lo que más pesa son las imágenes de word/media o xl/media ---------- */
  function comprimirOffice(file, carpeta, mime, alProgreso) {
   if (!window.JSZip) return Promise.resolve(file);
   var rxMedia = new RegExp('^' + carpeta + '/media/[^/]+\\.(png|jpe?g)$', 'i');
@@ -149,7 +152,7 @@
      if (!/^\[?\s*\/DCTDecode\s*\]?$/.test(String(d.get(N.of('Filter'))))) return;   // solo JPEG "puro"
      if (d.get(N.of('ImageMask')) || d.get(N.of('Mask')) || d.get(N.of('Decode'))) return;
      if (obj.contents.length < UMBRAL_IMAGEN) return;
-     // Solo colores que el navegador sabe reproducir igual (RGB y gris); CMYK, paletas y tintas se dejan como están
+     // Solo colores que el navegador sabe reproducir igual (RGB y gris); los demás (CMYK, paletas, tintas) se dejan como están
      var cs = d.get(N.of('ColorSpace'));
      if (cs instanceof P.PDFRef) cs = ctx.lookup(cs);
      var ok = false;
@@ -189,8 +192,10 @@
   }).catch(function (e) { if (window.console) console.warn('SicaCompresion (PDF): se usa el original.', e); return file; });   // PDF protegido, dañado o sin librería: se usa el original
  }
 
- /* ---------- CSV / TXT: se quitan las filas vacías (solo comas, punto y coma, tabuladores o espacios) ----------
-    Se trabaja con los bytes (sin decodificar el texto) para no dañar acentos ni la codificación del archivo. */
+ /*
+  * ---------- CSV / TXT: se quitan las filas vacías (solo comas, punto y coma, tabuladores o espacios) ----------
+  * Se trabaja con los bytes (sin leer el texto) para no dañar acentos ni la codificación del archivo.
+  */
  function comprimirCsv(file) {
   return file.arrayBuffer().then(function (buf) {
    var b = new Uint8Array(buf), n = b.length;
@@ -212,9 +217,11 @@
  }
 
 
- /* ---------- Validar: ¿es de verdad el tipo de archivo que se permite, y no está dañado? ----------
-    No basta con la extensión (alguien puede renombrar una foto a .pdf): se revisa el CONTENIDO real.
-    tipos: lista de 'docx' | 'xlsx' | 'xls' | 'csv' | 'pdf'.  Devuelve una promesa con null (está bien) o el texto del problema. */
+ /*
+  * ---------- Validar: ¿es de verdad el tipo de archivo permitido, y no está dañado? ----------
+  * No basta con la extensión (alguien puede renombrar una foto a .pdf): se revisa el CONTENIDO real.
+  * tipos: lista de 'docx' | 'xlsx' | 'xls' | 'csv' | 'pdf'.  Devuelve una promesa con null (está bien) o el texto del problema.
+  */
  var NOMBRE_TIPO = {docx: 'Word (.docx)', xlsx: 'Excel (.xlsx)', xls: 'Excel (.xls)', csv: 'CSV (.csv)', pdf: 'PDF (.pdf)'};
  function listaTipos(tipos) { return tipos.map(function (t) { return NOMBRE_TIPO[t]; }).join(', '); }
  function empieza(b, arr) { for (var i = 0; i < arr.length; i++) if (b[i] !== arr[i]) return false; return true; }
@@ -247,10 +254,10 @@
      var clave = ext === 'docx' ? 'word/document.xml' : 'xl/workbook.xml';
      if (z.file(clave)) return null;
      return (z.file('word/document.xml') || z.file('xl/workbook.xml') || z.file('ppt/presentation.xml')) ? otroTipo : danado;
-    }, function () { return danado; });   // el zip está truncado o corrupto
+    }, function () { return danado; });   // el archivo comprimido está incompleto o dañado
    }
    if (ext === 'xls') return esOle ? null : ((esZip || esPdf || esImagen || esExe) ? otroTipo : danado);
-   // CSV: texto plano. Un archivo binario (foto, PDF, programa, Excel) trae bytes 0 o cabeceras conocidas.
+   // CSV: texto plano. Un archivo que no es texto (foto, PDF, programa, Excel) trae bytes en cero o encabezados conocidos.
    if (esZip || esPdf || esOle || esImagen || esExe) return otroTipo;
    var utf16 = (b[0] === 0xFF && b[1] === 0xFE) || (b[0] === 0xFE && b[1] === 0xFF);
    if (!utf16) for (var i = 0; i < b.length; i++) if (b[i] === 0) return danado;
@@ -276,8 +283,10 @@
   return Promise.resolve(file);
  }
 
- /* Cola: ejecuta las tareas (funciones que devuelven una promesa) de pocas en pocas y reintenta las que fallan por red o por el servidor.
-    Un error con .noReintentar = true (por ejemplo, el servidor rechazó el archivo) no se repite. */
+ /*
+  * Cola: ejecuta las tareas de pocas en pocas y reintenta las que fallan por la red o por el servidor.
+  * Si el error trae .noReintentar = true (por ejemplo, el servidor rechazó el archivo), no se repite.
+  */
  function cola(tareas, op) {
   op = op || {};
   var simultaneas = op.simultaneas || 3, reintentos = op.reintentos == null ? 2 : op.reintentos, espera = op.espera || 800;

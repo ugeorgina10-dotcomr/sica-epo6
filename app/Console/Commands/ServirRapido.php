@@ -5,12 +5,12 @@ namespace App\Console\Commands;
 use Illuminate\Foundation\Console\ServeCommand;
 
 /**
- * Sustituye a `php artisan serve` (mismo nombre y mismas opciones: --host, --port...) para que arranque y responda más rápido:
- *  - opcache: el código PHP queda compilado en memoria (se revisan cambios de archivos cada 2 s, así que editar sigue funcionando);
- *  - varias peticiones a la vez (Linux, Mac y Codespaces; en Windows PHP no lo permite);
- *  - compresión de las respuestas y límites de subida de archivos suficientes para listas grandes;
- *  - las vistas ya compiladas.
- * No toca el .env ni guarda la configuración en caché: lo que cambies en .env se aplica al reiniciar el servidor.
+ * Sustituye a `php artisan serve` (se usa igual: --host, --port...) para que el sistema abra y responda más rápido:
+ * - deja el código preparado en memoria (si editas un archivo, el cambio se nota en unos segundos);
+ * - atiende a varias personas a la vez (Linux, Mac y Codespaces; en Windows no es posible);
+ * - comprime las respuestas y permite subir listas grandes;
+ * - deja las pantallas ya preparadas.
+ * No cambia tu archivo .env: lo que modifiques ahí se aplica al reiniciar el sistema.
  */
 class ServirRapido extends ServeCommand
 {
@@ -35,12 +35,12 @@ class ServirRapido extends ServeCommand
 
     public function handle()
     {
-        // Varias peticiones a la vez: sin esto, un guardado o una subida grande dejaba en espera las consultas de los demás equipos
+        // Atiende a varias personas a la vez: sin esto, un guardado o una subida grande hacía esperar a los demás equipos
         if (stripos(PHP_OS, 'WIN') !== 0 && empty($_ENV['PHP_CLI_SERVER_WORKERS']) && !getenv('PHP_CLI_SERVER_WORKERS')) {
             $_ENV['PHP_CLI_SERVER_WORKERS'] = '4';
         }
 
-        // Vistas ya compiladas (si falla no importa: se compilan al usarlas)
+        // Deja las pantallas preparadas (si falla no pasa nada: se preparan al usarlas)
         try {
             $this->callSilently('view:cache');
         } catch (\Throwable $e) {

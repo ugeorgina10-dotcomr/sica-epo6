@@ -19,7 +19,7 @@ class AuthController extends Controller
 
     private const MENSAJE_BORRADA = 'Tu contraseña fue borrada. Pide a Control Escolar que te genere una nueva. Mientras tanto no podrás entrar.';
 
-    /** Inicia sesión con correo y contraseña. Máximo 5 intentos fallidos por minuto (por correo + IP). */
+    /** Inicia sesión con correo y contraseña. Máximo 5 intentos fallidos por minuto (por correo y equipo). */
     public function login(Request $request): JsonResponse
     {
         $credenciales = $request->validate([
@@ -76,7 +76,7 @@ class AuthController extends Controller
      * - Director y Subdirector: se bloquea la cuenta del rol (y se cierran sus sesiones).
      * - Orientador: se bloquea solo ese orientador (por su nombre); los demás siguen entrando.
      * - Control Escolar nunca se bloquea desde aquí (nadie podría desbloquearlo): lo restablece quien administra el servidor.
-     * Responde igual si la cuenta no existe, para no revelar qué cuentas hay. Límite: 5 peticiones por minuto.
+     * Responde igual aunque la cuenta no exista, para no revelar qué cuentas hay. Límite: 5 veces por minuto.
      */
     public function olvide(Request $request): JsonResponse
     {
@@ -85,7 +85,7 @@ class AuthController extends Controller
             'orientador' => 'nullable|string|max:150',
         ]);
 
-        // Solo id y rol: no hace falta traer el hash de la contraseña para bloquear la cuenta
+        // Solo se piden el id y el rol: no hace falta traer la contraseña para bloquear la cuenta
         $usuario = User::select('id', 'rol')->where('email', Str::lower(trim($d['email'])))->first();
         $bloqueada = ['ok' => true, 'bloqueada' => true, 'mensaje' => self::MENSAJE_OLVIDO];
 
@@ -106,12 +106,12 @@ class AuthController extends Controller
                 return response()->json(['ok' => false, 'mensaje' => 'Selecciona tu nombre de la lista.'], 422);
             }
 
-            // Un solo UPDATE (antes: buscar + guardar). Si ya estaba bloqueado no cambia la hora de la solicitud.
+            // Se hace en un solo paso (antes eran dos: buscar y guardar). Si ya estaba bloqueado, no cambia la hora de la solicitud.
             DB::table('orientadores')
                 ->where('nombre', $d['orientador'])
                 ->whereNull('olvido_at')
                 ->update(['olvido_at' => now()]);
-            Cache::forget('sica.olvidos');   // la burbuja de Control Escolar sale en el siguiente consulta, no hasta que caduque la caché
+            Cache::forget('sica.olvidos');   // el aviso de Control Escolar aparece en la siguiente consulta, sin esperar a que caduque lo guardado
 
             return response()->json($bloqueada);
         }
@@ -129,9 +129,9 @@ class AuthController extends Controller
 
     /**
      * Quién pulsó "¿Olvidaste tu contraseña?" y espera que Control Escolar le dé una nueva.
-     * Es pública a propósito: la pantalla de inicio la consulta cada 1 s (sin sesión) para sacar la burbuja y el sonido de alerta,
+     * Es pública a propósito: la pantalla de inicio la consulta cada segundo (sin haber iniciado sesión) para mostrar la burbuja y el sonido de alerta,
      * así Control Escolar se entera aunque aún no haya iniciado sesión. Solo trae el nombre de la cuenta y la hora de la solicitud
-     * (los nombres de los orientadores ya son públicos en la lista del login). Misma forma que /api/sica/claves.
+     * (los nombres de los orientadores ya son públicos en la lista de inicio de sesión). Funciona igual que /api/sica/claves.
      */
     public function olvidos(Request $request): JsonResponse
     {
@@ -143,7 +143,7 @@ class AuthController extends Controller
                 ->map(fn ($o) => ['id' => (string) $o->id, 'nombre' => $o->nombre, 'bloqueada' => true, 'olvido_at' => (string) $o->olvido_at])->values()->all(),
         ]);
 
-        // ETag: la pantalla de inicio consulta esto cada 1.5 s en cada equipo; si nada cambió se responde 304 sin cuerpo
+        // Si nada cambió, se responde "sin cambios" (304) y sin datos: la pantalla de inicio pregunta cada 1.5 segundos desde cada equipo
         $etag = '"' . md5(json_encode($datos)) . '"';
 
         if (in_array($request->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
@@ -153,7 +153,7 @@ class AuthController extends Controller
         return response()->json($datos)->header('ETag', $etag);
     }
 
-    /** Cierra la sesión y descarta la sesión actual. */
+    /** Cierra la sesión actual. */
     public function logout(Request $request): JsonResponse
     {
         Auth::guard('web')->logout();
@@ -163,31 +163,31 @@ class AuthController extends Controller
         return response()->json(['ok' => true, 'csrf' => csrf_token()]);
     }
 
-    /** Devuelve quién tiene la sesión activa. Sin sesión responde 401 pero entrega un token CSRF nuevo. */
+    /** Dice quién tiene la sesión activa. Si no hay sesión responde 401 (no autorizado) pero entrega un código de seguridad nuevo. */
     public function me(Request $request): JsonResponse
     {
         if (!$request->user()) {
             return response()->json(['ok' => false, 'mensaje' => 'Sin sesión.', 'csrf' => csrf_token()], 401);
         }
 
-        // ?estado=1: una pestaña que entra sola por un aviso recibe también todo el estado (sin otra petición)
+        // ?estado=1: una pestaña que entra sola por un aviso recibe también todos los datos (sin hacer otra petición)
         return response()->json($this->datosUsuario($request, $request->boolean('estado')));
     }
 
     /**
-     * Devuelve [cuenta o null, bloqueo].  bloqueo = null | 'olvido' | 'borrada'.
+     * Devuelve [cuenta o vacío, bloqueo]. El bloqueo puede ser: ninguno, 'olvido' o 'borrada'.
      * Rol Orientador: se pide el nombre y se compara con la clave PERSONAL de ese orientador;
      * si Control Escolar no le puso una, vale la contraseña general del rol.
-     * 'olvido'  = la persona marcó "¿Olvidaste tu contraseña?" y Control Escolar aún no le genera una nueva.
-     * 'borrada' = Control Escolar eliminó la contraseña (columna vacía) y aún no genera una nueva.
-     * En ambos casos no se compara la contraseña escrita: no entra ni con la correcta.
+     * 'olvido'  = la persona pulsó "¿Olvidaste tu contraseña?" y Control Escolar aún no le genera una nueva.
+     * 'borrada' = Control Escolar eliminó la contraseña y aún no genera una nueva.
+     * En ambos casos no se revisa la contraseña escrita: no entra ni con la correcta.
      */
     private function usuarioValido(string $email, string $password, ?string $nombreOrientador): array
     {
         $usuario = User::where('email', $email)->first();
 
         if (!$usuario) {
-            Hash::make($password);   // gasta el mismo tiempo para no revelar qué correos existen
+            Hash::make($password);   // tarda lo mismo en todos los casos para no revelar qué correos existen
 
             return [null, null];
         }
@@ -206,7 +206,7 @@ class AuthController extends Controller
             $olvido = $orientador->olvido_at !== null;
 
             if ($orientador->password !== null) {
-                $hash = (string) $orientador->password;   // personal (o '' si se la borraron)
+                $hash = (string) $orientador->password;   // personal (o vacía si se la borraron)
             }
         }
 
@@ -222,8 +222,8 @@ class AuthController extends Controller
             return [null, null];
         }
 
-        // Si la contraseña se guardó con un costo distinto al actual (config/hashing.php), se vuelve a guardar con el actual:
-        // así las siguientes veces que entre será más rápido. Va con DB::table para no pasar por el cast 'hashed' del modelo.
+        // Si la contraseña se guardó con un nivel de seguridad distinto al actual (config/hashing.php), se vuelve a guardar con el actual:
+        // así las siguientes veces que entre será más rápido. Se guarda directo en la tabla para no pasar por el cifrado automático del modelo.
         if (Hash::needsRehash($hash)) {
             $nuevo = Hash::make($password);
 
@@ -249,7 +249,7 @@ class AuthController extends Controller
             'csrf'   => csrf_token(),
         ];
 
-        // Todo lo que el panel necesita para mostrarse YA cargado al entrar (sin esperar otras peticiones):
+        // Todo lo que el panel necesita para verse YA cargado al entrar (sin esperar otras peticiones):
         // listas, horarios, asistencias y permisos; y, para Control Escolar, también el estado de las contraseñas.
         if ($incluirEstado) {
             $datos['estado'] = app(ControlEscolarController::class)->paraPagina();

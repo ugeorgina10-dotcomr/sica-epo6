@@ -7,7 +7,7 @@ use Illuminate\Database\Seeder;
 
 class UsuarioSeeder extends Seeder
 {
-    /** Contraseña inicial de todas las cuentas. Se guarda SIEMPRE con hash (bcrypt), nunca en texto plano. */
+    /** Contraseña inicial de todas las cuentas. Siempre se guarda protegida (cifrada), nunca tal como se escribe. */
     public const CLAVE_INICIAL = 'prepa06';
 
     /** Cuentas del sistema (también las usa el comando sica:crear-usuarios en cada despliegue). */
@@ -23,7 +23,7 @@ class UsuarioSeeder extends Seeder
         $usuarios = self::CUENTAS;
 
         foreach ($usuarios as $u) {
-            // El cast 'hashed' del modelo User convierte la contraseña en hash al guardar
+            // El modelo User protege (cifra) la contraseña automáticamente al guardar
             User::updateOrCreate(['email' => $u['email']], $u + ['password' => self::CLAVE_INICIAL]);
 
             $this->command->info("{$u['rol']}  |  {$u['email']}  |  contraseña guardada con hash");

@@ -44,14 +44,14 @@
                 <div class="border-2 border-dashed border-gray-200 p-6 rounded-xl text-center">
                     <p class="text-xs font-bold text-gray-700 mb-2">Subir Lista de Alumnos por Grupo (.xlsx / .csv)</p>
                     <input type="file" class="text-xs text-gray-500 mb-4 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#800020] file:text-white hover:file:bg-[#600018]">
-                    <button class="w-full py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-950 transition">Importar y Generar QR Automáticos</button>
+                    <button class="w-full py-3 bg-slate-800 text-white text-lg font-bold rounded-lg hover:bg-slate-950 transition">Importar y Generar QR Automáticos</button>
                 </div>
 
                 <!-- Subir Plantilla Credencial -->
                 <div class="border-2 border-dashed border-gray-200 p-6 rounded-xl text-center">
                     <p class="text-xs font-bold text-gray-700 mb-2">Subir Plantilla Base para Credenciales</p>
                     <input type="file" class="text-xs text-gray-500 mb-4 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#800020] file:text-white hover:file:bg-[#600018]">
-                    <button class="w-full py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-950 transition">Guardar Plantilla Oficial</button>
+                    <button class="w-full py-3 bg-slate-800 text-white text-lg font-bold rounded-lg hover:bg-slate-950 transition">Guardar Plantilla Oficial</button>
                 </div>
             </div>
         </div>

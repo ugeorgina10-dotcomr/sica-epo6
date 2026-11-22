@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /** Datos sueltos que deben vivir en la base de datos (p. ej. la plantilla oficial de credenciales). */
+    /** Datos sueltos que deben guardarse en la base de datos (por ejemplo, la plantilla oficial de credenciales). */
     public function up(): void
     {
         Schema::create('ajustes', function (Blueprint $table) {

@@ -27,7 +27,7 @@ class SicaOlvidoAvisoTest extends TestCase
 
     public function test_al_pulsar_olvide_la_burbuja_aparece_al_instante_sin_iniciar_sesion(): void
     {
-        $this->getJson('/api/sica/olvidos')->assertOk();   // deja la respuesta vacía en caché
+        $this->getJson('/api/sica/olvidos')->assertOk();   // deja la respuesta vacía guardada
 
         $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk();
 

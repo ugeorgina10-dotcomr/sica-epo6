@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
-# Arranque rápido de SICA-EPO6 en Codespaces / Linux.
+# Abre SICA-EPO6 de forma rápida en Codespaces o Linux.
 # Uso:  bash iniciar-codespaces.sh
 cd "$(dirname "$0")" || exit 1
 
-# 1) Varias peticiones a la vez: antes, las consultas de actualización (cada 3 s) y los guardados hacían cola.
+# 1) Permite atender a varias personas al mismo tiempo (antes tenían que esperar su turno).
 export PHP_CLI_SERVER_WORKERS=4
 
-# 2) Configuración para producción SOLO durante esta ejecución (no toca tu .env):
-#    sesiones en archivo (sin consultar MySQL en cada petición), sin modo debug y con menos escritura de logs.
+# 2) Ajustes para que funcione más ligero SOLO mientras esté abierto (no cambia tu archivo .env).
 export SESSION_DRIVER=file APP_DEBUG=false LOG_LEVEL=warning
 
-# 3) Deja lista la configuración y las vistas ya compiladas (arranque y respuestas más rápidas).
-#    (No se usa route:cache porque las rutas de este proyecto llevan funciones anónimas.)
+# 3) Deja todo preparado de antemano para que el sistema abra más rápido.
 php artisan config:cache
 php artisan view:cache
 
 echo "SICA-EPO6 en http://localhost:8000 (en Codespaces: pestaña Puertos > puerto 8000)"
-# 4) PHP directo (sin el paso extra de "artisan serve") y con opcache: el código queda compilado en memoria.
-#    Si cambias archivos .php, detén el servidor (Ctrl+C) y vuelve a ejecutar este script.
+# 4) Enciende el sistema. Si cambias algún archivo .php, ciérralo (Ctrl+C) y vuelve a ejecutar este archivo.
 SERVIDOR=vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php
 if [ -f "$SERVIDOR" ]; then
   cd public && exec php -d zlib.output_compression=1 -d upload_max_filesize=25M -d post_max_size=30M -d max_file_uploads=50 -d memory_limit=256M -d opcache.enable_cli=1 -d opcache.validate_timestamps=0 -d opcache.memory_consumption=128 \
