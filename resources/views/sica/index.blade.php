@@ -2385,7 +2385,9 @@ function mostrarAvisoLento(mostrar) {
 function entrarSiHaySesion() {
  if (rolActivo || _entrandoPorAviso) return;
  _entrandoPorAviso = true;
- const reloj = setTimeout(() => { if (!rolActivo) mostrarAvisoLento(true); }, 2500);   // pasados 2.5 s sin entrar: botón Recargar
+ // La barra "Entrando al sistema… Recargar" SOLO sale si el servidor confirmó que hay una sesión abierta y entrar tarda de verdad.
+ // Antes salía con solo esperar la respuesta (servidor lento o sin sesión) y aparecía cada vez que se volvía a la pestaña de inicio.
+ let reloj = null;
  const vigila = setInterval(() => { if (rolActivo) { limpiar(); mostrarAvisoLento(false); } }, 300);
  const limpiar = () => { clearTimeout(reloj); clearInterval(vigila); };
  fetchT('/auth/me?estado=1', {headers: {'Accept': 'application/json'}, cache: 'no-store'}, 8000)
@@ -2395,10 +2397,11 @@ function entrarSiHaySesion() {
    if (!d || !d.ok || rolActivo) { if (!rolActivo) { limpiar(); mostrarAvisoLento(false); } return; }   // sin sesión en el servidor: se queda en el login
    if (d.csrf) $('meta[name="csrf-token"]').attr('content', d.csrf);
    _esSecundaria = true;
+   reloj = setTimeout(() => { if (!rolActivo) mostrarAvisoLento(true); }, 2500);   // hay sesión y pasados 2.5 s aún no entra: botón Recargar
    restaurarSesion({rol: d.rol, nombre: d.nombre, email: d.email});
    setTimeout(limpiar, 60000);   // la vigilancia termina sola si pasado un minuto aún no entra
   })
-  .catch(() => { clearInterval(vigila); mostrarAvisoLento(true); })   // no hubo respuesta: se deja el botón para recargar
+  .catch(() => { limpiar(); mostrarAvisoLento(false); })   // sin respuesta del servidor: no hay nada que "entrar", se queda en el login sin avisos
   .then(() => { _entrandoPorAviso = false; });
 }
 /* Pestaña PRINCIPAL: otra pestaña (la secundaria) pidió atender una solicitud -> aquí se pide iniciar sesión como Control Escolar */
