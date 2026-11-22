@@ -15,7 +15,7 @@
     <script src="{{ asset('vendor/html5-qrcode.min.js') }}" type="text/javascript"></script>
 </head>
 <body class="bg-slate-50 min-h-screen">
-    <header class="bg-[#800020] text-white py-3 px-6 shadow-md flex justify-between items-center">
+    <header class="bg-[#800020] text-white py-3 px-4 sm:px-6 shadow-md flex flex-wrap gap-3 justify-between items-center">
         <div>
             <h2 class="text-sm font-light">C.C.T. 15EBH0008G • C.C.T. 15EBH0199N</h2>
             <h1 class="text-lg font-bold">ESCUELA PREPARATORIA OFICIAL NÚM. 6</h1>
@@ -25,15 +25,15 @@
         </div>
     </header>
 
-    <main class="max-w-4xl mx-auto p-6">
+    <main class="max-w-4xl mx-auto p-3 sm:p-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-center">
             <h3 class="text-base font-black text-gray-800 uppercase tracking-wide">Lector Fijo - Control de Entradas y Salidas</h3>
             <p class="text-sm text-gray-700 mt-1 mb-6">El sistema detecta el grupo del alumno y, según el horario del grupo, registra solo si es Entrada o Salida. Escanea con la cámara frontal.</p>
 
             <!-- Botones de Modo -->
             <div class="flex flex-wrap justify-center gap-4 mb-6" role="group" aria-label="Modo de registro">
-                <button id="btnEntrada" type="button" aria-pressed="false" onclick="setModo('Entrada')" class="px-8 py-3 min-h-[52px] min-w-[150px] bg-gray-100 text-gray-800 text-base font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Entrada</button>
-                <button id="btnSalida" type="button" aria-pressed="false" onclick="setModo('Salida')" class="px-8 py-3 min-h-[52px] min-w-[150px] bg-gray-100 text-gray-800 text-base font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Salida</button>
+                <button id="btnEntrada" type="button" aria-pressed="false" onclick="setModo('Entrada')" class="px-8 py-3 min-h-[60px] min-w-[150px] bg-gray-100 text-gray-800 text-lg font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Entrada</button>
+                <button id="btnSalida" type="button" aria-pressed="false" onclick="setModo('Salida')" class="px-8 py-3 min-h-[60px] min-w-[150px] bg-gray-100 text-gray-800 text-lg font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Salida</button>
             </div>
 
             <p id="txtModo" role="status" aria-live="polite" class="text-sm font-bold text-green-800 -mt-3 mb-5">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
@@ -45,12 +45,12 @@
 
             <!-- Controles de Cámara -->
             <div class="flex flex-wrap justify-center gap-3">
-                <button type="button" onclick="iniciarCamara()" class="px-7 py-3 min-h-[52px] bg-[#800020] hover:bg-[#600018] text-white text-base font-bold rounded-xl shadow transition">Activar Cámara Frontal</button>
-                <button type="button" onclick="detenerCamara()" class="px-7 py-3 min-h-[52px] bg-gray-200 hover:bg-gray-300 text-gray-900 text-base font-bold rounded-xl border border-gray-400 transition">Detener</button>
+                <button type="button" onclick="iniciarCamara()" class="px-7 py-3 min-h-[60px] bg-[#800020] hover:bg-[#600018] text-white text-lg font-bold rounded-xl shadow transition">Activar Cámara Frontal</button>
+                <button type="button" onclick="detenerCamara()" class="px-7 py-3 min-h-[60px] bg-gray-200 hover:bg-gray-300 text-gray-900 text-lg font-bold rounded-xl border border-gray-400 transition">Detener</button>
             </div>
 
             <!-- Resultado del Escaneo -->
-            <div id="resultado" role="status" aria-live="polite" class="mt-6 p-4 bg-slate-100 rounded-xl hidden text-left max-w-md mx-auto">
+            <div id="resultado" role="status" aria-live="polite" class="mt-6 p-4 bg-slate-100 rounded-xl hidden text-left max-w-md mx-auto break-words">
                 <p class="text-sm font-bold text-gray-800">Alumno detectado:</p>
                 <p id="infoAlumno" class="text-base text-gray-900 font-semibold mt-1"></p>
             </div>
@@ -60,8 +60,8 @@
     <script>
         let html5QrCode;
         let modoActual = 'Auto';   // Auto = el servidor decide Entrada o Salida por el horario del grupo del alumno
-        const ACTIVO = "px-8 py-3 min-h-[52px] min-w-[150px] bg-[#800020] text-white text-base font-bold rounded-xl border border-[#800020] shadow transition";
-        const INACTIVO = "px-8 py-3 min-h-[52px] min-w-[150px] bg-gray-100 text-gray-800 text-base font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition";
+        const ACTIVO = "px-8 py-3 min-h-[60px] min-w-[150px] bg-[#800020] text-white text-lg font-bold rounded-xl border border-[#800020] shadow transition";
+        const INACTIVO = "px-8 py-3 min-h-[60px] min-w-[150px] bg-gray-100 text-gray-800 text-lg font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition";
 
         function setModo(tipo) {
             modoActual = (modoActual === tipo) ? 'Auto' : tipo;   // pulsar otra vez el mismo botón = volver a Automático
@@ -86,12 +86,12 @@
             return m ? { qr: m[1].slice(0, 16).toLowerCase() } : { curp: String(texto).trim().toUpperCase() };
         }
 
-        // Duración corta: menos de una hora en minutos ("4 min"); de una hora en adelante, horas completas ("1 hr")
+        // Duración: menos de una hora en minutos ("4 min"); de una hora en adelante horas y minutos ("1 hr 15 min")
         function duracion(n) {
             n = Math.max(0, Math.round(Number(n) || 0));
             if (n < 60) return n + ' min';
-            const h = Math.floor(n / 60);
-            return h + (h === 1 ? ' hr' : ' hrs');
+            const h = Math.floor(n / 60), m = n % 60;
+            return h + (h === 1 ? ' hr' : ' hrs') + (m ? ' ' + m + ' min' : '');
         }
 
         let ultimoQr = { t: '', ts: 0 };
@@ -109,12 +109,14 @@
             }).then(r => r.json().catch(() => ({})).then(d => {
                 if (r.ok && d.ok) {
                     const al = d.alumno || {};
-                    info.className = 'text-base font-semibold mt-1 text-green-800';
+                    // Con retardo TODO el texto sale en rojo; sin retardo, en verde
+                    const conRetardo = !!(d.retardo && d.retardo.minutos > 0);
+                    info.className = 'text-base font-semibold mt-1 break-words ' + (conRetardo ? 'text-red-700' : 'text-green-800');
                     info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora;
                     // Si ya pasó la tolerancia del grupo: aviso en ROJO, "Retardo de entrada" o "Retardo de salida"
                     if (d.retardo && d.retardo.minutos > 0) {
                         const aviso = document.createElement('span');
-                        aviso.className = 'block mt-2 text-base font-bold text-red-700';
+                        aviso.className = 'block mt-2 text-lg font-bold text-red-700 bg-red-50 border-l-4 border-red-700 rounded p-2 break-words';
                         aviso.setAttribute('role', 'alert');
                         aviso.textContent = '⚠ Retardo de ' + d.retardo.tipo + ': ' + duracion(d.retardo.minutos) + ' tarde (ya pasada la tolerancia)';
                         info.appendChild(aviso);
