@@ -1719,7 +1719,9 @@ const htmlEstadoHor = k => { const e = _horEstado[k]; return '<span class="hor-e
 function ponerEstadoHor(it, k, clase, txt, avisar) {
  _horEstado[k] = {clase: '', txt: ''};
  it.find('.hor-estado').text('');
- if (avisar && (clase === 'text-success' || clase === 'text-danger')) alert(txt);
+ // El mismo aviso no se repite si se dispara dos veces seguidas (p. ej. dos eventos "change" del mismo campo)
+ const ahora = Date.now(), clave = k + '|' + txt;
+ if (avisar && (clase === 'text-success' || clase === 'text-danger') && !(window._ultAvisoHor && window._ultAvisoHor.c === clave && ahora - window._ultAvisoHor.t < 1500)) { window._ultAvisoHor = {c: clave, t: ahora}; alert(txt); }
 }
 function renderListaHorarios() {
  renderGruposCargados();
@@ -1800,7 +1802,9 @@ function horarioCambiado(input, ya) {
  if (!k) return;
  const v = leerHorarioInline(it);
  if (v.error) {   // mientras se escribe solo se avisa que falta; al terminar (change) se explica el problema en rojo
-  if (ya) ponerEstadoHor(it, k, 'text-danger', v.error + ' Todavía no se ha guardado.', true);
+  // Si solo faltan las horas (se está llenando el renglón paso a paso: tolerancia de entrada, luego salida, etc.) NO se avisa nada:
+  // el único mensaje es el final de "Horario guardado", cuando ya está todo completo y se guardó.
+  if (ya && (v.e && v.s || v.error.indexOf('tolerancia') > -1)) ponerEstadoHor(it, k, 'text-danger', v.error + ' Todavía no se ha guardado.', true);
   return;
  }
  const h = db.horarios[k] = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''};
@@ -2775,7 +2779,9 @@ function confirmarOlvido(reintento) {
  // Respuesta al instante: para Director, Subdirector y Orientador el resultado ya se conoce (la cuenta queda bloqueada), así que se muestra
  // el aviso de "Cuenta bloqueada" en el acto y la petición va detrás. Si el servidor responde otra cosa o falla, ese mensaje lo reemplaza.
  // (Control Escolar no se bloquea desde aquí: ahí sí se espera la respuesta del servidor.)
- const optimista = rol !== 'control';
+ const optimista = true;   // todos los roles: el aviso sale en el acto
+ // Control Escolar no se bloquea desde aquí y el servidor siempre responde lo mismo: el mensaje sale YA, sin esperar la petición
+ if (rol === 'control') { _olvidoEnCurso = false; abrirModalCuenta('info', 'La cuenta de Control Escolar no se bloquea desde aquí. Avisa a quien administra el sistema: debe ejecutar en el servidor php artisan sica:restablecer-claves para asignar una contraseña nueva. No se pierde ningún dato.'); return; }
  if (optimista && !reintento) abrirModalCuenta('bloqueada', MENSAJE_OLVIDO_LOCAL);
  const btn = optimista ? $() : $('#modal-cuenta-botones button').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Enviando...');
  fetchT('/auth/olvide', {
