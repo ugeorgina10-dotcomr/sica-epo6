@@ -2740,7 +2740,8 @@ function abrirModalCuenta(modo, mensaje) {
  if (modo === 'confirmar') {
   titulo = '¿Olvidaste tu contraseña?';
   texto = 'Avisa a Control Escolar. Tu cuenta (<b>' + esc(nombre) + '</b>) quedará bloqueada automáticamente y no podrás entrar hasta que Control Escolar borre tu contraseña anterior, genere una nueva y te dé acceso otra vez.';
-  botones = btn('Cancelar', 'btn-outline-dark bg-white', 'cerrarModalCuenta()') + btn('Avisar a Control Escolar', 'btn-vinotinto', 'confirmarOlvido()');
+  botones = btn('Avisar a Control Escolar', 'btn-vinotinto', 'confirmarOlvido()') +
+   '<div class="w-100 text-center mt-2"><a href="#" class="small text-muted text-decoration-underline" onclick="cerrarModalCuenta(); return false;">Cancelar</a></div>';   // texto discreto debajo, como "Recargar sistema"
  } else if (modo === 'info') {
   titulo = 'Control Escolar';
   texto = mensaje;
