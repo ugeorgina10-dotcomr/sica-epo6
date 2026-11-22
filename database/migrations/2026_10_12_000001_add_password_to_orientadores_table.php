@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /** Contraseña propia de cada orientador (con hash). Vacía = usa la contraseña general del rol Orientador. */
+    /** Contraseña propia de cada orientador (guardada cifrada). Vacía = usa la contraseña general del rol Orientador. */
     public function up(): void
     {
         Schema::table('orientadores', function (Blueprint $table) {

@@ -21,7 +21,7 @@ class VerificarClaves extends Command
 
         foreach (User::orderBy('id')->get() as $u) {
             $hash       = (string) $u->getAuthPassword();
-            $esHash     = str_starts_with($hash, '$2y$');          // bcrypt
+            $esHash     = str_starts_with($hash, '$2y$');          // forma en que se protege la contraseña
             $coincide   = $esHash && Hash::check($clave, $hash);
             $todoBien   = $todoBien && $esHash && $coincide;
 

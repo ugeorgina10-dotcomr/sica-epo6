@@ -7,7 +7,7 @@ use Illuminate\Support\ServiceProvider;
 class AppServiceProvider extends ServiceProvider
 {
     /**
-     * Register any application services.
+     * Aquí se registran servicios del sistema (por ahora no se usa).
      */
     public function register(): void
     {
@@ -15,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Bootstrap any application services.
+     * Aquí se preparan servicios al arrancar el sistema (por ahora no se usa).
      */
     public function boot(): void
     {

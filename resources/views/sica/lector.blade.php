@@ -102,16 +102,16 @@
 
         function iniciarCamara() {
             html5QrCode = new Html5Qrcode("reader");
-            // Configuración estricta para forzar la cámara frontal (user) en el lector fijo de entrada
+            // Configuración para usar siempre la cámara frontal en el lector fijo de entrada
             html5QrCode.start(
                 { facingMode: "user" }, 
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText) => {
-                    // Éxito al leer el QR del alumno
+                    // Se leyó bien el QR del alumno
                     registrar(decodedText);
                 },
                 (errorMessage) => {
-                    // Errores de escaneo en tiempo real se pueden ignorar
+                    // Los errores al escanear mientras la cámara busca el código se pueden ignorar
                 }
             ).catch((err) => {
                 alert("No se pudo acceder a la cámara frontal: " + err);

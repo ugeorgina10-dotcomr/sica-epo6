@@ -1,10 +1,11 @@
 FROM php:8.5-apache
 
+# Instala los programas que necesita el sistema para funcionar
 RUN apt-get update && apt-get install -y git unzip libzip-dev libpng-dev libonig-dev libxml2-dev libpq-dev libicu-dev \
     && docker-php-ext-install pdo_mysql pdo_pgsql mbstring zip gd bcmath intl
 
-# --- Velocidad ---
-# PHP precompilado en memoria (opcache): el código no cambia dentro del contenedor, así que no revisa archivos en cada petición
+# --- Que el sistema responda más rápido ---
+# Guarda el código ya preparado para no leerlo de nuevo en cada visita
 RUN { \
       echo 'opcache.enable=1'; \
       echo 'opcache.memory_consumption=128'; \
@@ -12,8 +13,8 @@ RUN { \
       echo 'opcache.validate_timestamps=0'; \
     } > /usr/local/etc/php/conf.d/opcache-sica.ini
 
-# --- Subir archivos ---
-# Sin esto PHP solo acepta archivos de 2 MB (y 8 MB por petición): una plantilla o lista grande fallaba. El navegador ya reduce el peso antes de subir.
+# --- Permitir subir archivos grandes ---
+# Sin esto solo se podían subir archivos de 2 MB, y las listas o plantillas grandes fallaban
 RUN { \
       echo 'upload_max_filesize=25M'; \
       echo 'post_max_size=30M'; \
@@ -24,7 +25,8 @@ RUN { \
       echo 'realpath_cache_ttl=600'; \
     } > /usr/local/etc/php/conf.d/sica-subidas.ini
 
-# Apache: comprime las respuestas (página, JSON, JS) y deja que el navegador guarde librerías e imágenes 30 días (llevan ?v= y el service worker las renueva)
+# Comprime las páginas para que carguen más rápido y hace que el navegador
+# guarde las imágenes y librerías 30 días (así no las descarga cada vez)
 RUN a2enmod rewrite deflate headers \
     && { \
       echo 'AddOutputFilterByType DEFLATE text/html text/css text/plain text/javascript application/javascript application/json application/manifest+json image/svg+xml'; \
@@ -37,10 +39,12 @@ RUN a2enmod rewrite deflate headers \
     } > /etc/apache2/conf-available/sica-velocidad.conf \
     && a2enconf sica-velocidad
 
+# Indica que el sitio se muestra desde la carpeta "public"
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
     && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
 
+# Copia el proyecto e instala lo que necesita
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY . .
@@ -48,5 +52,5 @@ RUN composer install --no-dev --optimize-autoloader \
     && chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 80
-# Al arrancar: guarda la configuración y las vistas ya compiladas (más rápido), migra, crea cuentas y enciende Apache
+# Al encender el servidor: prepara todo, crea las tablas y las cuentas que falten, y abre el sistema
 CMD ["sh", "-c", "php artisan config:cache && php artisan view:cache && php artisan migrate --force && php artisan sica:crear-usuarios && chown -R www-data:www-data storage bootstrap/cache && apache2-foreground"]

@@ -18,7 +18,7 @@ class SicaClavesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Cache::flush();   // reinicia los límites de peticiones entre pruebas
+        Cache::flush();   // reinicia los límites de intentos entre pruebas
         $this->seed(UsuarioSeeder::class);
     }
 
@@ -150,7 +150,7 @@ class SicaClavesTest extends TestCase
         $c = $this->como('control');
         $c->deleteJson('/api/sica/claves/rol/director')->assertOk();
 
-        $this->assertSame('', DB::table('users')->where('rol', 'director')->value('password'));   // no queda ni un hash
+        $this->assertSame('', DB::table('users')->where('rol', 'director')->value('password'));   // no queda ninguna contraseña guardada
         $r = $this->postJson('/auth/login', ['email' => 'director@epo6.edu.mx', 'password' => 'prepa06'])->assertStatus(422);
         $this->assertStringContainsString('Pide a Control Escolar', $r->json('mensaje'));
         $this->postJson('/auth/login', ['email' => 'director@epo6.edu.mx', 'password' => ''])->assertStatus(422);
@@ -195,7 +195,7 @@ class SicaClavesTest extends TestCase
         // Luis no se ve afectado
         $this->postJson('/auth/login', ['email' => $correo, 'password' => 'prepa06', 'orientador' => 'Luis'])->assertOk();
 
-        // Control le genera una nueva y entra (el login de Luis cambió la sesión, así que Control vuelve a entrar)
+        // Control le genera una nueva y entra (el inicio de sesión de Luis cambió la sesión, así que Control vuelve a entrar)
         $c = $this->como('control');
         $c->postJson('/api/sica/claves/orientador', ['orientador_id' => $ana->id, 'password' => 'AnaNueva2026x', 'password_confirmation' => 'AnaNueva2026x'])->assertOk();
         $this->postJson('/auth/login', ['email' => $correo, 'password' => 'AnaNueva2026x', 'orientador' => 'Ana'])->assertOk();
@@ -441,12 +441,12 @@ class SicaClavesTest extends TestCase
         $r = $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk()->assertJsonPath('bloqueada', true);
 
         $this->assertNotNull(DB::table('users')->where('rol', 'director')->value('olvido_at'));
-        $this->assertNull($r->headers->get('Set-Cookie'));   // no abre sesión: no escribe nada en la tabla sessions
+        $this->assertNull($r->headers->get('Set-Cookie'));   // no abre sesión: no escribe nada en la tabla de sesiones
     }
 
     public function test_al_entrar_una_contrasena_con_costo_distinto_se_vuelve_a_guardar_con_el_actual(): void
     {
-        $viejo = password_hash('prepa06', PASSWORD_BCRYPT, ['cost' => 5]);   // el costo de pruebas es 4
+        $viejo = password_hash('prepa06', PASSWORD_BCRYPT, ['cost' => 5]);   // el nivel de seguridad en pruebas es 4
         DB::table('users')->where('rol', 'director')->update(['password' => $viejo]);
         $ana = Orientador::create(['nombre' => 'Ana']);
         DB::table('orientadores')->where('id', $ana->id)->update(['password' => password_hash('ClaveDeAna2026', PASSWORD_BCRYPT, ['cost' => 5])]);
@@ -483,7 +483,7 @@ class SicaClavesTest extends TestCase
 
         $this->como('control')->getJson('/api/sica/claves', ['If-None-Match' => $etag])->assertStatus(304);
 
-        // Cuando alguien pulsa "¿Olvidaste tu contraseña?" el ETag cambia y vuelve a llegar el cuerpo completo
+        // Cuando alguien pulsa "¿Olvidaste tu contraseña?" la marca de versión cambia y vuelve a llegar la respuesta completa
         $this->postJson('/auth/olvide', ['email' => 'director@epo6.edu.mx'])->assertOk();
         $this->como('control')->getJson('/api/sica/claves', ['If-None-Match' => $etag])->assertOk()
             ->assertJsonPath('roles.0.bloqueada', true);

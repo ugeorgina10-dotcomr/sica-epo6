@@ -3,12 +3,12 @@
 namespace App\Support;
 
 /**
- * Revisión de archivos subidos: devuelve el texto del problema o null si el archivo se ve limpio.
- * Solo mira el CONTENIDO real (no se fía de la extensión ni del tipo que declara el navegador).
+ * Revisa los archivos que se suben: devuelve el texto del problema, o vacío si el archivo se ve limpio.
+ * Solo mira el CONTENIDO real (no se fía de la extensión ni del tipo que dice el navegador).
  *
- * Bloquea: programas/scripts disfrazados, nombres con doble extensión peligrosa, Word con macros, objetos incrustados,
- * plantillas remotas o ActiveX, zips "bomba" (pequeños que al abrirse pesan gigas), y PDF con JavaScript, acciones de lanzar
- * programas, archivos adjuntos o contenido activo (RichMedia/XFA).
+ * Bloquea: programas disfrazados de documento, nombres con doble extensión peligrosa, Word con macros,
+ * objetos incrustados, plantillas que se cargan de internet, archivos zip "bomba" (pequeños, pero gigantes al abrirse)
+ * y PDF con programas, archivos adjuntos o contenido que se ejecuta solo.
  */
 class ArchivoSeguro
 {
@@ -19,8 +19,8 @@ class ArchivoSeguro
     ];
 
     private const MAX_ENTRADAS_ZIP    = 3000;
-    private const MAX_DESCOMPRIMIDO   = 300 * 1024 * 1024;   // 300 MB ya abierto
-    private const MAX_RAZON_ENTRADA   = 200;                 // una entrada que se infla más de 200 veces es sospechosa
+    private const MAX_DESCOMPRIMIDO   = 300 * 1024 * 1024;   // 300 MB una vez abierto
+    private const MAX_RAZON_ENTRADA   = 200;                 // si un archivo crece más de 200 veces al abrirse, es sospechoso
 
     /** Revisa el nombre original del archivo. */
     public static function problemaDeNombre(string $nombre): ?string
@@ -43,9 +43,9 @@ class ArchivoSeguro
     /** Revisa el contenido de un PDF (ya leído en memoria). */
     public static function problemaDePdf(string $contenido): ?string
     {
-        // Se miran solo las partes de texto del PDF: dentro de las imágenes/streams comprimidos cualquier combinación de bytes puede salir por azar
+        // Solo se revisan las partes de texto del PDF: dentro de las imágenes comprimidas cualquier combinación de datos puede parecer sospechosa por pura casualidad
         $contenido = self::sinStreams($contenido);
-        // Contenido activo: JavaScript, lanzar programas, adjuntos, multimedia/Flash y formularios XFA dinámicos
+        // Contenido que se ejecuta solo: programas, lanzar aplicaciones, adjuntos, multimedia/Flash y formularios dinámicos
         if (preg_match('#/(JavaScript|JS|Launch|EmbeddedFile|EmbeddedFiles|RichMedia|XFA|SubmitForm|ImportData)(?![A-Za-z0-9])#', $contenido, $m)) {
             return 'El PDF trae contenido activo no permitido (/' . $m[1] . '): scripts, adjuntos o acciones automáticas. Expórtalo de nuevo a PDF desde Word ("Guardar como PDF") para que quede limpio.';
         }
@@ -53,7 +53,7 @@ class ArchivoSeguro
         return null;
     }
 
-    /** Quita lo que hay entre "stream" y "endstream" (datos binarios) para quedarse con los diccionarios del PDF. */
+    /** Quita los datos binarios (lo que hay entre "stream" y "endstream") para quedarse solo con las partes de texto del PDF. */
     private static function sinStreams(string $pdf): string
     {
         $salida = '';
@@ -76,11 +76,11 @@ class ArchivoSeguro
         return $salida;
     }
 
-    /** Revisa un Word/Excel (.docx/.xlsx), que por dentro es un zip. $ruta = archivo en disco. */
+    /** Revisa un Word o Excel (.docx/.xlsx), que por dentro es un archivo comprimido. $ruta = ubicación del archivo. */
     public static function problemaDeOffice(string $ruta): ?string
     {
         if (!class_exists(\ZipArchive::class)) {
-            return null;   // sin la extensión zip no se puede mirar adentro; la validación de formato ya se hizo antes
+            return null;   // sin la extensión zip no se puede revisar por dentro; el formato ya se validó antes
         }
         $zip = new \ZipArchive();
         if ($zip->open($ruta) !== true) {
@@ -124,7 +124,7 @@ class ArchivoSeguro
                 return 'El archivo está guardado con macros activadas (docm/xlsm). Guárdalo como .docx o .xlsx normal.';
             }
 
-            // Relaciones hacia fuera: plantilla remota, objetos OLE o subdocumentos cargados de internet
+            // Enlaces hacia afuera: plantillas que se cargan de internet, objetos incrustados o documentos externos
             for ($i = 0; $i < $zip->numFiles; $i++) {
                 $nombre = (string) $zip->getNameIndex($i);
                 if (!str_ends_with(strtolower($nombre), '.rels')) {

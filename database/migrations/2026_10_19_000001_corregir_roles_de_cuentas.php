@@ -7,7 +7,7 @@ return new class extends Migration
 {
     /**
      * Las cuentas creadas antes de agregar la columna `rol` quedaron todas como 'orientador'
-     * (valor por defecto). Aquí se asigna a cada cuenta oficial su rol correcto por correo.
+     * (valor normal). Aquí se asigna a cada cuenta oficial su rol correcto según su correo.
      * No toca contraseñas ni otros datos. Es seguro ejecutarla varias veces.
      */
     public function up(): void

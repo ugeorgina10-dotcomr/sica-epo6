@@ -13,12 +13,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 /**
- * Contraseñas administradas por Control Escolar (todas las rutas pasan por el guardia sica:control).
- *  - clave de cada rol (director, subdirector, orientador general y la propia de Control Escolar)
- *  - clave personal de cada orientador (si no tiene, entra con la general del rol Orientador)
+ * Contraseñas administradas por Control Escolar (todas las rutas pasan por la revisión sica:control).
+ * - contraseña de cada rol (director, subdirector, orientador general y la propia de Control Escolar)
+ * - contraseña personal de cada orientador (si no tiene, entra con la general del rol Orientador)
  * Control Escolar es quien genera y entrega las contraseñas; una cuenta bloqueada por "olvidé mi contraseña"
  * se desbloquea al generarle una nueva (o al desbloquearla sin cambiarla).
- * Las claves se guardan siempre con hash (bcrypt); nunca se devuelven ni se guardan en texto plano.
+ * Las contraseñas siempre se guardan protegidas (cifradas); nunca se devuelven ni se guardan tal como se escriben.
  */
 class ClavesController extends Controller
 {
@@ -32,8 +32,8 @@ class ClavesController extends Controller
     ];
 
     /**
-     * Reglas de una contraseña nueva (las mismas indicaciones que muestra la pantalla):
-     * 8 a 72 caracteres, mayúscula, minúscula, número, solo letras y números (sin caracteres especiales), sin espacios y sin usar el nombre de la escuela ni la clave inicial.
+     * Reglas de una contraseña nueva (las mismas que muestra la pantalla):
+     * de 8 a 72 caracteres, con mayúscula, minúscula y número, solo letras y números (sin caracteres especiales), sin espacios y sin usar el nombre de la escuela ni la contraseña inicial.
      */
     public static function reglasClave(): array
     {
@@ -57,16 +57,16 @@ class ClavesController extends Controller
     }
 
     /**
-     * Estado de las contraseñas (nunca la clave ni su hash).
-     * Roles: borrada = sin contraseña; bloqueada = la persona marcó "olvidé mi contraseña".
-     * Orientadores: estado propia (personal) | general (usa la del rol) | borrada; bloqueada igual que en los roles.
+     * Estado de las contraseñas (nunca la contraseña en sí).
+     * Roles: borrada = sin contraseña; bloqueada = la persona pulsó "olvidé mi contraseña".
+     * Orientadores: propia (personal) | general (usa la del rol) | borrada; bloqueada igual que en los roles.
      */
     public function index(Request $request): JsonResponse|Response
     {
         $datos = self::datos();
 
-        // ETag: Control Escolar consulta esto cada pocos segundos para ver quién pulsó "¿Olvidaste tu contraseña?".
-        // Si nada cambió se responde 304 (sin cuerpo) y la pantalla no se vuelve a dibujar.
+        // Marca de versión: Control Escolar consulta esto cada pocos segundos para ver quién pulsó "¿Olvidaste tu contraseña?".
+        // Si nada cambió se responde "sin cambios" (304) y la pantalla no se vuelve a dibujar.
         $etag = self::etag($datos);
 
         if (in_array($request->header('If-None-Match'), [$etag, 'W/' . $etag], true)) {
@@ -76,7 +76,7 @@ class ClavesController extends Controller
         return response()->json($datos)->header('ETag', $etag);
     }
 
-    /** ETag de los datos de contraseñas (la pantalla lo guarda para que la primera consulta responda 304). */
+    /** Marca de versión de las contraseñas (la pantalla la guarda para que la primera consulta responda "sin cambios"). */
     public static function etag(array $datos): string
     {
         return '"' . md5(json_encode($datos)) . '"';
@@ -123,7 +123,7 @@ class ClavesController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'No existe la cuenta de ese rol.'], 404);
         }
 
-        // Para cambiar su propia clave, Control Escolar confirma primero la actual
+        // Para cambiar su propia contraseña, Control Escolar confirma primero la actual
         if ($d['rol'] === 'control' && !Hash::check($d['password_actual'] ?? '', $usuario->getAuthPassword())) {
             return response()->json(['ok' => false, 'mensaje' => 'La contraseña actual no es correcta.'], 422);
         }
@@ -132,8 +132,8 @@ class ClavesController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'Esa contraseña ya la usa otro rol. Elige una distinta.'], 422);
         }
 
-        $usuario->password = $d['password'];   // el modelo la guarda con hash
-        $usuario->olvido_at = null;            // con contraseña nueva, la cuenta vuelve a tener acceso
+        $usuario->password = $d['password'];   // el modelo la guarda cifrada
+        $usuario->olvido_at = null;            // con una contraseña nueva, la cuenta vuelve a tener acceso
         $usuario->save();
         Cache::forget('sica.olvidos');
 
@@ -146,7 +146,7 @@ class ClavesController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** Pone o cambia la clave propia de un orientador. */
+    /** Pone o cambia la contraseña propia de un orientador. */
     public function orientador(Request $request): JsonResponse
     {
         $d = $request->validate([
@@ -160,14 +160,14 @@ class ClavesController extends Controller
 
         $o = Orientador::findOrFail($d['orientador_id']);
         $o->password = $d['password'];
-        $o->olvido_at = null;   // con contraseña nueva, vuelve a tener acceso
+        $o->olvido_at = null;   // con una contraseña nueva, vuelve a tener acceso
         $o->save();
         Cache::forget('sica.olvidos');
 
         return response()->json(['ok' => true]);
     }
 
-    /** Quita la clave personal: el orientador vuelve a entrar con la contraseña general del rol Orientador (y se desbloquea). */
+    /** Quita la contraseña personal: el orientador vuelve a entrar con la contraseña general del rol Orientador (y se desbloquea). */
     public function quitarOrientador(Orientador $orientador): JsonResponse
     {
         $orientador->password = null;
@@ -180,7 +180,7 @@ class ClavesController extends Controller
 
     /**
      * Control Escolar borra la contraseña guardada de una cuenta (cuando alguien la olvidó).
-     * La columna queda vacía: nadie entra con esa cuenta hasta que Control Escolar genere una nueva.
+     * Queda sin contraseña: nadie entra con esa cuenta hasta que Control Escolar genere una nueva.
      * Solo se borra la contraseña (y las sesiones de esa cuenta); no se toca ningún otro dato.
      * La de Control Escolar no se puede borrar desde aquí (se quedaría sin acceso): usa  php artisan sica:restablecer-claves
      */
@@ -190,7 +190,7 @@ class ClavesController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'Esa cuenta no se puede borrar desde aquí.'], 422);
         }
 
-        // Un UPDATE y un DELETE directos (antes: buscar la cuenta primero = una consulta más por la red)
+        // Se actualiza o borra directo (antes se buscaba la cuenta primero, lo que era una consulta más)
         DB::table('users')->where('rol', $rol)->update(['password' => '', 'remember_token' => null]);
         DB::table('sessions')->whereIn('user_id', DB::table('users')->where('rol', $rol)->select('id'))->delete();
 
@@ -207,7 +207,7 @@ class ClavesController extends Controller
 
     /**
      * Quita el bloqueo de "olvidé mi contraseña" SIN cambiar la contraseña
-     * (por ejemplo, si alguien marcó el bloqueo por error o por broma). Si la contraseña está borrada, sigue sin entrar
+     * (por ejemplo, si alguien lo marcó por error o por broma). Si la contraseña está borrada, sigue sin entrar
      * hasta que se genere una nueva.
      */
     public function desbloquearRol(string $rol): JsonResponse
@@ -230,10 +230,10 @@ class ClavesController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** ¿La contraseña nueva ya es la de otra cuenta de rol? (se compara contra sus hashes) */
+    /** ¿La contraseña nueva ya es la de otra cuenta de rol? (se compara con las contraseñas guardadas) */
     private function laUsaOtraCuenta(string $password, ?int $exceptoUserId): bool
     {
-        // Solo id y hash, y sin cuentas vacías (borradas): cada Hash::check cuesta ~0.2 s, así que no se gasta en vano
+        // Solo se toman las cuentas que sí tienen contraseña: cada comparación tarda ~0.2 s, así que no se gasta en vano
         return User::when($exceptoUserId, fn ($q) => $q->where('id', '!=', $exceptoUserId))
             ->where('password', '!=', '')
             ->get(['id', 'password'])

@@ -24,7 +24,7 @@ class Grupo extends Model
         'plantilla_reverso',
     ];
 
-    /** Hora límite de entrada MÁS la tolerancia ("HH:MM"): después de esa hora la entrada cuenta como Retardo. null si el grupo no tiene horario. */
+    /** Hora límite de entrada más la tolerancia ("HH:MM"): después de esa hora la entrada cuenta como Retardo. Queda vacío si el grupo no tiene horario. */
     public function limiteEntrada(): ?string
     {
         $m = \App\Support\MovimientoAutomatico::aMinutos($this->hora_entrada);

@@ -1,6 +1,7 @@
 # SICA-EPO6
 
-Sistema de Identificacion y Control de Acceso (Laravel 12 + MySQL).
+Sistema de Identificacion y Control de Acceso (Laravel 12).
+Se usa en una computadora con XAMPP (MySQL) o publicado en Render (Postgres). Para publicarlo en Render lee `RENDER.md`.
 
 ## Instalacion en XAMPP (Windows)
 1. Copia esta carpeta a `C:\xampp\htdocs\sica-epo6`.

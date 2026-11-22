@@ -92,7 +92,7 @@ class SicaRapidezTest extends TestCase
 
         $this->assertSame(60, Alumno::count());
         $this->assertSame(60, Asistencia::count());
-        $this->assertLessThan(25, $consultas);   // antes: más de 60 (un INSERT por alumno)
+        $this->assertLessThan(25, $consultas);   // antes: más de 60 (un guardado por alumno)
     }
 
     public function test_el_mismo_alumno_repetido_en_un_lote_no_se_duplica(): void

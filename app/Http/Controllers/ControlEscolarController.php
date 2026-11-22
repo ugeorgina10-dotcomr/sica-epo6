@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 class ControlEscolarController extends Controller
 {
     /**
-     * Único punto de entrada que ya usa el frontend (sincronizarConServidor() en el JS).
+     * Único punto por donde el sistema envía sus cambios (sincronizarConServidor() en el JS).
      * Recibe { accion, datos } y decide qué hacer según la acción.
      */
     public function sync(Request $request): JsonResponse
@@ -31,7 +31,7 @@ class ControlEscolarController extends Controller
 
         $esControl = $request->user()?->rol === 'control';
 
-        // Cualquier escritura invalida la huella: los demás equipos ven el cambio en su próxima consulta
+        // Cualquier cambio actualiza la marca de versión: los demás equipos ven el cambio en su próxima consulta
         $respuesta = $this->ejecutarAccion($validado, $esControl);
         Cache::forget('sica.huella');
 
@@ -42,7 +42,7 @@ class ControlEscolarController extends Controller
     {
         return match ($validado['accion']) {
             'guardar_permisos'     => $this->guardarPermisos($validado['datos']),
-            // Solo Control Escolar puede crear/cambiar alumnos, horarios, orientadores y plantillas.
+            // Solo Control Escolar puede crear o cambiar alumnos, horarios, orientadores y plantillas.
             // Los demás roles con permiso "editar" únicamente pueden guardar asistencias.
             'guardar_todo'         => $this->guardarTodo($validado['datos'], !$esControl),
             'registrar_asistencia' => $this->registrarAsistencia($validado['datos']),
@@ -66,7 +66,7 @@ class ControlEscolarController extends Controller
 
         $request->validate([
             'archivo' => 'required|file|max:20480|extensions:docx,pdf',
-            'turno'   => 'required|in:Matutino,Vespertino,Ambos',   // "Ambos": el reverso para los dos turnos con UNA sola subida
+            'turno'   => 'required|in:Matutino,Vespertino,Ambos',   // "Ambos": el reverso sirve para los dos turnos con UNA sola subida
         ], [
             'archivo.extensions' => 'La plantilla debe ser un Word (.docx) o un PDF.',
             'archivo.max'        => 'El archivo pesa demasiado (máximo 20 MB).',
@@ -98,11 +98,11 @@ class ControlEscolarController extends Controller
                 return response()->json(['ok' => false, 'message' => $problemaPdf], 422);
             }
         } elseif ($esZip) {
-            // Un .docx es un zip que contiene word/document.xml: así no se guarda cualquier otro archivo (ni un Excel renombrado)
+            // Un .docx es un archivo comprimido que contiene word/document.xml: así no se guarda cualquier otro archivo (ni un Excel con el nombre cambiado)
             $ok = false;
             if ($extension === 'docx' && class_exists(\ZipArchive::class)) {
                 $zip = new \ZipArchive();
-                if ($zip->open($ruta) === true) {   // si el zip está truncado o corrupto, open() falla y NO hay nada que cerrar
+                if ($zip->open($ruta) === true) {   // si el archivo comprimido está incompleto o dañado, no se puede abrir y no hay nada que cerrar
                     $ok = $zip->locateName('word/document.xml') !== false;
                     $zip->close();
                 }
@@ -123,12 +123,12 @@ class ControlEscolarController extends Controller
 
         $turnos = $request->input('turno') === 'Ambos' ? ['Matutino', 'Vespertino'] : [$request->input('turno')];
         $valor  = base64_encode($contenido);
-        unset($contenido);   // el archivo puede pesar varios MB: no se tiene en memoria dos veces
+        unset($contenido);   // el archivo puede pesar varios MB: no se mantiene dos veces en memoria
         $ahora  = now();
 
         foreach ($turnos as $turno) {
-            // Un solo INSERT ... ON CONFLICT/DUPLICATE KEY UPDATE: ya no se lee de la BD la plantilla anterior (varios MB) solo para reemplazarla.
-            // (Un turno por consulta: así cada una pesa lo mismo que antes y no se pasa del límite de tamaño del servidor de BD)
+            // Se guarda o se reemplaza en un solo paso: ya no se lee de la base de datos la plantilla anterior (varios MB) solo para reemplazarla.
+            // (Un turno por vez: así cada guardado pesa lo mismo que antes y no se pasa del límite de tamaño del servidor)
             DB::table('ajustes')->upsert(
                 [['clave' => self::clavePlantilla($turno, $lado), 'valor' => $valor, 'created_at' => $ahora, 'updated_at' => $ahora]],
                 ['clave'],
@@ -141,12 +141,12 @@ class ControlEscolarController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    /** Sirve la plantilla (Word o PDF) guardada en la BD; si no hay, 404 y la página usa la que viene en public/plantillas */
+    /** Entrega la plantilla (Word o PDF) guardada en la base de datos; si no hay, responde 404 (no encontrada) y la página usa la que viene en public/plantillas */
     public function verPlantillaOficial(string $turno, string $lado)
     {
         abort_unless(in_array($turno, ['Matutino', 'Vespertino'], true) && in_array($lado, ['frente', 'reverso'], true), 404);
 
-        // Primero solo la fecha de la plantilla (sin traer el archivo de la BD): si el equipo ya tiene esta versión, responde 304 al instante
+        // Primero se revisa solo la fecha de la plantilla (sin traer el archivo): si el equipo ya tiene esta versión, responde "sin cambios" (304) al instante
         $clave = self::clavePlantilla($turno, $lado);
         $meta  = Ajuste::select('clave', 'updated_at')->find($clave);
         abort_unless($meta, 404);
@@ -241,7 +241,7 @@ class ControlEscolarController extends Controller
         return 'plantilla_docx_' . strtolower($turno) . '_' . $lado;
     }
 
-    /** Clave que usaban las plantillas en imagen (ya eliminadas) */
+    /** Nombre con el que se guardaban las plantillas en imagen (ya eliminadas) */
     private static function clavePlantillaImagenVieja(string $turno, string $lado): string
     {
         return 'plantilla_' . strtolower($turno) . '_' . $lado;
@@ -251,19 +251,19 @@ class ControlEscolarController extends Controller
      * Lo que manda el teléfono (o la computadora) en cada escaneo.
      *
      * El alumno se busca por CURP en TODA la base, así que cualquier orientador con permiso puede
-     * escanear a cualquier alumno: el registro queda en el grupo del alumno, no en el del que escanea.
+     * escanear a cualquier alumno: el registro queda en el grupo del alumno, no en el de quien escanea.
      *
      * La fecha y la hora las pone el SERVIDOR (zona America/Mexico_City): así nadie puede falsear
      * una entrada cambiando la hora de su teléfono. ÚNICA excepción: un escaneo "diferido" (hecho sin
-     * internet y enviado después) trae la hora en que se escaneó; solo se acepta si no es futura
-     * (tolerancia de 2 minutos) y no tiene más de 3 días. Si no cumple, se usa la hora del servidor.
+     * internet y enviado después) trae la hora en que se escaneó; solo se acepta si no es del futuro
+     * (con 2 minutos de margen) y no tiene más de 3 días. Si no cumple, se usa la hora del servidor.
      */
     private function registrarAsistencia(array $d): JsonResponse
     {
         $v = validator($d, [
             'curp'     => 'required_without:qr|nullable|string|max:30',
-            'qr'       => 'required_without:curp|nullable|string|max:40',   // código opaco del QR (sin CURP)
-            'modo'     => 'nullable|in:Entrada,Salida,Auto',   // sin modo = Auto (lo decide el horario del grupo)
+            'qr'       => 'required_without:curp|nullable|string|max:40',   // código del QR que no revela la CURP
+            'modo'     => 'nullable|in:Entrada,Salida,Auto',   // sin modo = Automático (lo decide el horario del grupo)
             'diferido' => 'nullable|boolean',
             'fecha'    => 'nullable|date_format:Y-m-d',
             'hora'     => ['nullable', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
@@ -304,7 +304,7 @@ class ControlEscolarController extends Controller
         // La PRIMERA hora en que se muestra la credencial es la que vale: mostrarla otra vez no cambia ni agrega nada
         // (ni la entrada ni la salida), en modo automático y también en modo manual.
         if ($this->enLote) {
-            // En un lote todo se resuelve en memoria (los registros de estos alumnos se leyeron UNA vez al inicio)
+            // En un lote todo se resuelve en memoria (los registros de estos alumnos se leyeron UNA sola vez al inicio)
             $dia = $ahora->toDateString();
             $hoy = collect($this->asistenciasDeLote($alumno->id))
                 ->filter(fn ($x) => substr($x->fecha_hora, 0, 10) === $dia)->sortBy('fecha_hora')->values();
@@ -353,7 +353,7 @@ class ControlEscolarController extends Controller
         }
 
         if ($this->enLote) {
-            // Se anota en memoria y se guarda todo junto al final del lote (un solo INSERT)
+            // Se anota en memoria y se guarda todo junto al final del lote (un solo guardado)
             $existente = null;
             foreach ($this->asisLote[$alumno->id] as $x) {
                 if ($x->fecha_hora === $fechaHora) { $existente = $x; break; }
@@ -368,7 +368,7 @@ class ControlEscolarController extends Controller
                 $this->nuevasLote[] = ['alumno_id' => $alumno->id, 'estatus' => $estatus, 'fecha_hora' => $fechaHora, 'created_at' => now(), 'updated_at' => now()];
             }
         } else {
-            // updateOrCreate: si el teléfono reintenta el mismo escaneo no se duplica el registro
+            // Si el teléfono reintenta el mismo escaneo no se duplica el registro (se actualiza el que ya existe)
             Asistencia::updateOrCreate(
                 ['alumno_id' => $alumno->id, 'fecha_hora' => $fechaHora],
                 ['estatus' => $estatus]
@@ -395,18 +395,18 @@ class ControlEscolarController extends Controller
     }
 
     /**
-     * Registra VARIOS escaneos en una sola petición (los que se acumularon en la cola del equipo).
+     * Registra VARIOS escaneos de una sola vez (los que se acumularon en espera en el equipo).
      * Se procesan en orden (así una entrada y su salida del mismo alumno quedan bien) y se responde el resultado de cada uno.
      */
-    /** Alumnos y grupos precargados durante un lote de escaneos (vacío en un escaneo suelto) */
+    /** Alumnos y grupos cargados de antemano durante un lote de escaneos (vacío en un escaneo suelto) */
     private array $alumnosLote = [];
     private array $gruposLote = [];
     private bool $enLote = false;
-    private array $asisLote = [];       // alumno_id => registros de asistencia (objetos con fecha_hora y estatus)
-    private array $nuevasLote = [];     // filas por insertar al final del lote
+    private array $asisLote = [];       // alumno_id => registros de asistencia (con fecha_hora y estatus)
+    private array $nuevasLote = [];     // filas por guardar al final del lote
     private array $actualizarLote = []; // [alumno_id, fecha_hora, estatus] por actualizar al final del lote
 
-    /** Registros de un alumno dentro de un lote (si no se precargaron, se leen una vez) */
+    /** Registros de un alumno dentro de un lote (si no se cargaron de antemano, se leen una sola vez) */
     private function asistenciasDeLote(int $alumnoId): array
     {
         if (!isset($this->asisLote[$alumnoId])) {
@@ -423,7 +423,7 @@ class ControlEscolarController extends Controller
             return response()->json(['ok' => false, 'mensaje' => 'Lote de escaneos inválido'], 422);
         }
 
-        // Alumnos y grupos del lote se consultan UNA vez (no una por escaneo) y todo se guarda en una sola transacción
+        // Los alumnos y grupos del lote se consultan UNA vez (no una por escaneo) y todo se guarda en un solo paso (todo o nada)
         $curps = [];
         foreach ($items as $item) {
             if (is_array($item) && !empty($item['curp']) && is_string($item['curp'])) {
@@ -483,15 +483,15 @@ class ControlEscolarController extends Controller
     }
 
     /**
-     * Código opaco que va al final del texto del QR de la credencial: no se puede sacar la CURP de él.
-     * Es un HMAC de la CURP con la APP_KEY (si cambias la APP_KEY, hay que volver a imprimir las credenciales).
+     * Código que va al final del texto del QR de la credencial: no se puede sacar la CURP a partir de él.
+     * Se calcula con la CURP y la APP_KEY (si cambias la APP_KEY, hay que volver a imprimir las credenciales).
      */
     public static function codigoQr(string $curp): string
     {
         return substr(hash_hmac('sha256', strtoupper($curp), self::claveQr()), 0, 16);
     }
 
-    /** Llave derivada de la APP_KEY (nunca se manda la APP_KEY). El sistema la recibe ya con sesión y calcula el código del QR de cualquier CURP */
+    /** Llave sacada de la APP_KEY (la APP_KEY nunca se manda). El sistema la recibe ya con sesión iniciada y calcula el código del QR de cualquier CURP */
     public static function claveQr(): string
     {
         return hash_hmac('sha256', 'sica-qr-v1', (string) config('app.key'));
@@ -500,7 +500,7 @@ class ControlEscolarController extends Controller
     /** código QR => id de alumno (se guarda unos minutos; solo cuenta la CURP de cada alumno) */
     private function mapaQr(): array
     {
-        // La llave depende SOLO de los alumnos (antes también de las asistencias: cada escaneo la invalidaba y se recalculaba el código de todos los alumnos)
+        // La llave depende SOLO de los alumnos (antes también de las asistencias, y cada escaneo obligaba a calcular de nuevo el código de todos los alumnos)
         $h = DB::table('alumnos')->selectRaw('COUNT(*) c, MAX(id) i, MAX(updated_at) u')->first();
 
         return Cache::remember('sica.mapaqr.v3.' . md5(json_encode($h)), 1800, function () {
@@ -512,7 +512,7 @@ class ControlEscolarController extends Controller
         });
     }
 
-    /** Nombres de orientadores para la pantalla de login (se recalcula solo si la tabla cambió) */
+    /** Nombres de orientadores para la pantalla de inicio de sesión (se recalcula solo si la tabla cambió) */
     public static function orientadoresLogin(): array
     {
         $h = DB::table('orientadores')->selectRaw('COUNT(*) c, MAX(updated_at) u')->first();
@@ -523,8 +523,8 @@ class ControlEscolarController extends Controller
     }
 
     /**
-     * Huella barata del estado: si no cambió nada, no se recalcula ni se arma el JSON.
-     * Son 5 consultas de agregado (usan índices); cubre altas, bajas y cambios.
+     * Marca de versión sencilla del estado: si no cambió nada, no se vuelve a calcular ni a armar la respuesta.
+     * Usa 5 consultas rápidas de conteo; cubre altas, bajas y cambios.
      */
     private function huellaEstado(): string
     {
@@ -533,7 +533,7 @@ class ControlEscolarController extends Controller
 
     private function calcularHuella(): string
     {
-        // UNA sola consulta (antes eran 5): con la base en la nube cada ida y vuelta al servidor cuesta decenas de milisegundos
+        // UNA sola consulta (antes eran 5): con la base de datos en la nube cada ida y vuelta al servidor tarda decenas de milisegundos
         $filas = DB::select(
             "select 'asistencias' as t, count(*) as c, max(id) as i, max(updated_at) as u from asistencias
              union all select 'alumnos', count(*), 0, max(updated_at) from alumnos
@@ -545,14 +545,14 @@ class ControlEscolarController extends Controller
         return md5(json_encode($filas));
     }
 
-    /** Estado completo para que computadoras y teléfonos lo descarguen */
+    /** Todos los datos para que computadoras y teléfonos los descarguen */
     public function estado(Request $request): JsonResponse
     {
-        // "-q2": al cambiar la forma del estado (llave del QR) los equipos con la versión anterior descargan todo de nuevo
+        // "-q2": si cambia la forma de los datos (llave del QR), los equipos con la versión anterior descargan todo de nuevo
         $huella = $this->huellaEstado() . '-q2';
         $etag   = '"' . $huella . '"';
 
-        // 304 inmediato: el navegador ya tiene la versión actual (sin leer asistencias ni armar JSON)
+        // Responde al instante "sin cambios" (304): el navegador ya tiene la versión actual (sin leer asistencias ni armar la respuesta)
         if ($request->header('If-None-Match') === $etag || $request->header('If-None-Match') === 'W/' . $etag) {
             return response()->json(null, 304)->setEtag($huella);
         }
@@ -565,7 +565,7 @@ class ControlEscolarController extends Controller
         return $respuesta;
     }
 
-    /** Lo mismo que /api/sica/estado, pero para incrustarlo en la página al abrirla con sesión (misma caché y mismo ETag) */
+    /** Lo mismo que /api/sica/estado, pero incluido en la página al abrirla con sesión iniciada (misma versión guardada y misma marca) */
     public function paraPagina(): array
     {
         $huella = $this->huellaEstado() . '-q2';
@@ -583,7 +583,7 @@ class ControlEscolarController extends Controller
             ->get()->keyBy('id');
 
         // Entrada (la más temprana) y salida (la más tardía) por alumno y día.
-        // Query builder + cursor: sin crear un modelo Eloquent por cada asistencia y sin cargar todo en memoria.
+        // Se leen fila por fila: sin crear un objeto por cada asistencia y sin cargar todo en memoria.
         $regs = [];
         foreach (DB::table('asistencias')->select('alumno_id', 'estatus', 'fecha_hora')->orderBy('alumno_id')->cursor() as $x) {
             $f = substr((string) $x->fecha_hora, 0, 10);
@@ -601,7 +601,7 @@ class ControlEscolarController extends Controller
         }
 
         $horarios = [];
-        $info     = [];   // por grupo: [grado, grupo, turno] calculado una sola vez
+        $info     = [];   // por grupo: [grado, grupo, turno] se calcula una sola vez
         foreach ($grupos as $g) {
             $partes = explode(' ', $g->nombre);
             $turno  = $g->turno ?: 'Matutino';
@@ -684,7 +684,7 @@ class ControlEscolarController extends Controller
 
     /**
      * Borra TODOS los alumnos de un grupo y turno junto con sus asistencias.
-     * Si el grupo se queda sin horario, sin orientador y sin alumnos, también se borra su registro (no queda basura en la BD).
+     * Si el grupo se queda sin horario, sin orientador y sin alumnos, también se borra su registro (no queda basura en la base de datos).
      */
     private function eliminarListaGrupo(array $d): JsonResponse
     {
@@ -698,7 +698,7 @@ class ControlEscolarController extends Controller
 
         $borrados = 0;
         $grupo = Grupo::where('grado', $grado)->where('nombre', $grado . '° ' . $n)->where('turno', $turno)
-            ->first(['id', 'hora_entrada', 'hora_salida', 'orientador_id']);   // sin las plantillas (imágenes pesadas)
+            ->first(['id', 'hora_entrada', 'hora_salida', 'orientador_id']);   // sin las plantillas (son archivos pesados)
 
         if ($grupo) {
             DB::transaction(function () use ($grupo, &$borrados) {
@@ -715,7 +715,7 @@ class ControlEscolarController extends Controller
     /**
      * Borra de una sola vez los alumnos (y sus asistencias) de VARIOS grupos: ['grupos' => [['grado','grupo','turno'], ...], 'configuracion' => bool].
      * Con configuracion = true también se quitan el horario y el orientador de esos grupos (y el grupo se borra si queda vacío).
-     * Todo en una transacción: o se borra todo o no se borra nada.
+     * Todo en un solo paso: o se borra todo o no se borra nada.
      */
     private function eliminarListasGrupos(array $d): JsonResponse
     {
@@ -767,7 +767,7 @@ class ControlEscolarController extends Controller
         if ($grupo->hora_entrada || $grupo->hora_salida || $grupo->orientador_id) {
             return false;
         }
-        // Las plantillas no siempre vienen cargadas en el modelo: se revisan directo en la base
+        // Las plantillas no siempre vienen cargadas en el modelo: se revisan directo en la base de datos
         if (Grupo::whereKey($grupo->id)->where(fn ($q) => $q->whereNotNull('plantilla_frente')->orWhereNotNull('plantilla_reverso'))->exists()) {
             return false;
         }
@@ -780,7 +780,7 @@ class ControlEscolarController extends Controller
     }
 
     /**
-     * Elimina un orientador de forma permanente: su registro (con contraseña, bloqueo, etc.) desaparece de la BD
+     * Elimina un orientador de forma permanente: su registro (con contraseña, bloqueo, etc.) desaparece de la base de datos
      * y los grupos que tenía quedan sin orientador. Se busca por id y, si no, por nombre.
      */
     private function eliminarOrientador(array $d): JsonResponse
@@ -810,7 +810,7 @@ class ControlEscolarController extends Controller
     private function guardarPermisos(array $permisos): JsonResponse
     {
         foreach ($permisos as $rol => $tipo) {
-            // Solo estos roles y estos tipos son válidos; Control Escolar siempre puede todo
+            // Solo estos roles y tipos son válidos; Control Escolar siempre puede hacer todo
             if (!in_array($rol, ['orientador', 'director', 'subdirector'], true) || !in_array($tipo, ['ver', 'editar'], true)) {
                 return response()->json(['ok' => false, 'mensaje' => 'Permiso inválido'], 422);
             }
@@ -839,8 +839,8 @@ class ControlEscolarController extends Controller
 
     private function guardarTodo(array $db, bool $soloAsistencias = false): JsonResponse
     {
-        // Orientadores y grupos van en su propia transacción: un problema con un alumno no los deja sin guardar.
-        // Los lotes siguientes de una lista grande los mandan vacíos: así no se gasta ni una consulta ni una transacción de más.
+        // Orientadores y grupos se guardan por separado: un problema con un alumno no impide que se guarden.
+        // Los siguientes lotes de una lista grande llegan vacíos: así no se hace ninguna consulta ni guardado de más.
         if (!$soloAsistencias && (!empty($db['orientadores']) || !empty($db['horarios']))) {
             $this->guardarSoloOrientadores($db);
         }
@@ -878,7 +878,7 @@ class ControlEscolarController extends Controller
         return [(int) $grado, (int) $grupo, $grado . '° ' . $grupo, $turno];
     }
 
-    /** Guarda la lista de orientadores y devuelve un mapa id-del-JS -> id-real-de-la-BD */
+    /** Guarda la lista de orientadores y devuelve un mapa: id-del-navegador -> id-real-en-la-base-de-datos */
     private function guardarOrientadores(array $orientadores): array
     {
         $mapa = [];
@@ -892,7 +892,7 @@ class ControlEscolarController extends Controller
 
             $id = $existentes[$o['nombre']] ?? null;
             if ($id === null) {
-                // No está tal cual: se busca/crea como antes (respeta mayúsculas y acentos de la base de datos)
+                // No se encuentra igual: se busca o crea como antes (respeta mayúsculas y acentos de la base de datos)
                 $id = Orientador::updateOrCreate(['nombre' => $o['nombre']], [])->id;
                 $existentes[$o['nombre']] = $id;
             }
@@ -902,10 +902,10 @@ class ControlEscolarController extends Controller
         return $mapa;
     }
 
-    /** Horario límite de entrada/salida y orientador asignado por grupo Y turno */
+    /** Horario límite de entrada y salida, y orientador asignado, por grupo Y turno */
     private function guardarHorarios(array $horarios, array $mapaOrientadores): void
     {
-        // Todos los grupos en una sola consulta, sin las plantillas (son imágenes pesadas)
+        // Todos los grupos en una sola consulta, sin las plantillas (son archivos pesados)
         $existentes = Grupo::select('id', 'grado', 'nombre', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida', 'orientador_id')->get()->keyBy(fn ($g) => $g->grado . '|' . $g->nombre . '|' . $g->turno);
 
         foreach ($horarios as $clave => $h) {
@@ -913,7 +913,7 @@ class ControlEscolarController extends Controller
 
             $grupo = $existentes[$grado . '|' . $nombre . '|' . $turno]
                 ?? Grupo::firstOrNew(['grado' => $grado, 'nombre' => $nombre, 'turno' => $turno]);
-            // Un grupo puede tener orientador sin horario todavía: la hora vacía se guarda como NULL
+            // Un grupo puede tener orientador sin horario todavía: la hora vacía se guarda en blanco
             $grupo->hora_entrada = $this->horaValida($h['entrada'] ?? null);
             $grupo->hora_salida = $this->horaValida($h['salida'] ?? null);
             // Solo si el navegador las manda (una copia vieja guardada en el equipo no debe borrar la tolerancia ya configurada)
@@ -935,7 +935,7 @@ class ControlEscolarController extends Controller
         }
     }
 
-    /** Solo acepta horas con formato HH:MM (o HH:MM:SS); cualquier otra cosa se guarda como NULL en vez de tirar todo el guardado */
+    /** Solo acepta horas con formato HH:MM (o HH:MM:SS); cualquier otra cosa se guarda en blanco en vez de arruinar todo el guardado */
     private function horaValida(mixed $hora): ?string
     {
         if (!is_string($hora) || !preg_match('/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/', trim($hora))) {
@@ -945,7 +945,7 @@ class ControlEscolarController extends Controller
         return trim($hora);
     }
 
-    /** Tolerancia en minutos: entero de 0 a 180; si viene vacía o inválida se usa el valor por defecto */
+    /** Tolerancia en minutos: número entero de 0 a 180; si viene vacía o inválida se usa el valor normal */
     private function toleranciaValida(mixed $min, int $defecto): int
     {
         if ($min === null || $min === '' || !is_numeric($min)) {
@@ -1002,10 +1002,10 @@ class ControlEscolarController extends Controller
         }
         $porClave = $porClave->keyBy('client_key');
 
-        $pares      = [];   // [alumno, grupo, reg] para guardar registros en lote
-        $nuevas     = [];   // alumnos que no existen: se insertan TODOS juntos al final (antes: un INSERT por alumno)
+        $pares      = [];   // [alumno, grupo, registro] para guardar los registros en lote
+        $nuevas     = [];   // alumnos que no existen: se guardan TODOS juntos al final (antes: un guardado por alumno)
         $indice     = [];   // 'c:CURP' | 'k:id-del-navegador' => posición en $nuevas (para no duplicar dentro del mismo lote)
-        $paresNuevos = [];  // [posición en $nuevas, grupo, reg]
+        $paresNuevos = [];  // [posición en $nuevas, grupo, registro]
         $ahora      = now();
 
         foreach ($alumnos as $a) {
@@ -1051,7 +1051,7 @@ class ControlEscolarController extends Controller
                 }
 
                 if ($curp === '' && $claveNav === null) {
-                    // Caso raro (id "srv-N" que ya no existe y sin CURP): no habría cómo encontrarlo después de insertarlo en lote
+                    // Caso raro (id "srv-N" que ya no existe y sin CURP): no habría forma de encontrarlo después de guardarlo en lote
                     $alumno = Alumno::create(['matricula' => null, 'nombre' => $nombre, 'grupo_id' => $grupo->id, 'client_key' => null]);
                 } else {
                     $i = count($nuevas);
@@ -1094,7 +1094,7 @@ class ControlEscolarController extends Controller
             $pares[] = [$alumno, $grupo, $a['reg'] ?? []];
         }
 
-        // Alumnos nuevos: un solo INSERT por cada 200 (con la base en la nube cada consulta cuesta decenas de milisegundos)
+        // Alumnos nuevos: se guardan de 200 en 200 (con la base de datos en la nube cada consulta tarda decenas de milisegundos)
         // y una consulta para recuperar sus ids, que hacen falta para guardar sus entradas y salidas.
         if ($nuevas) {
             foreach (array_chunk($nuevas, 200) as $bloque) {
@@ -1161,7 +1161,7 @@ class ControlEscolarController extends Controller
 
     /**
      * Guarda entradas y salidas por fecha, ignorando fechas u horas con formato inválido.
-     * Compara contra lo que ya hay en la BD (UNA consulta) y solo escribe lo nuevo o lo que cambió de estatus:
+     * Compara contra lo que ya hay en la base de datos (UNA consulta) y solo escribe lo nuevo o lo que cambió de estatus:
      * el navegador reenvía todo el historial en cada sincronización y casi nunca hay nada distinto.
      *
      * @param array<int, array{0: Alumno, 1: ?Grupo, 2: mixed}> $pares

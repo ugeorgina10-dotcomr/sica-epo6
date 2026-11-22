@@ -6,12 +6,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default Cache Store
+    | Caché por defecto
     |--------------------------------------------------------------------------
     |
-    | This option controls the default cache store that will be used by the
-    | framework. This connection is utilized if another isn't explicitly
-    | specified when running a cache operation inside the application.
+    | La caché guarda datos temporalmente para que el sistema responda más rápido.
+    | Aquí se indica cuál se usa normalmente.
     |
     */
 
@@ -19,16 +18,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Cache Stores
+    | Lugares de la caché
     |--------------------------------------------------------------------------
     |
-    | Here you may define all of the cache "stores" for your application as
-    | well as their drivers. You may even define multiple stores for the
-    | same cache driver to group types of items stored in your caches.
-    |
-    | Supported drivers: "array", "database", "file", "memcached",
-    |                    "redis", "dynamodb", "octane",
-    |                    "failover", "null"
+    | Aquí se definen los lugares donde puede guardarse la caché.
+    | Opciones: "array", "database", "file", "memcached", "redis", "dynamodb", "octane", "failover", "null".
     |
     */
 
@@ -103,12 +97,10 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Cache Key Prefix
+    | Prefijo de la caché
     |--------------------------------------------------------------------------
     |
-    | When utilizing the APC, database, memcached, Redis, and DynamoDB cache
-    | stores, there might be other applications using the same cache. For
-    | that reason, you may prefix every cache key to avoid collisions.
+    | Texto que se pone al inicio de cada dato guardado para que no se mezcle con el de otras aplicaciones que usen el mismo lugar.
     |
     */
 

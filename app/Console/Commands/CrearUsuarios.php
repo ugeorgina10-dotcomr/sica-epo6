@@ -23,7 +23,7 @@ class CrearUsuarios extends Command
                 continue;
             }
 
-            // El rol SIEMPRE debe ser el oficial de la cuenta (antes quedaban todas como 'orientador' por el valor por defecto)
+            // Cada cuenta debe tener siempre su rol correcto (antes todas quedaban como 'orientador' por error)
             if ($usuario->rol !== $cuenta['rol']) {
                 $anterior = $usuario->rol;
                 $usuario->rol = $cuenta['rol'];
@@ -31,13 +31,13 @@ class CrearUsuarios extends Command
                 $this->warn("Rol corregido: {$cuenta['email']} ({$anterior} -> {$cuenta['rol']})");
             }
 
-            // Contraseña borrada a propósito desde Control Escolar: NO se vuelve a poner la inicial en cada despliegue
+            // Si Control Escolar borró la contraseña a propósito, no se vuelve a poner la inicial cada vez que se publica el sistema
             if ((string) $usuario->getAuthPassword() === '') {
                 $this->warn("Sin contraseña (borrada): {$cuenta['rol']} | {$cuenta['email']}. Usa:  php artisan sica:restablecer-claves");
                 continue;
             }
 
-            // Cuenta vieja con la contraseña sin hash: se corrige. Si ya es hash, NO se toca (puede haberla cambiado su dueño).
+            // Si una cuenta vieja tiene la contraseña sin proteger, se corrige. Si ya está protegida no se toca (su dueño pudo haberla cambiado).
             if (!str_starts_with((string) $usuario->getAuthPassword(), '$2y$')) {
                 $usuario->password = UsuarioSeeder::CLAVE_INICIAL;
                 $usuario->rol = $cuenta['rol'];

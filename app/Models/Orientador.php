@@ -15,7 +15,7 @@ class Orientador extends Model
         'nombre',
     ];
 
-    // La contraseña nunca sale en JSON ni se llena en masa: solo la cambia ClavesController
+    // La contraseña nunca se muestra hacia afuera y solo se cambia desde ClavesController
     protected $hidden = [
         'password',
     ];
@@ -23,7 +23,7 @@ class Orientador extends Model
     protected function casts(): array
     {
         return [
-            'password' => 'hashed',   // al asignarla se guarda con bcrypt
+            'password' => 'hashed',   // al asignarla se guarda cifrada
         ];
     }
 

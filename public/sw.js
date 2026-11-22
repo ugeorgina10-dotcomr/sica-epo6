@@ -1,8 +1,9 @@
-/* SICA-EPO6 — Service worker
+/*
+ * SICA-EPO6 — Modo sin internet (service worker)
  * Permite abrir el sistema SIN internet:
- *   - Librerías (/vendor) e imágenes (/img): se guardan la primera vez y se sirven desde el equipo.
- *   - Página de inicio ("/"): se intenta primero el servidor; si no hay internet se usa la última copia.
- *   - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
+ * - Librerías (/vendor) e imágenes (/img): se guardan la primera vez y después se abren desde el equipo.
+ * - Página de inicio ("/"): se intenta primero el servidor; si no hay internet se usa la última copia.
+ * - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
 const VERSION = 'sica-v36';
@@ -39,7 +40,7 @@ const PRECARGA = [
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(C_ESTATICOS)
-      .then(c => Promise.all(PRECARGA.map(u => c.add(u).catch(() => {}))))   // un archivo que falle no cancela la instalación
+      .then(c => Promise.all(PRECARGA.map(u => c.add(u).catch(() => {}))))   // si un archivo falla, no se cancela la instalación
       .then(() => self.skipWaiting())
   );
 });
@@ -52,8 +53,8 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Al cerrar sesión la página avisa para borrar la copia guardada (trae el nombre/rol de quien la abrió)
-// Al iniciar sesión (o al abrir con sesión) avisa para guardar la copia YA CON la sesión: así, si luego
+// Al cerrar sesión, la página avisa para borrar la copia guardada (trae el nombre y rol de quien la abrió)
+// Al iniciar sesión (o al abrir con sesión), avisa para guardar la copia YA CON la sesión: así, si luego
 // se abre sin internet, entra directo al sistema en vez de mostrar "Sin conexión".
 self.addEventListener('message', e => {
   if (e.data === 'limpiar-paginas') e.waitUntil(caches.delete(C_PAGINAS));
@@ -73,9 +74,9 @@ self.addEventListener('fetch', e => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;   // siempre al servidor
 
-  // Páginas: servidor primero, copia guardada si no hay internet
+  // Páginas: primero el servidor; si no hay internet, la copia guardada
   if (req.mode === 'navigate') {
-    // Servidor primero, pero si tarda más de 4 s y hay copia guardada (solo existe con sesión abierta), se abre esa
+    // Primero el servidor, pero si tarda más de 4 segundos y hay copia guardada (solo existe con sesión abierta), se abre esa
     // y la consulta sigue en segundo plano. Sin copia guardada se espera al servidor como siempre.
     const red = fetch(req).then(res => {
       if (res.ok && !res.redirected && url.pathname === '/') {
@@ -110,7 +111,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Fondo y logo: no cambian nunca, así que salen de la copia guardada al instante (sin esperar a la red); si no está, se baja y se guarda
+  // Fondo y logo: no cambian nunca, así que se abren al instante desde la copia guardada (sin esperar a internet); si no está, se descarga y se guarda
   if (/^\/img\/(epo6\.(webp|jpg)|epo6-movil\.webp|logo6\.png)$/.test(url.pathname)) {
     const clave = new Request(url.origin + url.pathname);
     e.respondWith(
@@ -124,7 +125,7 @@ self.addEventListener('fetch', e => {
 
   // Imágenes y plantillas de Word (se pueden reemplazar): primero el servidor (así se ve la plantilla nueva),
   // y si no hay internet, la última copia guardada. La página las pide con ?v=<hora>; aquí se guardan
-  // por su ruta (sin el parámetro) para que sirvan sin internet y no se acumulen copias.
+  // por su ruta (sin ese dato extra) para que funcionen sin internet y no se acumulen copias.
   if (url.pathname.startsWith('/img/') || url.pathname.startsWith('/plantillas/') || url.pathname.startsWith('/plantilla-oficial/')) {
     const clave = new Request(url.origin + url.pathname);
     e.respondWith(
