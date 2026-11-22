@@ -219,6 +219,50 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 .burbuja .burbuja-mudo:hover{background:rgba(255,255,255,.15)}
 .burbuja.silenciada{background:#5c1a2c}
 @keyframes burbujaEntra{from{opacity:0;transform:translateY(-12px) scale(.95)}to{opacity:1;transform:none}}
+/* ===== ACCESIBILIDAD Y USABILIDAD =====
+   Botones y campos más grandes (objetivo táctil de 44-48 px), letra legible, foco visible con teclado, buen contraste y avisos claros. */
+#vista-sistema .btn,.main-card .btn,.login-card .btn{min-height:48px;font-size:1rem;padding:.6rem 1.25rem !important}   /* !important: ya no quedan botones diminutos por "py-0 px-2" */
+#vista-sistema .btn.btn-sm,.main-card .btn.btn-sm{min-height:44px;font-size:1rem;padding:.5rem 1rem !important}
+#vista-sistema .btn.small,.main-card .btn.small{font-size:1rem}
+#vista-sistema .btn.rounded-pill{padding-left:1.6rem !important;padding-right:1.6rem !important}
+#vista-sistema table .btn{min-height:44px;font-size:.95rem;padding:.45rem .9rem !important}
+#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:190px;min-height:54px;font-size:1.1rem}
+/* Botones blancos con borde (turno no elegido, Entrada/Salida): al pasar el mouse o enfocarlos el texto se volvía blanco sobre blanco y no se leía */
+.btn-outline-dark.bg-white:hover,.btn-outline-dark.bg-white:focus,.btn-outline-dark.bg-white:focus-visible,.btn-outline-dark.bg-white:active{color:#212529 !important;background-color:#f3e3e7 !important;border-color:#800020 !important}
+#vista-sistema .form-control,#vista-sistema .form-select,.main-card .form-control,.main-card .form-select,.login-card .form-control,.login-card .form-select{min-height:48px;font-size:1rem}
+#vista-sistema .form-control-sm,#vista-sistema .form-select-sm,#vista-sistema .input-group-sm>.form-control,#vista-sistema .input-group-sm>.input-group-text{min-height:44px;font-size:1rem;padding-top:.4rem;padding-bottom:.4rem}
+#vista-sistema .form-check-input{width:1.4em;height:1.4em;margin-top:.15em}
+#vista-sistema .form-check-label{padding-left:.3rem}
+#vista-sistema .small,#vista-sistema small,.main-card .small,.login-card .small{font-size:.95rem}
+#vista-sistema .form-label,.main-card .form-label{font-size:1rem}
+.text-muted{color:#505a63 !important}   /* contraste alto sobre fondo claro */
+.res-scan{min-height:28px;font-size:1.05rem;font-weight:700;line-height:1.4}
+.res-scan.text-success{color:#0b6b3a !important}
+.res-scan.text-danger{color:#b00020 !important}
+/* Aviso de retardo al escanear (entrada o salida) en ROJO, con ícono y borde para que no dependa solo del color */
+.res-retardo{color:#b00020;background:#fdecee;border-left:6px solid #b00020;border-radius:.4rem;padding:.55rem .8rem;font-size:1.15rem;font-weight:800}
+.hor-estado{font-size:.95rem}
+.hor-estado.text-success{color:#0b6b3a !important}
+.hor-estado.text-danger{color:#b00020 !important}
+.ori-hor [aria-invalid="true"]{border-color:#b00020;box-shadow:0 0 0 .2rem rgba(176,0,32,.2)}
+#lista-horarios-actual .ori-lista{max-height:70vh}
+.ori-desplegable>summary{min-height:48px;padding:.8rem 1rem;font-size:1rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.ori-desplegable>summary::after{float:none}
+.btn-cuenta{min-height:44px;font-size:.95rem}
+.dd-item{min-height:44px;font-size:1rem}
+.burbuja-x{width:44px;height:44px;top:0;right:0;font-size:1.7rem;opacity:1}
+.burbuja .burbuja-mudo{min-height:44px;font-size:.95rem;padding:.4rem .9rem}
+#selector-pestanas-superior .profile-card{min-height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#selector-pestanas-superior .profile-card h6{font-size:.95rem}
+.profile-card:hover{border-color:#800020}
+/* Foco claro al navegar con el teclado (Tab) */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible,.profile-card:focus-visible,[tabindex]:focus-visible{outline:3px solid #1d4ed8 !important;outline-offset:2px;box-shadow:0 0 0 6px #fff !important}
+@media (max-width:767.98px){
+ .table-responsive table{font-size:.85rem}
+ #vista-sistema .btn,.main-card .btn,.login-card .btn{min-height:50px}
+ #selector-pestanas-superior .profile-card h6{font-size:.85rem}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}}
 </style>
 </head>
 <body id="cuerpo-contenedor" class="bg-login">
@@ -310,8 +354,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="row g-2 text-center justify-content-center" id="fila-pestanas">
  @foreach([['alumno','fa-user-graduate','Portal del Alumno'],['lector','fa-qrcode','Lector Fijo (Entrada/Salida)'],['orientador','fa-users-rectangle','Panel de Orientadores'],['control','fa-user-gear','Control Escolar']] as $t)
  <div class="col-md-3 col-tab-pestana">
- <div id="tab-{{ $t[0] }}" onclick="seleccionarPerfil('{{ $t[0] }}')" class="profile-card p-3">
- <i class="fa-solid {{ $t[1] }} mb-1 text-secondary" style="font-size:1.4rem"></i>
+ <div id="tab-{{ $t[0] }}" role="button" tabindex="0" aria-pressed="false" onclick="seleccionarPerfil('{{ $t[0] }}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();seleccionarPerfil('{{ $t[0] }}')}" class="profile-card p-3">
+ <i class="fa-solid {{ $t[1] }} mb-1 text-secondary" style="font-size:1.4rem" aria-hidden="true"></i>
  <h6 class="fw-bold m-0 text-dark small">{{ $t[2] }}</h6>
  </div>
  </div>
@@ -440,12 +484,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <button onclick="setModoEscaneo('Entrada')" id="btn-modo-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoEscaneo('Salida')" id="btn-modo-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
- <p id="txt-modo-lector" class="small fw-semibold mb-3" style="color:#198754">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
+ <p id="txt-modo-lector" class="small fw-semibold mb-3" style="color:#0b6b3a" role="status" aria-live="polite">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
  <div class="camera-box-ref mb-2 border shadow-sm">
  <div class="cam-ph text-center text-warning"><span class="d-block small">[ <span id="lbl-modo">Automático</span> ] - Cámara apagada</span></div>
  <div id="cam-fija" style="width:100%"></div>
  </div>
- <div id="res-cam-fija" class="res-scan mb-2"></div>
+ <div id="res-cam-fija" class="res-scan mb-2" role="status" aria-live="polite"></div>
  <button onclick="activarCamaraFija()" class="btn btn-vinotinto px-4 py-2 rounded-pill shadow-sm small">Activar Cámara</button>
  <button onclick="apagarCamaraFija()" class="btn btn-dark py-2 px-3 rounded-pill small">Apagar</button>
  </div>
@@ -532,8 +576,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
  <h6 class="fw-bold mb-0" style="color:#800020">Grupos cargados</h6>
  <div class="d-flex flex-wrap gap-2">
- <button type="button" onclick="grpSeleccionarTodos(true)" class="btn btn-outline-dark btn-sm py-0 px-2">Seleccionar todos</button>
- <button type="button" onclick="grpSeleccionarTodos(false)" class="btn btn-outline-secondary btn-sm py-0 px-2">Quitar selección</button>
+ <button type="button" onclick="grpSeleccionarTodos(true)" class="btn btn-outline-dark btn-sm">Seleccionar todos</button>
+ <button type="button" onclick="grpSeleccionarTodos(false)" class="btn btn-outline-secondary btn-sm">Quitar selección</button>
  </div>
  </div>
  <div id="lista-grupos-cargados" class="small"></div>
@@ -572,12 +616,12 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
  <button onclick="setModoOrient('Entrada')" id="btn-orient-entrada" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Entrada</button>
  <button onclick="setModoOrient('Salida')" id="btn-orient-salida" class="btn btn-outline-dark bg-white px-3 py-2 fw-semibold shadow-sm small">Salida</button>
  </div>
- <p id="txt-modo-orient" class="small fw-semibold mb-3" style="color:#198754">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
+ <p id="txt-modo-orient" class="small fw-semibold mb-3" style="color:#0b6b3a" role="status" aria-live="polite">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
  <div class="camera-box-ref mb-2 border shadow-sm">
  <div class="cam-ph text-center text-warning"><span class="d-block small">Escáner apagado</span></div>
  <div id="cam-orient" style="width:100%"></div>
  </div>
- <div id="res-cam-orient" class="res-scan mb-2"></div>
+ <div id="res-cam-orient" class="res-scan mb-2" role="status" aria-live="polite"></div>
  <div id="aviso-camara-bloqueada" class="small text-danger fw-semibold mb-2 d-none">Necesitas autorización de Control Escolar para usar la cámara.</div>
  <button onclick="activarCamaraOrientador()" id="btn-activar-camara-orientador" class="btn btn-vinotinto px-4 py-2 rounded-pill shadow-sm small btn-accion-restringida">Activar Cámara</button>
  <button onclick="detener('cam-orient')" class="btn btn-dark py-2 px-3 rounded-pill small">Apagar</button>
@@ -1554,13 +1598,19 @@ function renderListaOrientadores() {
     ' <a href="#" class="text-danger text-decoration-none ms-1" title="Quitar de este grupo" data-o="' + esc(o.id) + '" data-k="' + esc(k) + '" onclick="quitarGrupoOrientador(this.dataset.o, this.dataset.k); return false;">&times;</a></span>'; });
   return '<div class="ori-item"><div><div class="fw-semibold">' + esc(o.nombre) + '</div>' +
    '<div class="small ' + (chips.length ? '' : 'text-danger') + '">' + (chips.length ? chips.join('') : 'Sin grupo asignado') + '</div></div>' +
-   '<div class="d-flex gap-1 flex-shrink-0"><button type="button" data-o="' + esc(o.id) + '" onclick="editarOrientador(this.dataset.o)" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Cambiar grados y grupos">Editar</button>' +
-   '<button type="button" data-o="' + esc(o.id) + '" onclick="eliminarOrientador(this.dataset.o)" class="btn btn-outline-danger btn-sm py-0 px-2" title="Eliminar orientador">Eliminar</button></div></div>' + (oriEditando && oriEditando.id === o.id ? htmlEditorOrientador(oriEditando) : '');
+   '<div class="d-flex gap-1 flex-shrink-0"><button type="button" data-o="' + esc(o.id) + '" onclick="editarOrientador(this.dataset.o)" class="btn btn-outline-secondary btn-sm" title="Cambiar grados y grupos">Editar</button>' +
+   '<button type="button" data-o="' + esc(o.id) + '" onclick="eliminarOrientador(this.dataset.o)" class="btn btn-outline-danger btn-sm" title="Eliminar orientador">Eliminar</button></div></div>' + (oriEditando && oriEditando.id === o.id ? htmlEditorOrientador(oriEditando) : '');
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver orientadores dados de alta (' + db.orientadores.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
 }
 /* Lista desplegable de horarios: un renglón por orientador(a) con SUS grupos. Se elige el grupo, se cambia la hora y se guarda ahí mismo. */
 let _horSel = {};   // grupo elegido en cada orientador(a) de esta lista
+let _horEstado = {};   // último aviso de guardado de cada grupo: {clave: {clase, txt}} (así no desaparece cuando la lista se vuelve a dibujar)
+const htmlEstadoHor = k => { const e = _horEstado[k]; return '<span class="hor-estado fw-semibold ' + (e ? e.clase : '') + '" role="status" aria-live="polite">' + (e ? esc(e.txt) : '') + '</span>'; };
+function ponerEstadoHor(it, k, clase, txt) {
+ _horEstado[k] = {clase: clase, txt: txt};
+ it.find('.hor-estado').removeClass('text-success text-danger text-muted').addClass(clase).text(txt);
+}
 function renderListaHorarios() {
  renderGruposCargados();
  const caja = $('#lista-horarios-actual');
@@ -1581,8 +1631,8 @@ function renderListaHorarios() {
  porOri.push({id: '', nombre: 'Sin orientador(a)', gr: grupos.filter(x => !x.h.orientadorId || !idsOri.has(x.h.orientadorId))});
  const items = porOri.filter(o => o.gr.length);
  if (!items.length) { caja.html('<span class="text-muted">Aún no hay grupos con alumnos en el turno ' + esc(turnoActivo) + '. Sube la lista de un grupo y aparecerá aquí para ponerle su horario.</span>'); return; }
- const filas = items.map(o => {
-  const llaves = o.gr.map(x => x.k);
+ const filas = items.map((o, n) => {
+  const llaves = o.gr.map(x => x.k), uid = 'hor' + n;
   let sel = _horSel[o.id];
   if (!sel || llaves.indexOf(sel) < 0) sel = o.gr[0].k;
   _horSel[o.id] = sel;
@@ -1592,14 +1642,16 @@ function renderListaHorarios() {
   return '<div class="ori-item ori-hor" data-o="' + esc(o.id) + '"><div class="w-100">' +
    '<div class="d-flex justify-content-between"><div class="fw-semibold ' + (o.id ? '' : 'text-danger') + '">' + esc(o.nombre) + '</div><div class="small text-muted">' + o.gr.length + (o.gr.length === 1 ? ' grupo' : ' grupos') + '</div></div>' +
    '<div class="row g-2 align-items-end mt-0">' +
-   '<div class="col-12 col-xl-4"><select class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Entrada</label><input type="time" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '"></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block">Cierre</label><input type="time" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '"></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '"><span class="input-group-text">min</span></div></div>' +
-   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" min="0" max="180" step="1" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '"><span class="input-group-text">min</span></div></div>' +
-   '<div class="col-12 d-flex flex-wrap gap-1">' +
-   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm py-0 px-2" title="Guardar la hora de este grupo">Guardar</button>' +
-   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm py-0 px-2" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
+   '<div class="col-12 col-xl-4"><label class="small text-muted d-block" for="' + uid + '-grupo">Grupo</label><select id="' + uid + '-grupo" class="form-select form-select-sm" onchange="cargarHorarioInline(this)">' + opciones + '</select></div>' +
+   // Los cambios se guardan SOLOS al escribirlos (ver horarioCambiado): ya no hace falta pulsar Guardar ni confirmar
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-ent">Entrada</label><input type="time" id="' + uid + '-ent" class="form-control form-control-sm hor-ent" value="' + esc(hs.entrada || '') + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-sal">Cierre</label><input type="time" id="' + uid + '-sal" class="form-control form-control-sm hor-sal" value="' + esc(hs.salida || '') + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-te" title="Minutos después de la hora de entrada en que todavía no es retardo">Tolerancia entrada</label><div class="input-group input-group-sm"><input type="number" inputmode="numeric" min="0" max="180" step="1" id="' + uid + '-te" class="form-control hor-tol-ent" value="' + tolDe(hs, 'tolEntrada', TOL_DEF.entrada) + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-6 col-xl-2"><label class="small text-muted d-block" for="' + uid + '-ts" title="Minutos después de la hora de cierre en que todavía no es retardo de salida">Tolerancia salida</label><div class="input-group input-group-sm"><input type="number" inputmode="numeric" min="0" max="180" step="1" id="' + uid + '-ts" class="form-control hor-tol-sal" value="' + tolDe(hs, 'tolSalida', TOL_DEF.salida) + '" oninput="horarioCambiado(this)" onchange="horarioCambiado(this, true)"><span class="input-group-text">min</span></div></div>' +
+   '<div class="col-12 d-flex flex-wrap gap-2 align-items-center">' +
+   '<button type="button" onclick="guardarHorarioInline(this)" class="btn btn-vinotinto btn-sm" title="Guardar la hora de este grupo ahora mismo">Guardar ahora</button>' +
+   '<button type="button" onclick="quitarHorarioGrupo(claveInline(this))" class="btn btn-outline-danger btn-sm" title="Borrar solo el horario (entrada, cierre y tolerancias) de este grupo">Quitar horario</button>' +
+   htmlEstadoHor(sel) +
    '</div></div></div></div>';
  }).join('');
  caja.html('<details class="ori-desplegable"' + (abierta ? ' open' : '') + '><summary>Ver horarios del turno ' + esc(turnoActivo) + ' por orientador(a) (' + items.length + ')</summary><div class="ori-lista">' + filas + '</div></details>');
@@ -1611,23 +1663,59 @@ function cargarHorarioInline(sel) {
  _horSel[it.attr('data-o')] = sel.value;
  it.find('.hor-ent').val(h.entrada || ''); it.find('.hor-sal').val(h.salida || '');
  it.find('.hor-tol-ent').val(tolDe(h, 'tolEntrada', TOL_DEF.entrada)); it.find('.hor-tol-sal').val(tolDe(h, 'tolSalida', TOL_DEF.salida));
+ it.find('.hor-tol-ent,.hor-tol-sal').attr('aria-invalid', 'false');
+ const e = _horEstado[sel.value]; it.find('.hor-estado').removeClass('text-success text-danger text-muted').addClass(e ? e.clase : '').text(e ? e.txt : '');
 }
-/* Guarda la hora del grupo elegido en el renglón del orientador(a) */
+/*
+ * GUARDADO INMEDIATO de horario y tolerancias: en cuanto se cambia una hora o una tolerancia (y es válida) se aplica YA en este equipo,
+ * así el siguiente escaneo ya la respeta, y se manda al servidor sin pedir confirmación. Los demás equipos la reciben en su próxima consulta.
+ * Si el dato no es válido no se guarda y se explica abajo del renglón (en rojo).
+ */
+let _horTimer = null, _horPend = [];   // _horPend: renglones editados que esperan el guardado (se avisa en todos, no solo en el último)
+function leerHorarioInline(it) {
+ const num = (v, d) => String(v).trim() === '' ? d : Number(v);   // vacío = valor por defecto
+ const e = it.find('.hor-ent').val(), s = it.find('.hor-sal').val();
+ const te = num(it.find('.hor-tol-ent').val(), TOL_DEF.entrada), ts = num(it.find('.hor-tol-sal').val(), TOL_DEF.salida);
+ let error = '';
+ if (![te, ts].every(v => Number.isInteger(v) && v >= 0 && v <= 180)) error = 'La tolerancia debe ser un número entero de minutos, de 0 a 180.';
+ else if (!e || !s) error = 'Indica la hora límite de entrada y la hora de cierre.';
+ else if (toMin(s) <= toMin(e)) error = 'La hora de cierre debe ser posterior a la hora límite de entrada.';
+ it.find('.hor-tol-ent').attr('aria-invalid', !Number.isInteger(te) || te < 0 || te > 180 ? 'true' : 'false');
+ it.find('.hor-tol-sal').attr('aria-invalid', !Number.isInteger(ts) || ts < 0 || ts > 180 ? 'true' : 'false');
+ return {e: e, s: s, te: te, ts: ts, error: error};
+}
+function horarioCambiado(input, ya) {
+ if (rolActivo !== 'control') return;
+ const it = $(input).closest('.ori-hor'), k = it.find('select').val();
+ if (!k) return;
+ const v = leerHorarioInline(it);
+ if (v.error) {   // mientras se escribe solo se avisa que falta; al terminar (change) se explica el problema en rojo
+  if (ya) ponerEstadoHor(it, k, 'text-danger', '⚠ ' + v.error + ' Todavía no se ha guardado.'); else ponerEstadoHor(it, k, 'text-muted', 'Escribiendo… se guarda solo al completar los datos.');
+  return;
+ }
+ const h = db.horarios[k] = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''};
+ h.entrada = v.e; h.salida = v.s; h.tolEntrada = v.te; h.tolSalida = v.ts;   // ya vale para el siguiente escaneo
+ try { localStorage.setItem(LS, JSON.stringify(db)); } catch (x) {}
+ ponerEstadoHor(it, k, 'text-muted', 'Guardando…');
+ _horPend = _horPend.filter(x => x.k !== k).concat([{it: it, k: k, v: v}]);
+ clearTimeout(_horTimer);
+ _horTimer = setTimeout(() => {
+  _horTimer = null;
+  const lote = _horPend; _horPend = [];
+  guardarOrientadoresServidor().then(ok => lote.forEach(x => {
+   const c = parseClave(x.k);
+   if (ok) {
+    ponerEstadoHor(x.it, x.k, 'text-success', '✔ Guardado. Tolerancia de entrada ' + x.v.te + ' min y de salida ' + x.v.ts + ' min.');
+    $('#resumen-horario-grupo').text('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ') de ' + h12(x.v.e) + ' a ' + h12(x.v.s) + ' · tolerancia de entrada ' + x.v.te + ' min, de salida ' + x.v.ts + ' min.');
+   } else ponerEstadoHor(x.it, x.k, 'text-danger', '⚠ No se pudo guardar en el servidor. El cambio ya funciona en este equipo; revisa tu conexión y pulsa «Guardar ahora».');
+  }));
+  renderTablaPronto();
+ }, ya ? 0 : 600);
+}
+/* Botón «Guardar ahora»: igual que el guardado automático, pero al momento y sin cuadro de confirmación */
 function guardarHorarioInline(btn) {
  if (rolActivo !== 'control') { alert('Solo el Encargado de Control Escolar puede cambiar horarios.'); return; }
- const it = $(btn).closest('.ori-hor'), k = it.find('select').val();
- const e = it.find('.hor-ent').val(), s = it.find('.hor-sal').val();
- const num = (v, d) => String(v).trim() === '' ? d : Number(v);   // vacío = valor por defecto
- const te = num(it.find('.hor-tol-ent').val(), TOL_DEF.entrada), ts = num(it.find('.hor-tol-sal').val(), TOL_DEF.salida);
- if (!k || !db.horarios[k]) return;
- if (![te, ts].every(v => Number.isInteger(v) && v >= 0 && v <= 180)) { alert('La tolerancia debe ser un número entero de minutos, de 0 a 180.'); return; }
- if (!e || !s) { alert('Indica la hora límite de entrada y la hora de cierre.'); return; }
- if (toMin(s) <= toMin(e)) { alert('La hora de cierre debe ser posterior a la hora límite de entrada.'); return; }
- { const cc = parseClave(k); if (!confirm('¿Guardar el horario del ' + cc.grado + '° grado, grupo ' + cc.grupo + ' (' + cc.turno + ')?\nEntrada hasta las ' + h12(e) + ' (tolerancia ' + te + ' min) y cierre a las ' + h12(s) + ' (tolerancia ' + ts + ' min).')) return; }
- db.horarios[k].entrada = e; db.horarios[k].salida = s; db.horarios[k].tolEntrada = te; db.horarios[k].tolSalida = ts;
- const c = parseClave(k);
- guardarOrientadoresServidor(); renderListaOrientadores(); refrescarHorarioForm(); renderTabla();
- $('#resumen-horario-grupo').html('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + esc(c.turno) + ') de ' + esc(h12(e)) + ' a ' + esc(h12(s)) + ' · tolerancia de entrada ' + te + ' min, de salida ' + ts + ' min.');
+ horarioCambiado($(btn).closest('.ori-hor').find('.hor-ent')[0], true);
 }
 /* Borra solo la hora de entrada y de cierre del grupo (el orientador(a) se conserva). */
 function quitarHorarioGrupo(k) {
@@ -1663,12 +1751,12 @@ function htmlEditorOrientador(e) {
   '<select class="form-select form-select-sm" style="max-width:140px" onchange="oriEditando.filas[' + i + '].turno=this.value">' + opt(['Matutino', 'Vespertino'], f.turno) + '</select>' +
   '<select class="form-select form-select-sm" style="max-width:120px" onchange="oriEditando.filas[' + i + '].grado=Number(this.value)">' + opt([1, 2, 3], f.grado, v => v + '° grado') + '</select>' +
   '<select class="form-select form-select-sm" style="max-width:120px" onchange="oriEditando.filas[' + i + '].grupo=Number(this.value)">' + opt([1, 2, 3, 4], f.grupo, v => 'Grupo ' + v) + '</select>' +
-  '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" title="Quitar este grupo" onclick="oriEditando.filas.splice(' + i + ',1); renderListaOrientadores()">&times;</button></div>').join('');
+  '<button type="button" class="btn btn-outline-danger btn-sm" title="Quitar este grupo" aria-label="Quitar este grupo" onclick="oriEditando.filas.splice(' + i + ',1); renderListaOrientadores()">&times;</button></div>').join('');
  return '<div class="p-2 border-bottom" style="background:#fdf3f5"><div class="small fw-semibold mb-2">Grados y grupos de este orientador(a)</div>' +
   (filas || '<div class="small text-muted mb-2">Sin grupos: quedará sin grupo asignado.</div>') +
-  '<div class="d-flex gap-2 mt-1"><button type="button" class="btn btn-outline-dark btn-sm py-0 px-2" onclick="oriEditando.filas.push({turno:turnoActivo,grado:1,grupo:1}); renderListaOrientadores()">+ Agregar grupo</button>' +
-  '<button type="button" class="btn btn-vinotinto btn-sm py-0 px-3" onclick="guardarGruposOrientador()">Guardar</button>' +
-  '<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="oriEditando=null; renderListaOrientadores()">Cancelar</button></div></div>';
+  '<div class="d-flex gap-2 mt-1"><button type="button" class="btn btn-outline-dark btn-sm" onclick="oriEditando.filas.push({turno:turnoActivo,grado:1,grupo:1}); renderListaOrientadores()">+ Agregar grupo</button>' +
+  '<button type="button" class="btn btn-vinotinto btn-sm" onclick="guardarGruposOrientador()">Guardar</button>' +
+  '<button type="button" class="btn btn-outline-secondary btn-sm" onclick="oriEditando=null; renderListaOrientadores()">Cancelar</button></div></div>';
 }
 function guardarGruposOrientador() {
  if (!oriEditando || rolActivo !== 'control') return;
@@ -1884,8 +1972,8 @@ function cerrarSesion() {
 function seleccionarPerfil(perfil) {
  Object.keys(scanners).forEach(detener);
  gradoSeleccionado = null;
- $('.profile-card').removeClass('active'); $('.panel-perfil').addClass('d-none');
- $('#tab-' + perfil).addClass('active'); $('#panel-' + perfil).removeClass('d-none');
+ $('.profile-card').removeClass('active').attr('aria-pressed', 'false'); $('.panel-perfil').addClass('d-none');
+ $('#tab-' + perfil).addClass('active').attr('aria-pressed', 'true'); $('#panel-' + perfil).removeClass('d-none');
  if (perfil === 'orientador') { configurarPanelOrientador(); renderTabla(); }
  if (perfil === 'control') renderStats();
  // La cámara del lector fijo ya NO se enciende sola: solo con el botón "Encender / Apagar Cámara". El lector físico funciona sin cámara.
@@ -2699,6 +2787,13 @@ function vaciarCola() {
 window.addEventListener('online', () => { pintarIndicadorCola(); if (rolActivo) vaciarCola(); });
 window.addEventListener('offline', pintarIndicadorCola);
 const etiquetaGrupo = x => (x && x.grado ? x.grado + '° grado, grupo ' + x.grupo + ' (' + x.turno + ')' : 'grupo sin asignar');
+/* Aviso en ROJO cuando el escaneo ya pasó la tolerancia del grupo: "Retardo de entrada" o "Retardo de salida", con los minutos y (si se sabe) la hora límite.
+   Devuelve '' si llegó a tiempo o dentro de la tolerancia. */
+function avisoRetardo(modo, minutos, limiteMin) {
+ if (!(minutos > 0)) return '';
+ const hh = limiteMin == null ? '' : ' (límite ' + h12(p2(Math.floor(limiteMin / 60)) + ':' + p2(limiteMin % 60)) + ', ya con la tolerancia)';
+ return 'Retardo de ' + (modo === 'Salida' ? 'salida' : 'entrada') + ': ' + durMin(minutos) + ' tarde' + hh;
+}
 /* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (y el retardo de entrada o de salida, si lo hubo) */
 function detalleRegistro(tipo, a, hora, extra) {
  // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
@@ -2751,13 +2846,14 @@ let modoOrient = 'Auto';
 /* Texto y color del modo: Automático (verde) o forzado a mano (rojo), con la indicación de cómo volver */
 function pintarModo(m, idTxt) {
  const el = $('#' + idTxt);
- if (m === 'Auto') el.css('color', '#198754').text('Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.');
- else el.css('color', '#dc3545').text('Modo MANUAL: todo escaneo se registra como ' + m.toUpperCase() + '. Vuelve a pulsar «' + m + '» para regresar al modo automático.');
+ if (m === 'Auto') el.css('color', '#0b6b3a').text('Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.');
+ else el.css('color', '#b00020').text('Modo MANUAL: todo escaneo se registra como ' + m.toUpperCase() + '. Vuelve a pulsar «' + m + '» para regresar al modo automático.');
 }
 function setModoOrient(m) {
  modoOrient = (modoOrient === m) ? 'Auto' : m;   // pulsar otra vez el mismo botón = volver a Automático
  $('#btn-orient-entrada').toggleClass('btn-success', modoOrient === 'Entrada').toggleClass('btn-outline-dark bg-white', modoOrient !== 'Entrada');
  $('#btn-orient-salida').toggleClass('btn-vinotinto', modoOrient === 'Salida').toggleClass('btn-outline-dark bg-white', modoOrient !== 'Salida');
+ $('#btn-orient-entrada').attr('aria-pressed', modoOrient === 'Entrada'); $('#btn-orient-salida').attr('aria-pressed', modoOrient === 'Salida');
  pintarModo(modoOrient, 'txt-modo-orient');
 }
 function activarCamaraOrientador() { if (!permisoPermite()) return; iniciarScanner('cam-orient', () => modoOrient); }
@@ -2777,9 +2873,11 @@ function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
  const mostrar = r => {
-  // Verde = registrado a tiempo. Rojo = hubo un error o el alumno llegó con retardo.
-  $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok && !r.retardo ? 'text-success' : 'text-danger').text(r.msg);
-  if (navigator.vibrate) navigator.vibrate(r.ok ? 150 : [100,60,100]);
+  // Verde = registrado. Rojo = hubo un error. Si además pasó la tolerancia, abajo aparece en ROJO el aviso "Retardo de entrada / de salida".
+  const caja = $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok ? 'text-success' : 'text-danger').empty();
+  $('<span>').text(r.msg).appendTo(caja);
+  if (r.ok && r.retardo) $('<span class="res-retardo d-block mt-2">').text('⚠ ' + r.retardo).appendTo(caja);
+  if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
  };
  const r = registrarPorCurp(curp, modo);
  if (r && typeof r.then === 'function') {   // alumno que este equipo aún no tiene: lo busca el servidor
@@ -2837,10 +2935,10 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
  if (a.curp) encolarEscaneo(a.curp, modo, f, horaAhora());
  guardarYPintarLuego();   // lo pesado (guardar y repintar la tabla) va después de mostrar el resultado en pantalla
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
- const tr = retrasosDe(a, r, f);
- const extraRet = modo === 'Entrada' ? (tr.entrada > 0 ? 'Retardo de entrada: ' + durMin(tr.entrada) : '') : (tr.salida > 0 ? 'Retardo de salida: ' + durMin(tr.salida) : '');
- // retardo = el alumno llegó después de la hora límite de entrada de su grupo (más su tolerancia)
- return {ok:true, retardo: modo === 'Entrada' && tr.entrada > 0, msg:detalleRegistro(modo, a, horaAhora(), extraRet) +
+ // Retardo = pasó la hora límite del grupo MÁS su tolerancia: de entrada al entrar, de salida al salir (aunque no tenga entrada registrada)
+ const lim = limiteDe(a), limiteMin = modo === 'Entrada' ? lim.retardo : lim.fin;
+ const minRet = toMin(modo === 'Entrada' ? r.entrada : r.salida) - limiteMin;
+ return {ok:true, retardo: avisoRetardo(modo, minRet, limiteMin), msg:detalleRegistro(modo, a, horaAhora(), '') +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 /*
@@ -2880,8 +2978,9 @@ function registrarDesconocido(curp, modo) {
   if (r.ok && d && d.ok) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
-   const tarde = (d.modo || modo) === 'Entrada' && d.estatus === 'Retardo';   // el servidor avisa si llegó con retardo
-   return {ok:true, retardo: tarde, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), tarde ? 'Llegó con retardo' : '')};
+   // El servidor avisa si ya pasó la tolerancia del grupo (de entrada o de salida)
+   const aviso = d.retardo ? avisoRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '';
+   return {ok:true, retardo: aviso, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '')};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
@@ -2898,6 +2997,7 @@ function setModoEscaneo(m) {
  modoEscaneo = (modoEscaneo === m) ? 'Auto' : m;   // pulsar otra vez el mismo botón = volver a Automático
  $('#btn-modo-entrada').toggleClass('btn-success', modoEscaneo === 'Entrada').toggleClass('btn-outline-dark bg-white', modoEscaneo !== 'Entrada');
  $('#btn-modo-salida').toggleClass('btn-vinotinto', modoEscaneo === 'Salida').toggleClass('btn-outline-dark bg-white', modoEscaneo !== 'Salida');
+ $('#btn-modo-entrada').attr('aria-pressed', modoEscaneo === 'Entrada'); $('#btn-modo-salida').attr('aria-pressed', modoEscaneo === 'Salida');
  $('#lbl-modo').text(modoEscaneo === 'Auto' ? 'Automático' : modoEscaneo);
  pintarModo(modoEscaneo, 'txt-modo-lector');
 }
@@ -3004,6 +3104,7 @@ function pintarBotonesTurno() {
  $('#btn-turno-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
  $('#btn-turno-lector-matutino').toggleClass('btn-vinotinto', t === 'Matutino').toggleClass('btn-outline-dark bg-white', t !== 'Matutino');
  $('#btn-turno-lector-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
+ ['', '-lector'].forEach(x => { $('#btn-turno' + x + '-matutino').attr('aria-pressed', t === 'Matutino'); $('#btn-turno' + x + '-vespertino').attr('aria-pressed', t === 'Vespertino'); });
  $('#titulo-tabla-orientador').text('Turno ' + t);
  sincronizarFiltroLector();
 }
@@ -3892,6 +3993,7 @@ function setTurnoCred(t) {
  turnoCred = t;
  $('#btn-turno-cred-matutino').toggleClass('btn-vinotinto', t === 'Matutino').toggleClass('btn-outline-dark bg-white', t !== 'Matutino');
  $('#btn-turno-cred-vespertino').toggleClass('btn-vinotinto', t === 'Vespertino').toggleClass('btn-outline-dark bg-white', t !== 'Vespertino');
+ $('#btn-turno-cred-matutino').attr('aria-pressed', t === 'Matutino'); $('#btn-turno-cred-vespertino').attr('aria-pressed', t === 'Vespertino');
  refrescarPreviewPlantillaOficial();    // cambia la vista previa de frente y reverso
  if (credSel) selCred(credSel.grado, credSel.grupo);
 }

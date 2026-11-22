@@ -297,7 +297,7 @@ class ControlEscolarController extends Controller
 
         $hora      = $ahora->format('H:i');
         $fechaHora = $ahora->format('Y-m-d H:i:00');
-        $grupo     = $this->gruposLote[$alumno->grupo_id] ?? Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada')->find($alumno->grupo_id);
+        $grupo     = $this->gruposLote[$alumno->grupo_id] ?? Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida')->find($alumno->grupo_id);
 
         $modo = $d['modo'] ?? 'Auto';
 
@@ -377,12 +377,16 @@ class ControlEscolarController extends Controller
 
         $partes = $grupo ? explode(' ', $grupo->nombre) : [];
 
+        // Retardo ya pasada la tolerancia del grupo: de entrada (al entrar) o de salida (al salir). 0 minutos = a tiempo.
+        $minutosRetardo = $grupo ? $grupo->minutosRetardo($modo, (int) $ahora->format('G') * 60 + (int) $ahora->format('i')) : 0;
+
         return response()->json([
             'ok'      => true,
             'fecha'   => $ahora->format('Y-m-d'),
             'hora'    => $hora,
             'estatus' => $estatus,
             'modo'    => $modo,
+            'retardo' => $minutosRetardo > 0 ? ['tipo' => $modo === 'Salida' ? 'salida' : 'entrada', 'minutos' => $minutosRetardo] : null,
             // A qué grupo se mandó el registro (para mostrarlo en el teléfono)
             'alumno'  => [
                 'nombre' => $alumno->nombre,
@@ -433,7 +437,7 @@ class ControlEscolarController extends Controller
         $this->alumnosLote = $curps
             ? Alumno::select('id', 'nombre', 'grupo_id', 'matricula')->whereIn('matricula', array_values(array_unique($curps)))->get()->keyBy('matricula')->all()
             : [];
-        $this->gruposLote = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada')->get()->keyBy('id')->all();
+        $this->gruposLote = Grupo::select('id', 'nombre', 'grado', 'turno', 'hora_entrada', 'hora_salida', 'tolerancia_entrada', 'tolerancia_salida')->get()->keyBy('id')->all();
 
         // Los registros de asistencia de esos alumnos se leen de una vez (antes: varias consultas por cada escaneo)
         $this->enLote = true;

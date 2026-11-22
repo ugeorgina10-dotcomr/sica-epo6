@@ -6,32 +6,37 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Lector Fijo - SICA-EPO6</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Accesibilidad: foco bien visible con el teclado y sin animaciones si la persona lo pidió */
+        :focus-visible { outline: 4px solid #1d4ed8; outline-offset: 3px; }
+        @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+    </style>
     <!-- Librería para lectura de códigos QR desde la cámara -->
     <script src="{{ asset('vendor/html5-qrcode.min.js') }}" type="text/javascript"></script>
 </head>
 <body class="bg-slate-50 min-h-screen">
     <header class="bg-[#800020] text-white py-3 px-6 shadow-md flex justify-between items-center">
         <div>
-            <h2 class="text-xs font-light">C.C.T. 15EBH0008G • C.C.T. 15EBH0199N</h2>
+            <h2 class="text-sm font-light">C.C.T. 15EBH0008G • C.C.T. 15EBH0199N</h2>
             <h1 class="text-lg font-bold">ESCUELA PREPARATORIA OFICIAL NÚM. 6</h1>
         </div>
         <div>
-            <a href="{{ route('login') }}" class="text-xs bg-white/10 hover:bg-white/20 py-2 px-4 rounded-lg transition">Regresar al Panel</a>
+            <a href="{{ route('login') }}" class="inline-flex items-center min-h-[48px] text-base font-semibold bg-white/10 hover:bg-white/20 py-2 px-5 rounded-lg transition">Regresar al Panel</a>
         </div>
     </header>
 
     <main class="max-w-4xl mx-auto p-6">
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-center">
-            <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide">Lector Fijo - Control de Entradas y Salidas</h3>
-            <p class="text-xs text-gray-500 mt-1 mb-6">El sistema detecta el grupo del alumno y, según el horario del grupo, registra solo si es Entrada o Salida. Escanea con la cámara frontal.</p>
+            <h3 class="text-base font-black text-gray-800 uppercase tracking-wide">Lector Fijo - Control de Entradas y Salidas</h3>
+            <p class="text-sm text-gray-700 mt-1 mb-6">El sistema detecta el grupo del alumno y, según el horario del grupo, registra solo si es Entrada o Salida. Escanea con la cámara frontal.</p>
 
             <!-- Botones de Modo -->
-            <div class="flex justify-center gap-4 mb-6">
-                <button id="btnEntrada" onclick="setModo('Entrada')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Entrada</button>
-                <button id="btnSalida" onclick="setModo('Salida')" class="px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition">Salida</button>
+            <div class="flex flex-wrap justify-center gap-4 mb-6" role="group" aria-label="Modo de registro">
+                <button id="btnEntrada" type="button" aria-pressed="false" onclick="setModo('Entrada')" class="px-8 py-3 min-h-[52px] min-w-[150px] bg-gray-100 text-gray-800 text-base font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Entrada</button>
+                <button id="btnSalida" type="button" aria-pressed="false" onclick="setModo('Salida')" class="px-8 py-3 min-h-[52px] min-w-[150px] bg-gray-100 text-gray-800 text-base font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Salida</button>
             </div>
 
-            <p id="txtModo" class="text-xs font-bold text-green-700 -mt-3 mb-5">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
+            <p id="txtModo" role="status" aria-live="polite" class="text-sm font-bold text-green-800 -mt-3 mb-5">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
 
             <!-- Contenedor de la Cámara -->
             <div class="max-w-md mx-auto bg-black rounded-2xl overflow-hidden shadow-inner relative mb-4">
@@ -39,15 +44,15 @@
             </div>
 
             <!-- Controles de Cámara -->
-            <div class="flex justify-center gap-3">
-                <button onclick="iniciarCamara()" class="px-5 py-2 bg-[#800020] hover:bg-[#600018] text-white text-xs font-bold rounded-xl shadow transition">Activar Cámara Frontal</button>
-                <button onclick="detenerCamara()" class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold rounded-xl transition">Detener</button>
+            <div class="flex flex-wrap justify-center gap-3">
+                <button type="button" onclick="iniciarCamara()" class="px-7 py-3 min-h-[52px] bg-[#800020] hover:bg-[#600018] text-white text-base font-bold rounded-xl shadow transition">Activar Cámara Frontal</button>
+                <button type="button" onclick="detenerCamara()" class="px-7 py-3 min-h-[52px] bg-gray-200 hover:bg-gray-300 text-gray-900 text-base font-bold rounded-xl border border-gray-400 transition">Detener</button>
             </div>
 
             <!-- Resultado del Escaneo -->
-            <div id="resultado" class="mt-6 p-4 bg-slate-100 rounded-xl hidden text-left max-w-md mx-auto">
-                <p class="text-xs font-bold text-gray-700">Alumno detectado:</p>
-                <p id="infoAlumno" class="text-sm text-gray-900 font-semibold mt-1"></p>
+            <div id="resultado" role="status" aria-live="polite" class="mt-6 p-4 bg-slate-100 rounded-xl hidden text-left max-w-md mx-auto">
+                <p class="text-sm font-bold text-gray-800">Alumno detectado:</p>
+                <p id="infoAlumno" class="text-base text-gray-900 font-semibold mt-1"></p>
             </div>
         </div>
     </main>
@@ -55,19 +60,21 @@
     <script>
         let html5QrCode;
         let modoActual = 'Auto';   // Auto = el servidor decide Entrada o Salida por el horario del grupo del alumno
-        const ACTIVO = "px-6 py-2.5 bg-[#800020] text-white text-xs font-bold rounded-xl shadow transition";
-        const INACTIVO = "px-6 py-2.5 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition";
+        const ACTIVO = "px-8 py-3 min-h-[52px] min-w-[150px] bg-[#800020] text-white text-base font-bold rounded-xl border border-[#800020] shadow transition";
+        const INACTIVO = "px-8 py-3 min-h-[52px] min-w-[150px] bg-gray-100 text-gray-800 text-base font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition";
 
         function setModo(tipo) {
             modoActual = (modoActual === tipo) ? 'Auto' : tipo;   // pulsar otra vez el mismo botón = volver a Automático
             document.getElementById('btnEntrada').className = modoActual === 'Entrada' ? ACTIVO : INACTIVO;
             document.getElementById('btnSalida').className = modoActual === 'Salida' ? ACTIVO : INACTIVO;
+            document.getElementById('btnEntrada').setAttribute('aria-pressed', modoActual === 'Entrada');
+            document.getElementById('btnSalida').setAttribute('aria-pressed', modoActual === 'Salida');
             const t = document.getElementById('txtModo');
             if (modoActual === 'Auto') {
-                t.className = 'text-xs font-bold text-green-700 -mt-3 mb-5';
+                t.className = 'text-sm font-bold text-green-800 -mt-3 mb-5';
                 t.innerText = 'Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.';
             } else {
-                t.className = 'text-xs font-bold text-red-600 -mt-3 mb-5';
+                t.className = 'text-sm font-bold text-red-700 -mt-3 mb-5';
                 t.innerText = 'Modo MANUAL: todo escaneo se registra como ' + modoActual.toUpperCase() + '. Vuelve a pulsar «' + modoActual + '» para regresar al modo automático.';
             }
         }
@@ -79,13 +86,21 @@
             return m ? { qr: m[1].slice(0, 16).toLowerCase() } : { curp: String(texto).trim().toUpperCase() };
         }
 
+        // Duración corta: menos de una hora en minutos ("4 min"); de una hora en adelante, horas completas ("1 hr")
+        function duracion(n) {
+            n = Math.max(0, Math.round(Number(n) || 0));
+            if (n < 60) return n + ' min';
+            const h = Math.floor(n / 60);
+            return h + (h === 1 ? ' hr' : ' hrs');
+        }
+
         let ultimoQr = { t: '', ts: 0 };
         function registrar(decodedText) {
             if (ultimoQr.t === decodedText && Date.now() - ultimoQr.ts < 4000) return;   // lectura repetida
             ultimoQr = { t: decodedText, ts: Date.now() };
             const caja = document.getElementById('resultado'), info = document.getElementById('infoAlumno');
             caja.classList.remove('hidden');
-            info.className = 'text-sm text-gray-900 font-semibold mt-1';
+            info.className = 'text-base text-gray-900 font-semibold mt-1';
             info.innerText = 'Buscando alumno…';
             fetch('/api/sica/sync', {
                 method: 'POST',
@@ -94,12 +109,18 @@
             }).then(r => r.json().catch(() => ({})).then(d => {
                 if (r.ok && d.ok) {
                     const al = d.alumno || {};
-                    // Rojo si el alumno llegó con retardo; si llegó a tiempo se queda normal
-                    const tarde = d.modo !== 'Salida' && d.estatus === 'Retardo';
-                    info.className = 'text-sm font-semibold mt-1 ' + (tarde ? 'text-red-600' : 'text-gray-900');
-                    info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora + (d.estatus === 'Retardo' ? ' · Retardo' : '');
+                    info.className = 'text-base font-semibold mt-1 text-green-800';
+                    info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora;
+                    // Si ya pasó la tolerancia del grupo: aviso en ROJO, "Retardo de entrada" o "Retardo de salida"
+                    if (d.retardo && d.retardo.minutos > 0) {
+                        const aviso = document.createElement('span');
+                        aviso.className = 'block mt-2 text-base font-bold text-red-700';
+                        aviso.setAttribute('role', 'alert');
+                        aviso.textContent = '⚠ Retardo de ' + d.retardo.tipo + ': ' + duracion(d.retardo.minutos) + ' tarde (ya pasada la tolerancia)';
+                        info.appendChild(aviso);
+                    }
                 } else {
-                    info.className = 'text-sm text-gray-900 font-semibold mt-1';
+                    info.className = 'text-base text-red-700 font-semibold mt-1';
                     info.innerText = (d && d.mensaje) || ('No se pudo registrar (error ' + r.status + ').');
                 }
             })).catch(() => { info.innerText = 'Sin conexión con el servidor. Intenta de nuevo.'; });
