@@ -232,6 +232,8 @@ body.modo-movil #bloque-camara-orientador .btn{width:100%;margin-bottom:.5rem;pa
 #vista-sistema .btn.small,.main-card .btn.small{font-size:1rem}
 #vista-sistema .btn.rounded-pill{padding-left:1.6rem !important;padding-right:1.6rem !important}
 #vista-sistema table .btn{min-height:44px;font-size:.95rem;padding:.45rem .9rem !important}
+#vista-sistema table .btn-rapido{min-width:160px;min-height:48px;font-size:1rem}   /* registro rápido: botón grande y fácil de tocar */
+.burbujas-claves{max-width:380px}
 #vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:190px;min-height:54px;font-size:1.1rem}
 /* Botones blancos con borde (turno no elegido, Entrada/Salida): al pasar el mouse o enfocarlos el texto se volvía blanco sobre blanco y no se leía */
 .btn-outline-dark.bg-white:hover,.btn-outline-dark.bg-white:focus,.btn-outline-dark.bg-white:focus-visible,.btn-outline-dark.bg-white:active{color:#212529 !important;background-color:#f3e3e7 !important;border-color:#800020 !important}
@@ -1615,12 +1617,13 @@ let _horSel = {};   // grupo elegido en cada orientador(a) de esta lista
 let _horEstado = {};   // último aviso de guardado de cada grupo: {clave: {clase, txt}} (así no desaparece cuando la lista se vuelve a dibujar)
 const htmlEstadoHor = k => { const e = _horEstado[k]; return '<span class="hor-estado fw-semibold ' + (e ? e.clase : '') + '" role="status" aria-live="polite">' + (e ? esc(e.txt) : '') + '</span>'; };
 /* Avisos como los de las cuentas: una burbuja que sale sola y se va a los pocos segundos (o con la X) */
-function avisoBurbuja(txt, error) {
+function avisoBurbuja(txt, error, retardo) {
  const b = $('<div class="burbuja ' + (error ? 'aviso-error' : 'aviso-ok') + '" role="alert"></div>');
  b.append($('<button type="button" class="burbuja-x" aria-label="Cerrar">&times;</button>').on('click', () => b.remove()));
  b.append($('<div></div>').text((error ? '⚠ ' : '✔ ') + txt));
+ if (retardo) b.append($('<div class="mt-2 fw-bold rounded px-2 py-1" style="background:#fff;color:#b00020"></div>').text('⚠ ' + retardo));
  $('#burbujas-avisos').append(b);
- setTimeout(() => b.fadeOut(300, () => b.remove()), error ? 9000 : 5000);
+ setTimeout(() => b.fadeOut(300, () => b.remove()), (error || retardo) ? 9000 : 5000);
 }
 function ponerEstadoHor(it, k, clase, txt) {
  _horEstado[k] = {clase: '', txt: ''};
@@ -3209,7 +3212,7 @@ function renderTabla() {
  const f = $('#calendario-orientador').val() || hoy(), q = norm($('#buscador-alumno').val());
  const rows = filtrados().filter(a => norm(a.nombre).includes(q)).map(a => {
  const r = a.reg[f] || {}, e = estatusDe(a, r, f), rt = celdasRetardo(a, r, f), dis = (r.salida || f !== hoy()) ? 'disabled' : '';
- return `<tr${e === 'Sin registro' ? ' class="fila-sin-reg"' : ''}><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="marcarSalida(this.dataset.c)" class="btn btn-outline-dark btn-sm btn-accion-restringida" ${dis}>Marcar Salida</button></td></tr>`;
+ return `<tr${e === 'Sin registro' ? ' class="fila-sin-reg"' : ''}><td>${a.curp ? '<code>'+esc(a.curp)+'</code>' : '<span class="badge bg-secondary">Sin CURP</span>'}</td><td>${esc(a.nombre)}</td><td>${a.grado}</td><td>${a.grupo}</td><td>${r.entrada ? h12(r.entrada) : '—'}</td><td>${r.salida ? h12(r.salida) : 'Pendiente'}</td><td>${rt.ent}</td><td>${rt.sal}</td><td>${badgesEstatus(e)}</td><td>${nombreOrientadorDe(a)}</td><td class="text-center"><button data-c="${esc(a.id)}" onclick="registroRapido(this.dataset.c)" class="btn ${r.entrada ? 'btn-outline-dark' : 'btn-vinotinto'} btn-sm btn-rapido btn-accion-restringida" ${dis}>${r.salida ? 'Completo' : (r.entrada ? 'Registrar salida' : 'Registrar entrada')}</button></td></tr>`;
  }).join('') || '<tr><td colspan="11" class="text-center text-muted py-3">Sin alumnos. Control Escolar debe subir la lista de este grupo.</td></tr>';
  $('#tabla-cuerpo-orientador').html(rows);
  if (rolActivo) aplicarPermisosSolo();
@@ -3222,6 +3225,15 @@ function aplicarPermisosSolo() {
  $('.btn-accion-restringida').toggleClass('bloqueado-permiso', !ok);
  bloquearEdicionCredencial();
  $('#aviso-camara-bloqueada').toggleClass('d-none', ok);
+}
+/* Registro rápido: UN solo toque, sin confirmación. Sin entrada hoy -> registra la entrada; con entrada -> registra la salida.
+   Avisa con una burbuja y, si ya pasó la tolerancia del grupo, con el retardo en rojo. */
+function registroRapido(id) {
+ if (!permisoPermite()) return;
+ const al = db.alumnos.find(x => x.id === id); if (!al) return;
+ const r0 = al.reg[hoy()] || {};
+ const r = registrarPorId(id, r0.entrada ? 'Salida' : 'Entrada', true);
+ avisoBurbuja(r.msg, !r.ok, r.ok ? r.retardo : '');
 }
 function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida', true); if (!r.ok) alert(r.msg); }
 function subirLista() {

@@ -1,0 +1,69 @@
+﻿PHPUnit 11.5.56 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.36
+Configuration: C:\xampp\htdocs\sica-epo6\phpunit.xml
+
+.E.EEEEF.F....................................................... 65 / 83 ( 78%)
+System.Management.Automation.RemoteException
+CONSULTAS en un guardado sin cambios (24 grupos): 2
+System.Management.Automation.RemoteException
+CONSULTAS al subir una lista de 60 alumnos nuevos: 10
+..................                                                83 / 83 (100%)
+
+Time: 00:11.975, Memory: 52.00 MB
+
+There were 5 errors:
+
+1) Tests\Feature\SicaArchivosSeguridadTest::test_word_limpio_se_acepta
+Error: Class "ZipArchive" not found
+
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:28
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:60
+
+2) Tests\Feature\SicaArchivosSeguridadTest::test_word_con_macros_se_rechaza
+Error: Class "ZipArchive" not found
+
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:28
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:70
+
+3) Tests\Feature\SicaArchivosSeguridadTest::test_word_con_ejecutable_u_objeto_incrustado_se_rechaza
+Error: Class "ZipArchive" not found
+
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:28
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:76
+
+4) Tests\Feature\SicaArchivosSeguridadTest::test_word_con_plantilla_remota_se_rechaza
+Error: Class "ZipArchive" not found
+
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:28
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:84
+
+5) Tests\Feature\SicaArchivosSeguridadTest::test_word_con_svg_y_hipervinculo_normal_se_acepta
+Error: Class "ZipArchive" not found
+
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:28
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:90
+
+--
+
+There were 2 failures:
+
+1) Tests\Feature\SicaArchivosSeguridadTest::test_pdf_con_javascript_o_adjuntos_se_rechaza
+Expected response status code [422] but received 200.
+Failed asserting that 200 is identical to 422.
+
+C:\xampp\htdocs\sica-epo6\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\xampp\htdocs\sica-epo6\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:175
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:95
+
+2) Tests\Feature\SicaArchivosSeguridadTest::test_doble_extension_y_nombres_raros_se_rechazan
+Expected response status code [422] but received 200.
+Failed asserting that 200 is identical to 422.
+
+C:\xampp\htdocs\sica-epo6\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\xampp\htdocs\sica-epo6\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:175
+C:\xampp\htdocs\sica-epo6\tests\Feature\SicaArchivosSeguridadTest.php:109
+
+ERRORS!
+Tests: 83, Assertions: 359, Errors: 5, Failures: 2.
+EXIT_CODE=2

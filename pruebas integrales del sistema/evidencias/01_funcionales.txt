@@ -1,0 +1,12 @@
+﻿PHPUnit 11.5.56 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.3.36
+Configuration: C:\xampp\htdocs\sica-epo6\phpunit.xml
+
+................................................................. 65 / 66 ( 98%)
+.                                                                 66 / 66 (100%)
+
+Time: 00:11.127, Memory: 50.00 MB
+
+OK (66 tests, 324 assertions)
+EXIT_CODE=0
