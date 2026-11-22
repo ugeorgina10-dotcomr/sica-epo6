@@ -343,7 +343,7 @@ a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-
  <p class="cct-text mb-0">C.C.T. 15EBH0008G (Matutino) &nbsp;|&nbsp; C.C.T. 15EBH0199N (Vespertino)</p>
 </div>
  <button onclick="mostrarSeccion('vista-login')" class="btn btn-vinotinto btn-lg rounded-pill py-3 px-5 shadow fs-5">
- INGRESAR AL SISTEMA
+ BIENVENIDO
 </button>
 </div>
 <!-- ============ LOGIN ============ -->
