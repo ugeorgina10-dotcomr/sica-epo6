@@ -117,13 +117,6 @@
                 } else {
                     info.className = 'text-base text-red-700 font-semibold mt-1 break-words';
                     info.innerText = (d && d.mensaje) || ('No se pudo registrar (error ' + r.status + ').');
-                    // Entrada o salida que ya estaba registrada: aviso claro debajo
-                    if (r.status === 409) {
-                        const ya = document.createElement('span');
-                        ya.className = 'block mt-2 text-lg font-bold text-red-700 bg-red-50 border-l-4 border-red-700 rounded p-2 break-words';
-                        ya.textContent = '✔ Ya está el registro: no se registró de nuevo.';
-                        info.appendChild(ya);
-                    }
                 }
             })).catch(() => { info.innerText = 'Sin conexión con el servidor. Intenta de nuevo.'; });
         }

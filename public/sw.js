@@ -6,7 +6,7 @@
  * - /api y /auth NUNCA se guardan: siempre van al servidor (los datos viven en la base de datos).
  * Si cambias algo en /vendor, sube el número de VERSION para que los equipos descarguen la copia nueva.
  */
-const VERSION = 'sica-v36';
+const VERSION = 'sica-v37';
 const C_ESTATICOS = VERSION + '-estaticos';
 const C_PAGINAS = VERSION + '-paginas';
 
@@ -85,9 +85,14 @@ self.addEventListener('fetch', e => {
       }
       return res;
     });
+    let sirvioCopia = false;
     const rapido = url.pathname === '/'
-      ? Promise.race([red, new Promise((ok, no) => setTimeout(() => caches.match('/', { cacheName: C_PAGINAS }).then(r => r ? ok(r) : null), 4000))])
+      ? Promise.race([red, new Promise((ok, no) => setTimeout(() => caches.match('/', { cacheName: C_PAGINAS }).then(r => { if (r) { sirvioCopia = true; ok(r); } }), 4000))])
       : red;
+    // Si se abrió la copia guardada porque el servidor tardaba, en cuanto llega la página nueva se le avisa al teléfono para que se actualice
+    e.waitUntil(red.then(res => {
+      if (sirvioCopia && res && res.ok) return self.clients.matchAll({ type: 'window' }).then(cs => cs.forEach(c => c.postMessage('pagina-nueva')));
+    }).catch(() => {}));
     e.respondWith(
       rapido.catch(() =>
         caches.match('/', { cacheName: C_PAGINAS }).then(r => r || new Response(

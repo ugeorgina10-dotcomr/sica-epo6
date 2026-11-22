@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <meta name="theme-color" content="#800020">
 <title>SICA-EPO6 | Sistema de Identificación y Control de Acceso</title>
@@ -327,6 +327,31 @@ body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')
 .burbuja .burbuja-acciones>*{flex:1 1 100%;width:100%}
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
 a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:var(--fs-small);font-weight:400}
+
+/* ===== Botón "Elegir archivos": misma forma, alto y letra que el resto de botones ===== */
+body input[type=file],body input[type=file].form-control{display:flex;align-items:center;min-height:var(--btn-h);padding:.25rem !important;font-size:var(--btn-fs) !important;line-height:1.25;color:#495057;border-radius:var(--btn-radius)}
+body input[type=file]::file-selector-button{box-sizing:border-box;height:calc(var(--btn-h) - .5rem - 2px);margin:0 .9rem 0 0;padding:0 var(--btn-px);border:1px solid #212529;border-radius:var(--btn-radius);background:#fff;color:#212529;font-family:inherit;font-size:var(--btn-fs);font-weight:600;line-height:1.25;cursor:pointer;transition:background .12s,border-color .12s}
+body input[type=file]:hover::file-selector-button{background:#f3e3e7;border-color:#800020}
+/* ===== CUALQUIER TELÉFONO: nada se sale ni se corta, con muescas, barras del navegador y pantallas desde 320 px ===== */
+html{overflow-x:hidden}
+body{min-height:100vh;min-height:100dvh;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+.bg-escuela,.bg-login{min-height:100vh;min-height:100dvh}
+img,canvas,video,svg{max-width:100%;height:auto}
+.table-responsive{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.form-control,.form-select,.input-group{min-width:0;max-width:100%}
+input[type=time],input[type=date],input[type=number]{min-width:0}
+.modal-cuenta-caja{max-height:calc(100dvh - 2rem);overflow-y:auto}
+.burbujas-claves{max-width:min(380px,calc(100vw - 28px))}
+@media (max-width:767.98px){
+ #vista-sistema,.main-card,.login-card{padding-left:max(1rem,env(safe-area-inset-left)) !important;padding-right:max(1rem,env(safe-area-inset-right)) !important}
+ .d-flex.justify-content-between{flex-wrap:wrap;gap:.5rem}
+ .camera-box-ref,.preview-credencial{max-width:100%}
+ h2,h3{overflow-wrap:anywhere}
+}
+@media (max-width:359.98px){
+ :root{--btn-px:.8rem;--fs-small:.9rem}
+ .main-card,.login-card{padding:.75rem !important}
+}
 </style>
 </head>
 <body id="cuerpo-contenedor" class="bg-login">
@@ -939,25 +964,32 @@ Object.keys(db.horarios).forEach(k => {
  */
 /* Mientras se guardan orientadores y horarios (o justo después), una consulta de actualización más vieja no debe sobrescribirlos */
 let _oriGuardando = 0, _oriUltimoCambio = 0;
+let _cadenaOri = Promise.resolve();   // los guardados salen de uno en uno y en orden: el aviso de "guardado" nunca llega antes que el servidor
 function guardarOrientadoresServidor() {
  localStorage.setItem(LS, JSON.stringify(db));
  _oriGuardando++; _oriUltimoCambio = Date.now();
  const caja = $('#estado-sync-orientadores');
  caja.removeClass('text-danger text-success').addClass('text-muted').text('Guardando en el servidor…');
- return fetchT('/api/sica/sync', {
+ const envio = _cadenaOri.then(() => fetchT('/api/sica/sync', {
   method: 'POST',
   headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
-  body: JSON.stringify({accion: 'guardar_orientadores', datos: {orientadores: db.orientadores, horarios: db.horarios}})
- }, 30000).then(r => {
+  body: JSON.stringify({accion: 'guardar_orientadores', datos: {orientadores: db.orientadores, horarios: db.horarios}})   // se arma al momento de enviar: siempre va lo último
+ }, 30000)).then(r => {
   if (r.status === 419) return refrescarCsrf().then(() => Promise.reject('csrf'));
   if (r.status === 401) { sesionExpirada(); return Promise.reject('sesion'); }
   if (!r.ok) return Promise.reject('error');
-  caja.removeClass('text-muted text-danger').addClass('text-success').text('');   // guardado correcto: el aviso se oculta (los errores sí se siguen mostrando)
-  return true;
+  // Solo cuenta como guardado si el servidor lo confirma ({ok:true}); recién entonces se muestra el aviso de éxito
+  return r.json().catch(() => ({ok: true})).then(j => {
+   if (j && j.ok === false) return Promise.reject('error');
+   caja.removeClass('text-muted text-danger').addClass('text-success').text('');   // guardado correcto: el aviso se oculta (los errores sí se siguen mostrando)
+   return true;
+  });
  }).catch(e => {
   if (e !== 'sesion') caja.removeClass('text-muted text-success').addClass('text-danger').text('⚠ No se pudo guardar en el servidor (' + (e === 'csrf' ? 'la sesión se renovó, inténtalo otra vez' : 'revisa tu conexión') + '). Los cambios siguen en este equipo; vuelve a intentarlo.');
   return false;
  }).finally(() => { _oriGuardando--; _oriUltimoCambio = Date.now(); });
+ _cadenaOri = envio.then(() => {}, () => {});
+ return envio;
 }
 // El teléfono nunca sobrescribe toda la base de datos del servidor: solo envía cada escaneo (registrar_asistencia).
 let _temporizadorSave = null;
@@ -2953,8 +2985,6 @@ function procesarQR(curp, modo, el) {
   // Con retardo TODO el texto (nombre, grupo, hora...) sale en rojo y abajo van los minutos u horas de retraso
   const caja = $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok && !r.retardo ? 'text-success' : 'text-danger').empty();
   $('<span>').text(r.msg).appendTo(caja);
-  // Si ya tenía ese registro (entrada o salida), se avisa clarito debajo con la hora en que quedó
-  if (!r.ok && /ya estaba registrada|ya tiene entrada/i.test(r.msg || '')) $('<span class="res-retardo d-block mt-2">').text('✔ Ya está el registro: no se registró de nuevo.').appendTo(caja);
   if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
  };
  const r = registrarPorCurp(curp, modo);
@@ -4435,7 +4465,7 @@ window.addEventListener('pageshow', () => { if (!rolActivo) actualizarCredencial
 var _rafagaHasta = 0;
 function acelerarSync(ms) { _rafagaHasta = Math.max(_rafagaHasta, Date.now() + (ms || 6000)); }
 function programarConsulta() {
- const espera = Date.now() < _rafagaHasta ? 800 : (ES_MOVIL ? 2500 : 1500);
+ const espera = Date.now() < _rafagaHasta ? 800 : (ES_MOVIL ? 1500 : 1500);
  setTimeout(() => {
   const p = (rolActivo && !document.hidden) ? Promise.resolve().then(() => cargarDesdeServidor()).catch(() => {}) : Promise.resolve();
   p.then(programarConsulta);
@@ -4483,7 +4513,23 @@ $(function () {
  if (_canalOlvidos) _canalOlvidos.onmessage = () => { if (!rolActivo) consultarOlvidosInicio(); };
  document.addEventListener('visibilitychange', () => { if (!document.hidden && !rolActivo) consultarOlvidosInicio(); });
  // Modo sin internet (service worker): permite abrir el sistema sin internet (solo funciona en https o localhost)
- if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+ if ('serviceWorker' in navigator) {
+  const teniaControl = !!navigator.serviceWorker.controller;   // en la primera visita no hay nada que actualizar
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  /* Versión nueva del sistema: sin sesión abierta se recarga sola; con sesión abierta (escaneando) aparece una barra para tocar y no interrumpir */
+  const hayVersionNueva = () => {
+   if (!rolActivo) { location.reload(); return; }
+   if (document.getElementById('barra-version-nueva')) return;
+   const bar = document.createElement('button');
+   bar.id = 'barra-version-nueva'; bar.type = 'button';
+   bar.textContent = 'Hay una versión nueva. Toca aquí para actualizar';
+   bar.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));z-index:2200;background:#800020;color:#fff;border:0;border-radius:.6rem;padding:.7rem 1.1rem;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:calc(100vw - 24px)';
+   bar.onclick = () => location.reload();
+   document.body.appendChild(bar);
+  };
+  navigator.serviceWorker.addEventListener('message', ev => { if (ev.data === 'pagina-nueva') hayVersionNueva(); });
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (teniaControl) hayVersionNueva(); });
+ }
  document.addEventListener('visibilitychange', () => { if (!document.hidden && rolActivo) cargarDesdeServidor(); });
 });
 </script>
