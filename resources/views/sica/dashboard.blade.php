@@ -23,10 +23,10 @@
         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-wrap gap-4 items-center justify-between">
             <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Selecciona tu perfil de usuario:</span>
             <div class="flex flex-wrap gap-2">
-                <button class="px-4 py-4 bg-[#800020] text-white text-lg font-bold rounded-lg shadow">Alumno</button>
-                <button class="px-4 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-lg font-semibold rounded-lg">Lector Fijo (Entrada/Salida)</button>
-                <button class="px-4 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-lg font-semibold rounded-lg">Orientador (Grupos)</button>
-                <button class="px-4 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 text-lg font-semibold rounded-lg">Encargado General</button>
+                <button class="px-4 py-3 bg-[#800020] text-white text-sm font-bold rounded-lg shadow">Alumno</button>
+                <button class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Lector Fijo (Entrada/Salida)</button>
+                <button class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Orientador (Grupos)</button>
+                <button class="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg">Encargado General</button>
             </div>
         </div>
 
@@ -38,7 +38,7 @@
             <div class="max-w-md mx-auto">
                 <label class="block text-xs font-bold text-gray-700 mb-2 uppercase">Ingresa tu matrícula o CURP:</label>
                 <input type="text" placeholder="Ej. 2026EPO01..." class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#800020] text-sm mb-4">
-                <button class="w-full py-4 bg-[#800020] hover:bg-[#600018] text-white font-bold rounded-xl text-lg uppercase tracking-wider shadow-md transition">
+                <button class="w-full py-3 bg-[#800020] hover:bg-[#600018] text-white font-bold rounded-xl text-sm uppercase tracking-wider shadow-md transition">
                     Generar Credencial y QR
                 </button>
             </div>

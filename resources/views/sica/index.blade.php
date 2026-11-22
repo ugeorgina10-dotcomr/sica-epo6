@@ -278,12 +278,12 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
 .txt-ret-ent,.txt-ret-sal{color:#b00020}
 /* ===== Botones más grandes ===== */
-#vista-sistema .btn,.main-card .btn,.login-card .btn{min-height:66px;font-size:1.3rem;font-weight:700;padding:.85rem 1.8rem !important;border-radius:.75rem}
-#vista-sistema .btn.btn-sm,.main-card .btn.btn-sm{min-height:62px;font-size:1.25rem;padding:.8rem 1.5rem !important}
-#vista-sistema table .btn{min-height:60px;font-size:1.2rem;padding:.7rem 1.3rem !important}
-#vista-sistema table .btn-rapido{min-width:220px;min-height:64px;font-size:1.25rem}
-#vista-sistema .btn-cuenta{min-height:62px;font-size:1.2rem}
-#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:220px;min-height:70px;font-size:1.35rem}
+#vista-sistema .btn,.main-card .btn,.login-card .btn{min-height:48px;font-size:1rem;font-weight:600;padding:.55rem 1.25rem !important;border-radius:.75rem}
+#vista-sistema .btn.btn-sm,.main-card .btn.btn-sm{min-height:48px;font-size:1rem;padding:.55rem 1.25rem !important}
+#vista-sistema table .btn{min-height:46px;font-size:.95rem;padding:.5rem 1.1rem !important}
+#vista-sistema table .btn-rapido{min-width:170px;min-height:48px;font-size:1rem}
+#vista-sistema .btn-cuenta{min-height:48px;font-size:1rem}
+#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:170px;min-height:48px;font-size:1rem}
 #vista-sistema .burbuja .burbuja-mudo{min-height:44px}
 /* ===== Pantalla dividida y celular: nada se sale ni se corta ===== */
 #vista-sistema :is(p,span,div,label,h1,h2,h3,h4,h5,h6,summary,li,small,.alert,.badge){overflow-wrap:anywhere}
@@ -306,18 +306,21 @@ td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
  .ori-hor .col-xl-2{width:100%}
  .res-retardo{font-size:1.05rem;padding:.5rem .6rem}
  .res-scan{font-size:1rem}
- #vista-sistema .btn,.main-card .btn,.login-card .btn{font-size:1.2rem;padding:.8rem 1rem !important}
+ #vista-sistema .btn,.main-card .btn,.login-card .btn{font-size:1rem;padding:.55rem 1rem !important}
  .grupo-botones .btn,.d-flex.gap-2.flex-wrap .btn{flex:1 1 100%;max-width:100%}
 }
 
-/* ===== BOTONES: TODOS DEL MISMO TAMAÑO (grandes), sin importar btn-sm / btn-lg ni el ancho de la pantalla ===== */
-body .btn,#vista-sistema .btn,#vista-sistema .btn.btn-sm,#vista-sistema .btn.btn-lg,#vista-sistema .btn.small,#vista-sistema table .btn,#vista-sistema .btn-cuenta,
-.main-card .btn,.main-card .btn.btn-sm,.main-card .btn.btn-lg,.login-card .btn,.login-card .btn.btn-lg,.btn-recargar-sistema,.grupo-botones .btn,.ori-hor .btn,.ori-hor .btn.btn-sm,
+/* ===== BOTONES: todos del mismo tamaño (cómodos de tocar, sin verse exagerados), sin importar btn-sm / btn-lg ni el ancho de la pantalla ===== */
+body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,#vista-sistema .btn.btn-lg,#vista-sistema .btn.small,#vista-sistema table .btn,#vista-sistema .btn-cuenta,
+.main-card .btn,.main-card .btn.btn-sm,.main-card .btn.btn-lg,.login-card .btn,.login-card .btn.btn-lg,.grupo-botones .btn,.ori-hor .btn,.ori-hor .btn.btn-sm,
 #vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino
-{min-height:64px !important;font-size:1.25rem !important;font-weight:700 !important;line-height:1.25 !important;padding:.8rem 1.6rem !important;border-radius:.75rem !important;align-items:center;justify-content:center;text-align:center}
-#vista-sistema table .btn-rapido{min-width:220px}
+{min-height:48px !important;font-size:1rem !important;font-weight:600 !important;line-height:1.3 !important;padding:.55rem 1.25rem !important;border-radius:.6rem !important;align-items:center;justify-content:center;text-align:center;letter-spacing:0}
+#vista-sistema table .btn-rapido{min-width:170px}
+#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino{min-width:170px}
+/* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
+a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:.95rem;font-weight:400}
 @media (max-width:575.98px){
- body .btn,#vista-sistema .btn,#vista-sistema .btn.btn-sm,.main-card .btn,.login-card .btn{font-size:1.2rem !important;min-height:64px !important;padding:.8rem 1rem !important}
+ body .btn:not(.btn-close),#vista-sistema .btn,#vista-sistema .btn.btn-sm,.main-card .btn,.login-card .btn{font-size:1rem !important;min-height:48px !important;padding:.55rem 1rem !important}
 }
 </style>
 </head>
