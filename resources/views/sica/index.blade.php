@@ -2777,7 +2777,8 @@ function procesarQR(curp, modo, el) {
  if (ultimo.t === curp && Date.now() - ultimo.ts < 4000) return;
  ultimo = {t:curp, ts:Date.now()};
  const mostrar = r => {
-  $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok ? 'text-success' : 'text-danger').text(r.msg);
+  // Verde = registrado a tiempo. Rojo = hubo un error o el alumno llegó con retardo.
+  $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok && !r.retardo ? 'text-success' : 'text-danger').text(r.msg);
   if (navigator.vibrate) navigator.vibrate(r.ok ? 150 : [100,60,100]);
  };
  const r = registrarPorCurp(curp, modo);
@@ -2838,7 +2839,8 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
  // El alumno se registra en SU grupo (el de la lista), sea o no del orientador que escanea
  const tr = retrasosDe(a, r, f);
  const extraRet = modo === 'Entrada' ? (tr.entrada > 0 ? 'Retardo de entrada: ' + durMin(tr.entrada) : '') : (tr.salida > 0 ? 'Retardo de salida: ' + durMin(tr.salida) : '');
- return {ok:true, msg:detalleRegistro(modo, a, horaAhora(), extraRet) +
+ // retardo = el alumno llegó después de la hora límite de entrada de su grupo (más su tolerancia)
+ return {ok:true, retardo: modo === 'Entrada' && tr.entrada > 0, msg:detalleRegistro(modo, a, horaAhora(), extraRet) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 /*
@@ -2878,7 +2880,8 @@ function registrarDesconocido(curp, modo) {
   if (r.ok && d && d.ok) {
    cargarDesdeServidor();   // este equipo descarga al alumno nuevo
    const al = d.alumno || {};
-   return {ok:true, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '')};
+   const tarde = (d.modo || modo) === 'Entrada' && d.estatus === 'Retardo';   // el servidor avisa si llegó con retardo
+   return {ok:true, retardo: tarde, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), tarde ? 'Llegó con retardo' : '')};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};

@@ -85,6 +85,7 @@
             ultimoQr = { t: decodedText, ts: Date.now() };
             const caja = document.getElementById('resultado'), info = document.getElementById('infoAlumno');
             caja.classList.remove('hidden');
+            info.className = 'text-sm text-gray-900 font-semibold mt-1';
             info.innerText = 'Buscando alumno…';
             fetch('/api/sica/sync', {
                 method: 'POST',
@@ -93,8 +94,12 @@
             }).then(r => r.json().catch(() => ({})).then(d => {
                 if (r.ok && d.ok) {
                     const al = d.alumno || {};
+                    // Rojo si el alumno llegó con retardo; si llegó a tiempo se queda normal
+                    const tarde = d.modo !== 'Salida' && d.estatus === 'Retardo';
+                    info.className = 'text-sm font-semibold mt-1 ' + (tarde ? 'text-red-600' : 'text-gray-900');
                     info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora + (d.estatus === 'Retardo' ? ' · Retardo' : '');
                 } else {
+                    info.className = 'text-sm text-gray-900 font-semibold mt-1';
                     info.innerText = (d && d.mensaje) || ('No se pudo registrar (error ' + r.status + ').');
                 }
             })).catch(() => { info.innerText = 'Sin conexión con el servidor. Intenta de nuevo.'; });
