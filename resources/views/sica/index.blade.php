@@ -775,7 +775,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 </div>
 </div>
 <div id="burbujas-claves" class="burbujas-claves"></div>
-<div id="burbujas-avisos" class="burbujas-claves" style="top:auto;bottom:14px" role="status" aria-live="polite"></div>
 <div id="modal-cuenta" class="modal-cuenta d-none" role="dialog" aria-modal="true" aria-labelledby="modal-cuenta-titulo">
  <div class="modal-cuenta-caja">
     <h5 id="modal-cuenta-titulo"></h5>
@@ -1616,20 +1615,12 @@ function renderListaOrientadores() {
 let _horSel = {};   // grupo elegido en cada orientador(a) de esta lista
 let _horEstado = {};   // último aviso de guardado de cada grupo: {clave: {clase, txt}} (así no desaparece cuando la lista se vuelve a dibujar)
 const htmlEstadoHor = k => { const e = _horEstado[k]; return '<span class="hor-estado fw-semibold ' + (e ? e.clase : '') + '" role="status" aria-live="polite">' + (e ? esc(e.txt) : '') + '</span>'; };
-/* Avisos como los de las cuentas: una burbuja que sale sola y se va a los pocos segundos (o con la X) */
-function avisoBurbuja(txt, error, retardo) {
- const b = $('<div class="burbuja ' + (error ? 'aviso-error' : 'aviso-ok') + '" role="alert"></div>');
- b.append($('<button type="button" class="burbuja-x" aria-label="Cerrar">&times;</button>').on('click', () => b.remove()));
- b.append($('<div></div>').text((error ? '⚠ ' : '✔ ') + txt));
- if (retardo) b.append($('<div class="mt-2 fw-bold rounded px-2 py-1" style="background:#fff;color:#b00020"></div>').text('⚠ ' + retardo));
- $('#burbujas-avisos').append(b);
- setTimeout(() => b.fadeOut(300, () => b.remove()), (error || retardo) ? 9000 : 5000);
-}
-function ponerEstadoHor(it, k, clase, txt) {
+/* Avisos con el cuadro normal del navegador ("127.0.0.1 dice ... Aceptar"), como los de dar acceso a una cuenta.
+   Mientras se escribe se guarda en silencio; el cuadro sale al terminar de escribir (o con «Guardar ahora»). */
+function ponerEstadoHor(it, k, clase, txt, avisar) {
  _horEstado[k] = {clase: '', txt: ''};
  it.find('.hor-estado').text('');
- if (clase === 'text-success') avisoBurbuja(txt.replace(/^✔\s*/, ''), false);
- else if (clase === 'text-danger') avisoBurbuja(txt.replace(/^⚠\s*/, ''), true);
+ if (avisar && (clase === 'text-success' || clase === 'text-danger')) alert(txt);
 }
 function renderListaHorarios() {
  renderGruposCargados();
@@ -1710,14 +1701,14 @@ function horarioCambiado(input, ya) {
  if (!k) return;
  const v = leerHorarioInline(it);
  if (v.error) {   // mientras se escribe solo se avisa que falta; al terminar (change) se explica el problema en rojo
-  if (ya) ponerEstadoHor(it, k, 'text-danger', '⚠ ' + v.error + ' Todavía no se ha guardado.'); else ponerEstadoHor(it, k, 'text-muted', 'Escribiendo… se guarda solo al completar los datos.');
+  if (ya) ponerEstadoHor(it, k, 'text-danger', v.error + ' Todavía no se ha guardado.', true);
   return;
  }
  const h = db.horarios[k] = db.horarios[k] || {entrada: '', salida: '', orientadorId: ''};
  h.entrada = v.e; h.salida = v.s; h.tolEntrada = v.te; h.tolSalida = v.ts;   // ya vale para el siguiente escaneo
  try { localStorage.setItem(LS, JSON.stringify(db)); } catch (x) {}
- ponerEstadoHor(it, k, 'text-muted', 'Guardando…');
- _horPend = _horPend.filter(x => x.k !== k).concat([{it: it, k: k, v: v}]);
+ const antes = _horPend.find(x => x.k === k);
+ _horPend = _horPend.filter(x => x.k !== k).concat([{it: it, k: k, v: v, ya: !!ya || !!(antes && antes.ya)}]);
  clearTimeout(_horTimer);
  _horTimer = setTimeout(() => {
   _horTimer = null;
@@ -1725,9 +1716,9 @@ function horarioCambiado(input, ya) {
   guardarOrientadoresServidor().then(ok => lote.forEach(x => {
    const c = parseClave(x.k);
    if (ok) {
-    ponerEstadoHor(x.it, x.k, 'text-success', '✔ Guardado. Tolerancia de entrada ' + x.v.te + ' min y de salida ' + x.v.ts + ' min.');
+    ponerEstadoHor(x.it, x.k, 'text-success', 'Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ').\nTolerancia de entrada ' + x.v.te + ' min y de salida ' + x.v.ts + ' min.', x.ya);
     $('#resumen-horario-grupo').text('✔ Horario guardado: ' + c.grado + '° grado, grupo ' + c.grupo + ' (' + c.turno + ') de ' + h12(x.v.e) + ' a ' + h12(x.v.s) + ' · tolerancia de entrada ' + x.v.te + ' min, de salida ' + x.v.ts + ' min.');
-   } else ponerEstadoHor(x.it, x.k, 'text-danger', '⚠ No se pudo guardar en el servidor. El cambio ya funciona en este equipo; revisa tu conexión y pulsa «Guardar ahora».');
+   } else ponerEstadoHor(x.it, x.k, 'text-danger', 'No se pudo guardar en el servidor. El cambio ya funciona en este equipo; revisa tu conexión y pulsa «Guardar ahora».', true);
   }));
   renderTablaPronto();
  }, ya ? 0 : 600);
@@ -3233,7 +3224,8 @@ function registroRapido(id) {
  const al = db.alumnos.find(x => x.id === id); if (!al) return;
  const r0 = al.reg[hoy()] || {};
  const r = registrarPorId(id, r0.entrada ? 'Salida' : 'Entrada', true);
- avisoBurbuja(r.msg, !r.ok, r.ok ? r.retardo : '');
+ if (!r.ok) alert(r.msg);
+ else if (r.retardo) alert(r.msg + '\n\n⚠ ' + r.retardo);   // sin retardo no estorba: la fila se actualiza sola
 }
 function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida', true); if (!r.ok) alert(r.msg); }
 function subirLista() {
