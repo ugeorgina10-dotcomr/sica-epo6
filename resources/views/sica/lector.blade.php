@@ -21,7 +21,7 @@
             <h1 class="text-lg font-bold">ESCUELA PREPARATORIA OFICIAL NÚM. 6</h1>
         </div>
         <div>
-            <a href="{{ route('login') }}" class="inline-flex items-center min-h-[48px] text-base font-semibold bg-white/10 hover:bg-white/20 py-2 px-5 rounded-lg transition">Regresar al Panel</a>
+            <a href="{{ route('login') }}" class="inline-flex items-center min-h-[72px] text-xl font-bold bg-white/10 hover:bg-white/20 py-2 px-5 rounded-lg transition">Regresar al Panel</a>
         </div>
     </header>
 
@@ -111,18 +111,19 @@
                     const al = d.alumno || {};
                     const conRetardo = !!(d.retardo && d.retardo.minutos > 0);
                     info.className = 'text-base font-semibold mt-1 break-words ' + (conRetardo ? 'text-red-700' : 'text-green-800');
-                    info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora;
-                    // Si ya pasó la tolerancia del grupo: aviso en ROJO, "Retardo de entrada" o "Retardo de salida"
-                    if (d.retardo && d.retardo.minutos > 0) {
-                        const aviso = document.createElement('span');
-                        aviso.className = 'block mt-2 text-lg font-bold text-red-700 bg-red-50 border-l-4 border-red-700 rounded p-2 break-words';
-                        aviso.setAttribute('role', 'alert');
-                        aviso.textContent = '⚠ Retardo de ' + d.retardo.tipo + ': ' + duracion(d.retardo.minutos) + ' tarde (ya pasada la tolerancia)';
-                        info.appendChild(aviso);
-                    }
+                    info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora +
+                        // El retardo va en el MISMO mensaje, entre paréntesis (todo en rojo)
+                        (conRetardo ? ' (Retardo de ' + d.retardo.tipo + ': ' + duracion(d.retardo.minutos) + ')' : '');
                 } else {
-                    info.className = 'text-base text-red-700 font-semibold mt-1';
+                    info.className = 'text-base text-red-700 font-semibold mt-1 break-words';
                     info.innerText = (d && d.mensaje) || ('No se pudo registrar (error ' + r.status + ').');
+                    // Entrada o salida que ya estaba registrada: aviso claro debajo
+                    if (r.status === 409) {
+                        const ya = document.createElement('span');
+                        ya.className = 'block mt-2 text-lg font-bold text-red-700 bg-red-50 border-l-4 border-red-700 rounded p-2 break-words';
+                        ya.textContent = '✔ Ya está el registro: no se registró de nuevo.';
+                        info.appendChild(ya);
+                    }
                 }
             })).catch(() => { info.innerText = 'Sin conexión con el servidor. Intenta de nuevo.'; });
         }

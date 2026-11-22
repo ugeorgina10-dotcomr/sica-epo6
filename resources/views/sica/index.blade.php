@@ -309,6 +309,16 @@ td.txt-ret-ent,td.txt-ret-sal{color:#b00020;font-weight:700}
  #vista-sistema .btn,.main-card .btn,.login-card .btn{font-size:1.2rem;padding:.8rem 1rem !important}
  .grupo-botones .btn,.d-flex.gap-2.flex-wrap .btn{flex:1 1 100%;max-width:100%}
 }
+
+/* ===== BOTONES: TODOS DEL MISMO TAMAÑO (grandes), sin importar btn-sm / btn-lg ni el ancho de la pantalla ===== */
+body .btn,#vista-sistema .btn,#vista-sistema .btn.btn-sm,#vista-sistema .btn.btn-lg,#vista-sistema .btn.small,#vista-sistema table .btn,#vista-sistema .btn-cuenta,
+.main-card .btn,.main-card .btn.btn-sm,.main-card .btn.btn-lg,.login-card .btn,.login-card .btn.btn-lg,.btn-recargar-sistema,.grupo-botones .btn,.ori-hor .btn,.ori-hor .btn.btn-sm,
+#vista-sistema #btn-turno-matutino,#vista-sistema #btn-turno-vespertino,#vista-sistema #btn-turno-lector-matutino,#vista-sistema #btn-turno-lector-vespertino,#vista-sistema #btn-turno-cred-matutino,#vista-sistema #btn-turno-cred-vespertino
+{min-height:64px !important;font-size:1.25rem !important;font-weight:700 !important;line-height:1.25 !important;padding:.8rem 1.6rem !important;border-radius:.75rem !important;align-items:center;justify-content:center;text-align:center}
+#vista-sistema table .btn-rapido{min-width:220px}
+@media (max-width:575.98px){
+ body .btn,#vista-sistema .btn,#vista-sistema .btn.btn-sm,.main-card .btn,.login-card .btn{font-size:1.2rem !important;min-height:64px !important;padding:.8rem 1rem !important}
+}
 </style>
 </head>
 <body id="cuerpo-contenedor" class="bg-login">
@@ -1239,6 +1249,7 @@ function limiteDe(a) {
    (salió después del cierre + tolerancia, o hoy todavía no sale y ya pasó ese límite) */
 function retrasosDe(a, r, fecha) {
  const res = {entrada: 0, salida: 0, sinSalida: false};
+ if (r && !r.entrada && r.salida) { res.salida = Math.max(0, toMin(r.salida) - limiteDe(a).fin); return res; }   // salió sin entrada registrada: igual lleva su retardo de salida
  if (!r || !r.entrada) return res;
  const l = limiteDe(a);
  res.entrada = Math.max(0, toMin(r.entrada) - l.retardo);
@@ -1262,8 +1273,9 @@ function durMin(n) {
 }
 /* Texto de las columnas "Retardo entrada" y "Retardo salida" (tabla, Excel y PDF). "—" = no vino. */
 function textoRetardo(a, r, f) {
- if (!r || !r.entrada) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
+ if (!r || (!r.entrada && !r.salida)) return {ent: '—', sal: '—', t: {entrada: 0, salida: 0}};
  const t = retrasosDe(a, r, f);
+ if (!r.entrada) return {t: t, ent: '—', sal: t.salida > 0 ? durMin(t.salida) : 'Sin retardo'};
  return {t: t,
   ent: t.entrada > 0 ? durMin(t.entrada) : 'Sin retardo',
   sal: t.salida > 0 ? (t.sinSalida ? 'Sin salida (' + durMin(t.salida) + ')' : durMin(t.salida)) : (r.salida ? 'Sin retardo' : 'Pendiente')};
@@ -1275,6 +1287,7 @@ function celdasRetardo(a, r, f) {
          lateEnt: x.t.entrada > 0, lateSal: x.t.salida > 0};
 }
 function estatusDe(a, r, fecha) {
+ if (r && !r.entrada && r.salida) return retrasosDe(a, r, fecha).salida > 0 ? 'Retardo salida' : 'Sin registro';
  if (!r || !r.entrada) return 'Sin registro';
  const t = retrasosDe(a, r, fecha);
  if (t.entrada > 0 && t.salida > 0) return 'Retardo entrada y salida';
@@ -2845,6 +2858,7 @@ function avisoRetardo(modo, minutos, limiteMin) {
  return 'Retardo de ' + (modo === 'Salida' ? 'salida' : 'entrada') + ': ' + durMin(minutos) + ' tarde' + hh;
 }
 /* Mensaje al escanear: nombre, grado en letras, grupo en número romano, turno, CURP y hora (y el retardo de entrada o de salida, si lo hubo) */
+const parRetardo = (modo, minutos) => minutos > 0 ? ' (Retardo de ' + (modo === 'Salida' ? 'salida' : 'entrada') + ': ' + durMin(minutos) + ')' : '';
 function detalleRegistro(tipo, a, hora, extra) {
  // A qué grupo y orientador(a) se mandó el registro (el alumno siempre va a SU grupo, aunque lo escanee otro orientador)
  let ori = '';
@@ -2931,7 +2945,8 @@ function procesarQR(curp, modo, el) {
   // Con retardo TODO el texto (nombre, grupo, hora...) sale en rojo y abajo van los minutos u horas de retraso
   const caja = $('#res-' + el).removeClass('text-success text-danger').addClass(r.ok && !r.retardo ? 'text-success' : 'text-danger').empty();
   $('<span>').text(r.msg).appendTo(caja);
-  if (r.ok && r.retardo) $('<span class="res-retardo d-block mt-2">').text('⚠ ' + r.retardo).appendTo(caja);
+  // Si ya tenía ese registro (entrada o salida), se avisa clarito debajo con la hora en que quedó
+  if (!r.ok && /ya estaba registrada|ya tiene entrada/i.test(r.msg || '')) $('<span class="res-retardo d-block mt-2">').text('✔ Ya está el registro: no se registró de nuevo.').appendTo(caja);
   if (navigator.vibrate) navigator.vibrate(r.ok ? (r.retardo ? [120,70,120] : 150) : [100,60,100]);
  };
  const r = registrarPorCurp(curp, modo);
@@ -2996,7 +3011,7 @@ function aplicarRegistro(a, modo, sinEntradaOk) {
  // Retardo = pasó la hora límite del grupo MÁS su tolerancia: de entrada al entrar, de salida al salir (aunque no tenga entrada registrada)
  const lim = limiteDe(a), limiteMin = modo === 'Entrada' ? lim.retardo : lim.fin;
  const minRet = toMin(modo === 'Entrada' ? r.entrada : r.salida) - limiteMin;
- return {ok:true, retardo: avisoRetardo(modo, minRet, limiteMin), msg:detalleRegistro(modo, a, horaAhora(), '') +
+ return {ok:true, retardo: avisoRetardo(modo, minRet, limiteMin), msg:detalleRegistro(modo, a, horaAhora(), '') + parRetardo(modo, minRet) +
   (navigator.onLine === false ? ' · guardada sin internet, se enviará al reconectar' : '')};
 }
 /*
@@ -3038,7 +3053,7 @@ function registrarDesconocido(curp, modo) {
    const al = d.alumno || {};
    // El servidor avisa si ya pasó la tolerancia del grupo (de entrada o de salida)
    const aviso = d.retardo ? avisoRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '';
-   return {ok:true, retardo: aviso, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '')};
+   return {ok:true, retardo: aviso, msg:detalleRegistro(d.modo || modo, al, d.hora || horaAhora(), '') + (d.retardo ? parRetardo(d.retardo.tipo === 'salida' ? 'Salida' : 'Entrada', d.retardo.minutos) : '')};
   }
   if (r.status === 404) return {ok:false, msg:'QR no reconocido: ' + curp};
   if (r.status === 409) return {ok:false, msg:(d && d.mensaje) || 'Ya estaba registrado.'};
@@ -3272,7 +3287,7 @@ function registroRapido(id) {
  const r0 = al.reg[hoy()] || {};
  const r = registrarPorId(id, r0.entrada ? 'Salida' : 'Entrada', true);
  if (!r.ok) alert(r.msg);
- else if (r.retardo) alert(r.msg + '\n\n⚠ ' + r.retardo);   // sin retardo no estorba: la fila se actualiza sola
+ else if (r.retardo) alert(r.msg);   // sin retardo no estorba: la fila se actualiza sola
 }
 function marcarSalida(id) { if (!permisoPermite()) return; const al = db.alumnos.find(x => x.id === id); if (al && !confirm('¿Registrar la salida de ' + al.nombre + ' ahora (' + h12(horaAhora()) + ')?')) return; const r = registrarPorId(id, 'Salida', true); if (!r.ok) alert(r.msg); }
 function subirLista() {

@@ -29,7 +29,7 @@
                                 <option value="Salida">Salida</option>
                             </select>
                         </div>
-                        <button type="submit" class="btn text-white w-100 fw-bold py-2" style="background-color: #800020;">Registrar</button>
+                        <button type="submit" class="btn text-white w-100 fw-bold py-4" style="background-color: #800020;">Registrar</button>
                     </form>
                 </div>
             </div>
