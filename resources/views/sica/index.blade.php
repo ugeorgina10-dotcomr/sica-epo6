@@ -328,10 +328,11 @@ body #btn-ingresar.btn,body .btn.btn.btn[onclick*="mostrarSeccion('vista-login')
 /* "Recargar sistema" de la pantalla de inicio: texto pequeño y discreto, igual que "¿Olvidaste tu contraseña?" */
 a.btn-recargar-sistema{display:inline;flex:0 0 auto;min-height:0;padding:0;font-size:var(--fs-small);font-weight:400}
 
-/* ===== Botón "Elegir archivos": misma forma, alto y letra que el resto de botones ===== */
-body input[type=file],body input[type=file].form-control{display:flex;align-items:center;min-height:var(--btn-h);padding:.25rem !important;font-size:var(--btn-fs) !important;line-height:1.25;color:#495057;border-radius:var(--btn-radius)}
-body input[type=file]::file-selector-button{box-sizing:border-box;height:calc(var(--btn-h) - .5rem - 2px);margin:0 .9rem 0 0;padding:0 var(--btn-px);border:1px solid #212529;border-radius:var(--btn-radius);background:#fff;color:#212529;font-family:inherit;font-size:var(--btn-fs);font-weight:600;line-height:1.25;cursor:pointer;transition:background .12s,border-color .12s}
-body input[type=file]:hover::file-selector-button{background:#f3e3e7;border-color:#800020}
+/* ===== Botón "Elegir archivos": gris como el original, pero COMPLETO y rodeado de negro para que se note que es un botón ===== */
+body input[type=file],body input[type=file].form-control{display:flex;align-items:center;flex-wrap:nowrap;width:100%;min-height:var(--btn-h);padding:.25rem !important;font-size:var(--btn-fs) !important;line-height:1.25;color:#495057;border-radius:var(--btn-radius);overflow:hidden;text-overflow:ellipsis}
+body input[type=file]::file-selector-button{box-sizing:border-box;flex:0 0 auto;white-space:nowrap;min-width:max-content;height:calc(var(--btn-h) - .5rem - 2px);margin:0 .8rem 0 0;padding:0 1rem;border:2px solid #000;border-radius:var(--btn-radius);background:#e9ecef;color:#212529;font-family:inherit;font-size:var(--btn-fs);font-weight:600;line-height:1.25;cursor:pointer;transition:background .12s}
+body input[type=file]:hover::file-selector-button{background:#d8dde2}
+@media (max-width:359.98px){body input[type=file]::file-selector-button{padding:0 .7rem;margin-right:.5rem;font-size:.9rem}}
 /* ===== CUALQUIER TELÉFONO: nada se sale ni se corta, con muescas, barras del navegador y pantallas desde 320 px ===== */
 html{overflow-x:hidden}
 body{min-height:100vh;min-height:100dvh;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
