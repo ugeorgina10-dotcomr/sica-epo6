@@ -4,14 +4,18 @@
 cd "$(dirname "$0")" || exit 1
 
 # 1) Permite atender a varias personas al mismo tiempo (antes tenían que esperar su turno).
-export PHP_CLI_SERVER_WORKERS=4
+export PHP_CLI_SERVER_WORKERS=${PHP_CLI_SERVER_WORKERS:-64}
 
 # 2) Ajustes para que funcione más ligero SOLO mientras esté abierto (no cambia tu archivo .env).
 export SESSION_DRIVER=file APP_DEBUG=false LOG_LEVEL=warning
 
+export DB_PERSISTENT=true   # mantiene abierta la conexión a la base de datos entre visitas
 # 3) Deja todo preparado de antemano para que el sistema abra más rápido.
 php artisan config:cache
 php artisan view:cache
+php artisan migrate --force >/dev/null 2>&1
+# Despierta la base de datos (la de la nube se duerme sola) y llena las listas en memoria: la primera visita ya sale rápida
+php artisan sica:calentar
 
 echo "SICA-EPO6 en http://localhost:8000 (en Codespaces: pestaña Puertos > puerto 8000)"
 # 4) Enciende el sistema. Si cambias algún archivo .php, ciérralo (Ctrl+C) y vuelve a ejecutar este archivo.

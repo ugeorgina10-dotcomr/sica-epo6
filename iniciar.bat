@@ -4,9 +4,15 @@ title SICA-EPO6 (no cierres esta ventana)
 set "PHP=php"
 where php >nul 2>nul || set "PHP=C:\xampp\php\php.exe"
 
+rem Mantiene abierta la conexion a la base de datos entre visitas (abrirla cada vez es lento con la base de datos en la nube)
+set "DB_PERSISTENT=true"
+
 rem Deja todo preparado de antemano: asi el sistema abre y responde mas rapido
 "%PHP%" artisan config:cache >nul 2>nul
 "%PHP%" artisan view:cache >nul 2>nul
+"%PHP%" artisan migrate --force >nul 2>nul
+rem Despierta la base de datos (la de la nube se duerme sola) y llena las listas en memoria: la primera visita ya sale rapida
+"%PHP%" artisan sica:calentar
 
 rem Abre el navegador cuando el servidor ya esta encendido (antes se abria primero y salia "no se puede conectar")
 start "" /min cmd /c "ping -n 3 127.0.0.1 >nul & start "" http://127.0.0.1:8000"
