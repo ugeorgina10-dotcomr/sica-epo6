@@ -32,8 +32,8 @@
 
             <!-- Botones de Modo -->
             <div class="flex flex-wrap justify-center gap-4 mb-6" role="group" aria-label="Modo de registro">
-                <button id="btnEntrada" type="button" aria-pressed="false" onclick="setModo('Entrada')" class="px-8 py-3 min-h-[60px] min-w-[150px] bg-gray-100 text-gray-800 text-lg font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Entrada</button>
-                <button id="btnSalida" type="button" aria-pressed="false" onclick="setModo('Salida')" class="px-8 py-3 min-h-[60px] min-w-[150px] bg-gray-100 text-gray-800 text-lg font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Salida</button>
+                <button id="btnEntrada" type="button" aria-pressed="false" onclick="setModo('Entrada')" class="px-8 py-3 min-h-[72px] min-w-[170px] bg-gray-100 text-gray-800 text-xl font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Entrada</button>
+                <button id="btnSalida" type="button" aria-pressed="false" onclick="setModo('Salida')" class="px-8 py-3 min-h-[72px] min-w-[170px] bg-gray-100 text-gray-800 text-xl font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition">Salida</button>
             </div>
 
             <p id="txtModo" role="status" aria-live="polite" class="text-sm font-bold text-green-800 -mt-3 mb-5">Modo AUTOMÁTICO: el sistema detecta el grupo del alumno y registra solo si es entrada o salida según su horario.</p>
@@ -45,12 +45,12 @@
 
             <!-- Controles de Cámara -->
             <div class="flex flex-wrap justify-center gap-3">
-                <button type="button" onclick="iniciarCamara()" class="px-7 py-3 min-h-[60px] bg-[#800020] hover:bg-[#600018] text-white text-lg font-bold rounded-xl shadow transition">Activar Cámara Frontal</button>
-                <button type="button" onclick="detenerCamara()" class="px-7 py-3 min-h-[60px] bg-gray-200 hover:bg-gray-300 text-gray-900 text-lg font-bold rounded-xl border border-gray-400 transition">Detener</button>
+                <button type="button" onclick="iniciarCamara()" class="px-7 py-3 min-h-[72px] bg-[#800020] hover:bg-[#600018] text-white text-xl font-bold rounded-xl shadow transition">Activar Cámara Frontal</button>
+                <button type="button" onclick="detenerCamara()" class="px-7 py-3 min-h-[72px] bg-gray-200 hover:bg-gray-300 text-gray-900 text-xl font-bold rounded-xl border border-gray-400 transition">Detener</button>
             </div>
 
             <!-- Resultado del Escaneo -->
-            <div id="resultado" role="status" aria-live="polite" class="mt-6 p-4 bg-slate-100 rounded-xl hidden text-left max-w-md mx-auto break-words">
+            <div id="resultado" role="status" aria-live="polite" class="mt-6 p-4 bg-slate-100 rounded-xl hidden text-left max-w-md mx-auto">
                 <p class="text-sm font-bold text-gray-800">Alumno detectado:</p>
                 <p id="infoAlumno" class="text-base text-gray-900 font-semibold mt-1"></p>
             </div>
@@ -60,8 +60,8 @@
     <script>
         let html5QrCode;
         let modoActual = 'Auto';   // Auto = el servidor decide Entrada o Salida por el horario del grupo del alumno
-        const ACTIVO = "px-8 py-3 min-h-[60px] min-w-[150px] bg-[#800020] text-white text-lg font-bold rounded-xl border border-[#800020] shadow transition";
-        const INACTIVO = "px-8 py-3 min-h-[60px] min-w-[150px] bg-gray-100 text-gray-800 text-lg font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition";
+        const ACTIVO = "px-8 py-3 min-h-[72px] min-w-[170px] bg-[#800020] text-white text-xl font-bold rounded-xl border border-[#800020] shadow transition";
+        const INACTIVO = "px-8 py-3 min-h-[72px] min-w-[170px] bg-gray-100 text-gray-800 text-xl font-bold rounded-xl border border-gray-300 hover:bg-gray-200 transition";
 
         function setModo(tipo) {
             modoActual = (modoActual === tipo) ? 'Auto' : tipo;   // pulsar otra vez el mismo botón = volver a Automático
@@ -109,7 +109,6 @@
             }).then(r => r.json().catch(() => ({})).then(d => {
                 if (r.ok && d.ok) {
                     const al = d.alumno || {};
-                    // Con retardo TODO el texto sale en rojo; sin retardo, en verde
                     const conRetardo = !!(d.retardo && d.retardo.minutos > 0);
                     info.className = 'text-base font-semibold mt-1 break-words ' + (conRetardo ? 'text-red-700' : 'text-green-800');
                     info.innerText = (d.modo === 'Salida' ? '¡Salida' : '¡Entrada') + ' registrada correctamente! ' + al.nombre + ' - ' + al.grado + '° ' + al.grupo + ' (' + al.turno + ') · ' + d.hora;
