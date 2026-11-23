@@ -3,14 +3,14 @@
 return [
 
     /*
-    | Forma en que se protegen las contraseñas. Con rounds=10 guardar y revisar una contraseña tarda unas 4 veces menos que con 12
+    | Forma en que se protegen las contraseñas. Con rounds=8 guardar y revisar una contraseña tarda unas 4 veces menos que con 10 (y 16 veces menos que con 12)
     | (se entra más rápido). Las contraseñas ya guardadas con otro nivel se actualizan solas la próxima vez que
-    | esa persona inicia sesión (ver AuthController::usuarioValido). Para volver al nivel anterior: BCRYPT_ROUNDS=12 en .env
+    | esa persona inicia sesión (ver AuthController::usuarioValido). Para volver a un nivel más lento y más fuerte: BCRYPT_ROUNDS=10 (o 12) en .env
     */
     'driver' => 'bcrypt',
 
     'bcrypt' => [
-        'rounds' => env('BCRYPT_ROUNDS', 10),
+        'rounds' => env('BCRYPT_ROUNDS', 8),
         'verify' => env('HASH_VERIFY', true),
         'limit' => env('BCRYPT_LIMIT', null),
     ],

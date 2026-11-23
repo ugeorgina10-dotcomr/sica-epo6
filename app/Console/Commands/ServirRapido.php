@@ -75,7 +75,6 @@ class ServirRapido extends ServeCommand
     {
         // Configuración, rutas, pantallas y base de datos en un solo paso (solo repite lo que cambió) + despierta la base de datos
         // y llena las cachés ANTES de abrir: así la primera visita en el navegador ya es rápida
-        $this->components->info('Preparando el sistema (despertando la base de datos)...');
         try {
             $this->callSilently('sica:preparar');
         } catch (\Throwable $e) {
