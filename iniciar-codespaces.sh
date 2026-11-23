@@ -18,7 +18,7 @@ echo "SICA-EPO6 en http://localhost:8000 (en Codespaces: pestaña Puertos > puer
 # 4) Enciende el sistema. Si cambias algún archivo .php, ciérralo (Ctrl+C) y vuelve a ejecutar este archivo.
 SERVIDOR=vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php
 if [ -f "$SERVIDOR" ]; then
-  cd public && exec php -d zlib.output_compression=1 -d upload_max_filesize=25M -d post_max_size=30M -d max_file_uploads=50 -d memory_limit=256M -d opcache.enable_cli=1 -d opcache.interned_strings_buffer=16 -d xdebug.mode=off -d zend.assertions=-1 -d opcache.validate_timestamps=0 -d opcache.memory_consumption=128 \
+  cd public && exec php -d zlib.output_compression=1 -d upload_max_filesize=25M -d post_max_size=30M -d max_file_uploads=50 -d memory_limit=256M -d opcache.enable_cli=1 -d opcache.jit=tracing -d opcache.jit_buffer_size=32M -d pcre.jit=1 -d opcache.interned_strings_buffer=16 -d xdebug.mode=off -d zend.assertions=-1 -d opcache.validate_timestamps=0 -d opcache.memory_consumption=128 \
     -d opcache.max_accelerated_files=10000 -d realpath_cache_size=4096K -d realpath_cache_ttl=600 \
     -S 0.0.0.0:8000 -t . "../$SERVIDOR"
 fi

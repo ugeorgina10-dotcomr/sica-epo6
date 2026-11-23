@@ -686,12 +686,66 @@ class ControlEscolarController extends Controller
             return response()->json(null, 304)->setEtag($huella);
         }
 
-        $datos = Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado($huellas['base']));
+        $gz = $this->estadoComprimido($huellas['base'], $huella);
 
-        $respuesta = response()->json($datos);
+        // Los equipos que aceptan gzip (todos los navegadores) reciben el estado YA comprimido: antes el servidor lo comprimía
+        // una vez por cada equipo y por cada cambio. Ahora se comprime una sola vez para todos.
+        if (str_contains((string) $request->header('Accept-Encoding'), 'gzip')) {
+            @ini_set('zlib.output_compression', '0');   // evita comprimir dos veces
+            $respuesta = response($gz, 200, ['Content-Type' => 'application/json', 'Content-Encoding' => 'gzip', 'Vary' => 'Accept-Encoding']);
+        } else {
+            $respuesta = response((string) gzdecode($gz), 200, ['Content-Type' => 'application/json']);
+        }
         $respuesta->setEtag($huella);
 
         return $respuesta;
+    }
+
+    /**
+     * Estado completo YA armado para esta versión (huella). Si cambia algo y muchos equipos lo piden a la vez, solo UNO lo arma y los
+     * demás esperan ese resultado (antes cada uno lo armaba por su cuenta y el servidor se saturaba justo cuando más equipos escanean).
+     * Se guarda en una sola llave que se reescribe (antes se creaba un archivo nuevo por cada cambio).
+     */
+    private function estadoActual(string $huellaBase, string $huella): array
+    {
+        $leer = function () use ($huella) {
+            $g = Cache::get('sica.estado.cur.a');
+
+            return (is_array($g) && ($g['h'] ?? null) === $huella) ? $g['datos'] : null;
+        };
+
+        if (($d = $leer()) !== null) {
+            return $d;
+        }
+
+        $armar = function () use ($leer, $huellaBase, $huella) {
+            if (($d = $leer()) !== null) {   // otro equipo lo armó mientras esperábamos
+                return $d;
+            }
+            $d = $this->construirEstado($huellaBase);
+            Cache::put('sica.estado.cur.a', ['h' => $huella, 'datos' => $d], 600);
+            Cache::put('sica.estado.cur.g', ['h' => $huella, 'gz' => gzencode((string) json_encode($d, JSON_INVALID_UTF8_SUBSTITUTE), 4)], 600);
+
+            return $d;
+        };
+
+        try {
+            return Cache::lock('sica.estado.armar', 20)->block(8, $armar);
+        } catch (\Illuminate\Contracts\Cache\LockTimeoutException) {
+            return $armar();
+        }
+    }
+
+    private function estadoComprimido(string $huellaBase, string $huella): string
+    {
+        $g = Cache::get('sica.estado.cur.g');
+        if (is_array($g) && ($g['h'] ?? null) === $huella) {
+            return $g['gz'];
+        }
+        $d = $this->estadoActual($huellaBase, $huella);
+        $g = Cache::get('sica.estado.cur.g');
+
+        return (is_array($g) && ($g['h'] ?? null) === $huella) ? $g['gz'] : gzencode((string) json_encode($d, JSON_INVALID_UTF8_SUBSTITUTE), 4);
     }
 
     /** Lo mismo que /api/sica/estado, pero incluido en la página al abrirla con sesión iniciada (misma versión guardada y misma marca) */
@@ -702,7 +756,7 @@ class ControlEscolarController extends Controller
 
         return [
             'etag'  => '"' . $huella . '"',
-            'datos' => Cache::remember('sica.estado.v2.' . $huella, 300, fn () => $this->construirEstado($huellas['base'])),
+            'datos' => $this->estadoActual($huellas['base'], $huella),
         ];
     }
 

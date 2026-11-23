@@ -40,7 +40,7 @@ if (stripos(PHP_OS, 'WIN') !== 0) {
 
 $ajustes = [
     'zlib.output_compression=1', 'upload_max_filesize=25M', 'post_max_size=30M', 'max_file_uploads=50', 'memory_limit=256M',
-    'opcache.enable_cli=1', 'opcache.interned_strings_buffer=16', 'xdebug.mode=off', 'zend.assertions=-1', 'opcache.validate_timestamps=0', 'opcache.memory_consumption=128', 'opcache.max_accelerated_files=10000',
+    'opcache.enable_cli=1', 'opcache.jit=tracing', 'opcache.jit_buffer_size=32M', 'pcre.jit=1', 'opcache.interned_strings_buffer=16', 'xdebug.mode=off', 'zend.assertions=-1', 'opcache.validate_timestamps=0', 'opcache.memory_consumption=128', 'opcache.max_accelerated_files=10000',
     'realpath_cache_size=4096K', 'realpath_cache_ttl=600',
 ];
 $banderas = implode(' ', array_map(fn ($a) => '-d ' . escapeshellarg($a), $ajustes));
