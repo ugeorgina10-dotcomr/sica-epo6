@@ -40,6 +40,7 @@ if exist C:\xampp\mysql\bin\mysql.exe (
 
 rem --- Tablas y cuentas ---
 "%PHP%" artisan optimize:clear
+if exist storage\framework\sica-preparado.json del storage\framework\sica-preparado.json
 "%PHP%" artisan migrate --force
 if errorlevel 1 ( echo Fallo migrate. Revisa los datos DB_ en el archivo .env & pause & exit /b 1 )
 "%PHP%" artisan sica:crear-usuarios

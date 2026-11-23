@@ -27,24 +27,20 @@ if (!is_file($router)) {
 // Mantiene abierta la conexión a la base de datos entre visitas (abrirla cada vez es lento con la base de datos en la nube)
 putenv('DB_PERSISTENT=true');
 
-echo "Preparando configuración y vistas...\n";
-passthru("$php artisan config:cache", $c1);
-passthru("$php artisan view:cache", $c2);
-if ($c1 !== 0 || $c2 !== 0) {
+// Configuración, rutas, pantallas y base de datos en UN solo arranque (solo repite lo que cambió) + despierta la base de datos
+echo "Preparando el sistema...\n";
+passthru("$php artisan sica:preparar", $c1);
+if ($c1 !== 0) {
     fwrite(STDERR, "No se pudo preparar la configuración (revisa el mensaje de arriba y tu archivo .env).\n");
     exit(1);
 }
-
-// Mejoras pendientes de la base de datos, y despertarla (la de la nube se duerme sola) + llenar las listas en memoria
-passthru("$php artisan migrate --force > " . (stripos(PHP_OS, 'WIN') === 0 ? 'NUL' : '/dev/null') . ' 2>&1');
-passthru("$php artisan sica:calentar");
 if (stripos(PHP_OS, 'WIN') !== 0) {
     putenv('PHP_CLI_SERVER_WORKERS=' . (getenv('PHP_CLI_SERVER_WORKERS') ?: '64'));
 }
 
 $ajustes = [
     'zlib.output_compression=1', 'upload_max_filesize=25M', 'post_max_size=30M', 'max_file_uploads=50', 'memory_limit=256M',
-    'opcache.enable_cli=1', 'opcache.validate_timestamps=0', 'opcache.memory_consumption=128', 'opcache.max_accelerated_files=10000',
+    'opcache.enable_cli=1', 'opcache.interned_strings_buffer=16', 'xdebug.mode=off', 'zend.assertions=-1', 'opcache.validate_timestamps=0', 'opcache.memory_consumption=128', 'opcache.max_accelerated_files=10000',
     'realpath_cache_size=4096K', 'realpath_cache_ttl=600',
 ];
 $banderas = implode(' ', array_map(fn ($a) => '-d ' . escapeshellarg($a), $ajustes));

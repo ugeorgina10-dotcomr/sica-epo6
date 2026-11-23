@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClavesController;
 use App\Http\Controllers\ControlEscolarController;
+use App\Http\Controllers\PaginasController;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
@@ -11,25 +12,9 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 // ===== Públicas (no necesitan iniciar sesión) =====
 
 // Pantalla de inicio y de inicio de sesión del sistema SICA
-Route::get('/', function () {
-    $u = auth()->user();
+Route::get('/', [PaginasController::class, 'inicio']);
 
-    return view('sica.index', [
-        // Se incluye dentro de la página para que al abrirla no haga falta pedir esos datos por separado
-        'sesion' => $u ? ['rol' => $u->rol, 'nombre' => $u->name, 'email' => $u->email] : null,
-        'orientadoresLogin' => ControlEscolarController::orientadoresLogin(),
-        // Si ya inició sesión, todos los datos van dentro de la página: al recargar entra sin esperar
-        'estado' => $u ? app(ControlEscolarController::class)->paraPagina() : null,
-        // Control Escolar: el estado de las contraseñas también viene en la página (el panel abre ya con todo listo)
-        'claves' => ($u && $u->rol === 'control')
-            ? ['etag' => ClavesController::etag($c = ClavesController::datos()), 'datos' => $c]
-            : null,
-    ]);
-});
-
-Route::get('/login', function () {
-    return view('sica.dashboard');
-})->name('login');
+Route::get('/login', [PaginasController::class, 'login'])->name('login');
 
 // Inicio y cierre de sesión
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:20,1')->name('auth.login');
@@ -49,9 +34,7 @@ Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 
 // Solo nombres de orientadores, para llenar la lista del inicio de sesión.
 // No incluye alumnos, CURP ni asistencias.
-Route::get('/api/sica/orientadores', function () {
-    return ControlEscolarController::orientadoresLogin();
-})->middleware('throttle:30,1')->name('sica.orientadores');
+Route::get('/api/sica/orientadores', [PaginasController::class, 'orientadores'])->middleware('throttle:30,1')->name('sica.orientadores');
 
 // Plantilla oficial guardada en el sistema (como imagen, igual que las de public/img)
 Route::get('/plantilla-oficial/{turno}/{lado}', [ControlEscolarController::class, 'verPlantillaOficial'])
@@ -60,13 +43,9 @@ Route::get('/plantilla-oficial/{turno}/{lado}', [ControlEscolarController::class
 // ===== Requieren haber iniciado sesión =====
 Route::middleware('auth')->group(function () {
 
-    Route::get('/lector-fijo', function () {
-        return view('sica.lector');
-    })->name('lector');
+    Route::get('/lector-fijo', [PaginasController::class, 'lector'])->name('lector');
 
-    Route::get('/control-escolar', function () {
-        return view('sica.control_escolar');
-    })->name('control.escolar');
+    Route::get('/control-escolar', [PaginasController::class, 'controlEscolar'])->name('control.escolar');
 
     // Todos los datos del sistema (los descargan computadoras y teléfonos)
     Route::get('/api/sica/estado', [ControlEscolarController::class, 'estado'])->name('sica.estado');

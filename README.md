@@ -16,6 +16,11 @@ En `C:\xampp\php\php.ini` deben estar activas (sin `;`): `extension=zip`, `exten
 Cuentas iniciales: ver `database/seeders/UsuarioSeeder.php` (contrasena inicial `prepa06`; cambiala desde Control Escolar).
 Si aparece "500 Server Error": pon `APP_DEBUG=true` en `.env` o revisa `storage/logs/laravel.log`.
 
+## Arranque rápido
+`iniciar.bat`, `iniciar-codespaces.sh` y `php rapido.php` ejecutan `php artisan sica:preparar`: configuración, rutas, pantallas y base de datos
+en UN solo arranque de Laravel, y solo repiten lo que cambió (pantallas y rutas si se editaron sus archivos; `migrate` si hay migraciones nuevas
+o cambió la base de datos). Con `--forzar` repite todo. Si editas `routes/` o `resources/views`, vuelve a abrir el sistema para que lo tome.
+
 ## Cambios al instante (computadoras y celulares)
 Cada escaneo, guardado, borrado, plantilla subida o contraseña desbloqueada sube un contador (`storage/framework/pulso.json`).
 Todos los equipos lo consultan unas 2 veces por segundo en `public/pulso.php` (no arranca Laravel ni usa la base de datos, responde en ~1 ms)

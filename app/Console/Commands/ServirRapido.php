@@ -28,6 +28,9 @@ class ServirRapido extends ServeCommand
         'opcache.max_accelerated_files=10000',
         'realpath_cache_size=4096K',
         'realpath_cache_ttl=600',
+        'opcache.interned_strings_buffer=16',
+        'xdebug.mode=off',
+        'zend.assertions=-1',
         'zlib.output_compression=1',
         'upload_max_filesize=25M',
         'post_max_size=30M',
@@ -67,22 +70,11 @@ class ServirRapido extends ServeCommand
 
     public function handle()
     {
-        // Deja las pantallas preparadas (si falla no pasa nada: se preparan al usarlas)
-        try {
-            $this->callSilently('view:cache');
-        } catch (\Throwable $e) {
-        }
-
-        // Aplica mejoras pendientes de la base de datos (por ejemplo índices nuevos); si no hay nada nuevo no hace nada
-        try {
-            $this->callSilently('migrate', ['--force' => true]);
-        } catch (\Throwable $e) {
-        }
-
-        // Despierta la base de datos y llena las cachés ANTES de abrir: así la primera visita en el navegador ya es rápida
+        // Configuración, rutas, pantallas y base de datos en un solo paso (solo repite lo que cambió) + despierta la base de datos
+        // y llena las cachés ANTES de abrir: así la primera visita en el navegador ya es rápida
         $this->components->info('Preparando el sistema (despertando la base de datos)...');
         try {
-            $this->callSilently('sica:calentar');
+            $this->callSilently('sica:preparar');
         } catch (\Throwable $e) {
         }
 
