@@ -58,7 +58,7 @@
 
         <!-- Sección de Gráficas Comparativas -->
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-            <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide mb-4">Estadísticas Comparativas de Asistencia, Retardos y Permanencia por Grupo</h3>
+            <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide mb-4">Estadísticas Comparativas de Asistencia y Retardos de Entrada y Salida por Grupo</h3>
             <div class="w-full h-72 flex justify-center">
                 <canvas id="graficaAsistencias"></canvas>
             </div>
@@ -74,8 +74,8 @@
                 labels: ['Grupo 1.1', 'Grupo 1.2', 'Grupo 1.3', 'Grupo 1.4', 'Grupo 2.1', 'Grupo 2.2'],
                 datasets: [
                     { label: 'Asistencias', data: [95, 90, 92, 88, 94, 91], backgroundColor: '#10b981' },
-                    { label: 'Retardos', data: [4, 8, 5, 9, 3, 6], backgroundColor: '#f59e0b' },
-                    { label: 'Permanencia', data: [1, 2, 3, 3, 3, 3], backgroundColor: '#ef4444' }
+                    { label: 'Retardo entrada', data: [4, 8, 5, 9, 3, 6], backgroundColor: '#f59e0b' },
+                    { label: 'Retardo salida', data: [1, 2, 3, 3, 3, 3], backgroundColor: '#8b5cf6' }
                 ]
             },
             options: {

@@ -4659,7 +4659,7 @@ function avisarEstado() { try { if (_canalEstado) _canalEstado.postMessage(Date.
 if (_canalEstado) _canalEstado.onmessage = () => { if (rolActivo) { acelerarSync(); cargarDesdeServidor(); } };
 /* "Retardo salida": un alumno sin salida pasa a ese estatus cuando se pasa la hora de cierre de su grupo MÁS su tolerancia de salida, aunque no entre ningún dato nuevo.
    Cada 20 s se revisa si se cruzó alguna de esas horas y, solo entonces, se vuelve a dibujar la tabla. */
-var _minutoPerm = null;
+var _minutoRetSalida = null;
 function horasFinDeHoy() {
  // +1: el retardo de salida empieza UN minuto después del límite (cierre + tolerancia)
  const f = new Set(Object.values(LIM).map(x => x.fin + TOL_DEF.salida + 1));
@@ -4667,10 +4667,10 @@ function horasFinDeHoy() {
  return f;
 }
 function cruzoHoraFin(antes, ahora, fines) { for (const m of fines) if (antes < m && ahora >= m) return true; return false; }
-function vigilarPermanencia() {
+function vigilarRetardoSalida() {
  const ahora = toMin(horaAhora());
- if (_minutoPerm !== null && ahora !== _minutoPerm && rolActivo && cruzoHoraFin(_minutoPerm, ahora, horasFinDeHoy())) renderTablaPronto();
- _minutoPerm = ahora;
+ if (_minutoRetSalida !== null && ahora !== _minutoRetSalida && rolActivo && cruzoHoraFin(_minutoRetSalida, ahora, horasFinDeHoy())) renderTablaPronto();
+ _minutoRetSalida = ahora;
 }
 $(function () {
  precalentarPlantillas();   // las plantillas de Word se leen ya, antes de iniciar sesión
@@ -4685,7 +4685,7 @@ $(function () {
  // se pausa si la pestaña está oculta para no gastar datos ni servidor
  programarConsulta();
  consultarPulso(); programarPulso();   // aviso instantáneo de cambios (ver arriba)
- setInterval(() => { if (!document.hidden) vigilarPermanencia(); }, 20000);
+ setInterval(() => { if (!document.hidden) vigilarRetardoSalida(); }, 20000);
  // Reintenta enviar los escaneos que quedaron esperando por falta de internet
  setInterval(() => { if (rolActivo && colaEscaneos.length) vaciarCola(); }, 15000);
  pintarIndicadorCola();
