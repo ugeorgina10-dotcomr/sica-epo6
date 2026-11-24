@@ -77,7 +77,7 @@ body{background:#f4f6f9;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
 .badge-asignado{font-size:.85rem}
 /* ===== Responsivo ===== */
 @media (max-width:767.98px){
-.form-control,.form-select{font-size:16px;min-height:46px} /* 16px evita que el teléfono haga zoom automático */
+.form-control,.form-select{font-size:16px;min-height:46px} /* 16px evita que el telefóno haga zoom automático */
 .main-card,.login-card{padding:1.5rem !important;border-radius:16px}
 .institution-logo{width:90px;height:90px}
 .small-logo{width:55px;height:55px}
