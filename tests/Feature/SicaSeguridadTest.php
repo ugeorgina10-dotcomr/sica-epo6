@@ -6,6 +6,7 @@ use App\Models\Alumno;
 use App\Models\Grupo;
 use App\Models\User;
 use Database\Seeders\UsuarioSeeder;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -18,6 +19,7 @@ class SicaSeguridadTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutMiddleware(ValidateCsrfToken::class);
         RateLimiter::clear('director@epo6.edu.mx|127.0.0.1');
         $this->seed(UsuarioSeeder::class);
     }
