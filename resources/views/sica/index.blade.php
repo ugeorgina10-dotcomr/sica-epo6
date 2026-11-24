@@ -409,7 +409,7 @@ input[type=time],input[type=date],input[type=number]{min-width:0}
  </div>
  <div class="mb-3">
  <label class="form-label">Correo Institucional</label>
- <input type="email" id="input-correo" class="form-control shadow-sm" autocomplete="username" readonly>
+ <input type="email" id="input-correo" class="form-control shadow-sm" autocomplete="username" autocapitalize="off" spellcheck="false">
  </div>
  <div class="mb-4">
  <label class="form-label">Contraseña</label>
@@ -1984,7 +1984,7 @@ function intentarEntrar(reintento) {
  fetchT('/auth/login', {
  method: 'POST',
  headers: {'Content-Type':'application/json', 'Accept':'application/json', 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') || ''},
- body: JSON.stringify({email: $('#input-correo').val(), password: clave, orientador: orientadorActivo ? orientadorActivo.nombre : null})
+ body: JSON.stringify({email: ($('#input-correo').val() || '').trim() || correosRoles[rol] || '', password: clave, orientador: orientadorActivo ? orientadorActivo.nombre : null})
  }, 20000)
  .then(r => r.json().catch(() => ({})).then(d => ({status: r.status, ...d})))
  .then(d => {
