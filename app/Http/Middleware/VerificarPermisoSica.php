@@ -46,6 +46,10 @@ class VerificarPermisoSica
 
         $accion = (string) $request->input('accion');
 
+        if ($accion === 'guardar_todo') {
+            return $this->denegar('No tienes permiso para guardar cambios. Solo Control Escolar puede hacerlo.');
+        }
+
         if (in_array($accion, self::SOLO_CONTROL, true)) {
             return $this->denegar('Solo Control Escolar puede hacer esto.');
         }

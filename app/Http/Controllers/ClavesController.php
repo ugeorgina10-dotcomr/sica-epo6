@@ -25,6 +25,10 @@ class ClavesController extends Controller
     private const ROLES = ['control', 'director', 'subdirector', 'orientador'];
 
     public const MENSAJES = [
+        'rol.required'       => 'Elige el rol al que le vas a cambiar la contraseña.',
+        'rol.in'             => 'Ese rol no es válido. Elige Control Escolar, Director, Subdirector u Orientador.',
+        'orientador_id.required' => 'Elige un orientador.',
+        'orientador_id.exists'   => 'Ese orientador no existe.',
         'password.required'  => 'Escribe la contraseña nueva.',
         'password.min'       => 'La contraseña debe tener al menos 8 caracteres.',
         'password.max'       => 'La contraseña no puede tener más de 72 caracteres.',

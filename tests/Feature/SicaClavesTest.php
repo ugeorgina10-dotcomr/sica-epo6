@@ -66,6 +66,18 @@ class SicaClavesTest extends TestCase
         $c->postJson('/api/sica/claves/rol', ['rol' => 'admin', 'password' => 'NuevaClave2026', 'password_confirmation' => 'NuevaClave2026'])->assertStatus(422);
     }
 
+    public function test_los_errores_de_clave_salen_en_espanol_y_la_anterior_sigue_valiendo(): void
+    {
+        $c = $this->como('control');
+        $c->postJson('/api/sica/claves/rol', ['rol' => 'director', 'password' => 'corta', 'password_confirmation' => 'corta'])
+            ->assertJsonValidationErrors(['password']);
+        $this->assertStringContainsString('al menos 8', $c->postJson('/api/sica/claves/rol', ['rol' => 'director', 'password' => 'corta', 'password_confirmation' => 'corta'])->json('errors.password.0'));
+        $this->assertSame('Las dos contraseñas no coinciden.', $c->postJson('/api/sica/claves/rol', ['rol' => 'director', 'password' => 'NuevaClave2026', 'password_confirmation' => 'otra'])->json('errors.password.0'));
+        $this->assertStringContainsString('no es válido', $c->postJson('/api/sica/claves/rol', ['rol' => 'admin', 'password' => 'NuevaClave2026', 'password_confirmation' => 'NuevaClave2026'])->json('errors.rol.0'));
+
+        $this->postJson('/auth/login', ['email' => 'director@epo6.edu.mx', 'password' => 'prepa06'])->assertOk();
+    }
+
     public function test_control_necesita_su_clave_actual_para_cambiar_la_suya(): void
     {
         $c = $this->como('control');

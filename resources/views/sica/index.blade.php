@@ -4315,14 +4315,15 @@ function eliminarAlumno(id) {
  db.alumnos = db.alumnos.filter(x => x.id !== id);
  localStorage.setItem(LS, JSON.stringify(db));
  selCred(credSel.grado, credSel.grupo); renderTabla();
+ let _msgServidor = '';
  _postSync('eliminar_alumno', {curp:a.curp || '', id:a.id}, 30000)
- .then(r => r.ok ? null : Promise.reject())
+ .then(r => r.ok ? null : r.json().catch(() => ({})).then(d => { if (r.status === 403) _msgServidor = (d && d.mensaje) || 'Acción no permitida.'; return Promise.reject(); }))
  .catch(() => {
  if (!db.alumnos.some(x => x.id === a.id)) db.alumnos.push(a);
  localStorage.setItem(LS, JSON.stringify(db));
  if (credSel) selCred(credSel.grado, credSel.grupo);
  renderTabla();
- alert('No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
+ alert(_msgServidor || 'No se pudo eliminar en el servidor. Revisa tu conexión e inténtalo de nuevo.');
  });
 }
 function guardarCambiosCredencial() {

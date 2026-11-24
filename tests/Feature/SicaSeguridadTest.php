@@ -70,6 +70,18 @@ class SicaSeguridadTest extends TestCase
         $this->getJson('/api/sica/estado')->assertStatus(401);
     }
 
+    public function test_sin_sesion_el_navegador_ve_el_mensaje_sin_sesion(): void
+    {
+        // Como cuando se escribe la dirección en el navegador (pide una página, no JSON)
+        $this->get('/api/sica/estado')->assertStatus(401)->assertJsonPath('mensaje', 'Sin sesión.');
+    }
+
+    public function test_director_recibe_aviso_de_que_no_tiene_permiso_para_guardar(): void
+    {
+        $this->como('director')->postJson('/api/sica/sync', ['accion' => 'guardar_todo', 'datos' => ['alumnos' => []]])
+            ->assertForbidden()->assertJsonPath('mensaje', 'No tienes permiso para guardar cambios. Solo Control Escolar puede hacerlo.');
+    }
+
     public function test_orientador_no_puede_eliminar_alumnos_ni_cambiar_permisos(): void
     {
         $this->alumnoDePrueba();

@@ -26,6 +26,10 @@ class AuthController extends Controller
             'email'    => 'required|email|max:150',
             'password' => 'required|string|max:200',
             'orientador' => 'nullable|string|max:150',   // nombre elegido en la lista (solo rol Orientador)
+        ], [
+            'email.required'    => 'Escribe tu correo.',
+            'email.email'       => 'Escribe un correo válido.',
+            'password.required' => 'Escribe tu contraseña.',
         ]);
 
         $nombreOrientador = $credenciales['orientador'] ?? null;

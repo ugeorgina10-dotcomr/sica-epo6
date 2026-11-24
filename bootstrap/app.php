@@ -6,6 +6,7 @@ use App\Http\Middleware\VerificarPermisoSica;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -33,6 +34,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Sin sesión: los datos (/api/*) y el inicio de sesión (/auth/*) responden «Sin sesión.» con código 401 (igual que /auth/me)
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*', 'auth/*') || $request->expectsJson()) {
+                return response()->json(['ok' => false, 'mensaje' => 'Sin sesión.'], 401);
+            }
+        });
+
         // Los datos (/api/*) y el inicio de sesión (/auth/*) siempre responden con mensajes de error y nunca mandan a otra página
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request, Throwable $e) => $request->is('api/*', 'auth/*') || $request->expectsJson()
