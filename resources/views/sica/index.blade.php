@@ -390,7 +390,7 @@ input[type=time],input[type=date],input[type=number]{min-width:0}
 <form id="form-login" onsubmit="return false">
  <div class="mb-3">
  <label class="form-label">Seleccionar Rol</label>
- <select id="rol-select" class="form-select shadow-sm" onchange="actualizarCredenciales()">
+ <select id="rol-select" class="form-select shadow-sm" onchange="actualizarCredenciales(true)">
  <option value="orientador">Orientador</option>
  <option value="director">Director</option>
  <option value="subdirector">Subdirector</option>
@@ -409,7 +409,7 @@ input[type=time],input[type=date],input[type=number]{min-width:0}
  </div>
  <div class="mb-3">
  <label class="form-label">Correo Institucional</label>
- <input type="email" id="input-correo" class="form-control shadow-sm" autocomplete="username" autocapitalize="off" spellcheck="false">
+ <input type="email" id="input-correo" class="form-control shadow-sm" autocomplete="username" autocapitalize="off" spellcheck="false" oninput="_correoEditado = true">
  </div>
  <div class="mb-4">
  <label class="form-label">Contraseña</label>
@@ -1937,9 +1937,11 @@ function gruposDeOrientadores(claveActual) {
  return m;
 }
 /* ============ NAVEGACIÓN / ROLES ============ */
-function actualizarCredenciales() {
+let _correoEditado = false;   // la persona ya escribió o borró el correo: las actualizaciones automáticas no se lo vuelven a llenar
+function actualizarCredenciales(reiniciarCorreo) {
  const rol = $('#rol-select').val();
- $('#input-correo').val(correosRoles[rol] || '');
+ if (reiniciarCorreo === true) _correoEditado = false;
+ if (!_correoEditado) $('#input-correo').val(correosRoles[rol] || '');
  const esOrientador = rol === 'orientador';
  $('#campo-orientador-login').toggleClass('d-none', !esOrientador);
  if (esOrientador) {
@@ -2026,7 +2028,7 @@ function mostrarSeccion(id) {
  $('#vista-inicio,#vista-login,#vista-sistema').addClass('d-none');
  $('#cuerpo-contenedor').toggleClass('bg-escuela', id !== 'vista-inicio').toggleClass('bg-login', id === 'vista-inicio');
  $('#' + id).removeClass('d-none');
- if (id === 'vista-login') actualizarCredenciales();
+ if (id === 'vista-login') actualizarCredenciales(true);
  if (id === 'vista-sistema') {
  const rol = rolActivo = $('#rol-select').val();
  // Control Escolar: buscador + tabla de registros van en el Lector Fijo (así el Panel de Orientadores no queda tan cargado).
