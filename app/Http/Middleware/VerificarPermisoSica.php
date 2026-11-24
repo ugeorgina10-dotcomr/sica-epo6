@@ -13,7 +13,7 @@ class VerificarPermisoSica
     private const SOLO_CONTROL = ['guardar_permisos', 'guardar_orientadores', 'eliminar_orientador', 'eliminar_alumno', 'eliminar_lista_grupo', 'eliminar_listas_grupos'];
 
     /** Acciones que puede hacer cualquier rol que tenga permiso de "editar". */
-    private const ACCIONES_EDITAR = ['guardar_todo', 'registrar_asistencia', 'registrar_asistencias'];
+    private const ACCIONES_EDITAR = ['registrar_asistencia', 'registrar_asistencias'];
 
     /** Permiso que tiene cada rol mientras Control Escolar no lo cambie. */
     private const PERMISO_DEFAULT = [

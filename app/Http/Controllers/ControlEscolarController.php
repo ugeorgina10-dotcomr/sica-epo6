@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class ControlEscolarController extends Controller
 {
@@ -674,7 +675,7 @@ class ControlEscolarController extends Controller
     }
 
     /** Todos los datos para que computadoras y teléfonos los descarguen */
-    public function estado(Request $request): JsonResponse
+    public function estado(Request $request): Response
     {
         // "-q2": si cambia la forma de los datos (llave del QR), los equipos con la versión anterior descargan todo de nuevo
         $huellas = $this->huellas();
