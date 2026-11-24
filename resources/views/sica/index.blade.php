@@ -1946,8 +1946,10 @@ function actualizarCredenciales(reiniciarCorreo) {
  $('#campo-orientador-login').toggleClass('d-none', !esOrientador);
  if (esOrientador) {
  const sel = $('#select-orientador-login');
- sel.html('<option value="" selected disabled>Selecciona tu nombre...</option>' +
- db.orientadores.map(o => '<option value="' + esc(o.id) + '">' + esc(o.nombre) + '</option>').join(''));
+ // Solo se vuelve a dibujar la lista si cambió (así no se cierra el desplegable ni se pierde lo elegido mientras llegan actualizaciones)
+ const htmlLista = '<option value="" selected disabled>Selecciona tu nombre...</option>' +
+ db.orientadores.map(o => '<option value="' + esc(o.id) + '">' + esc(o.nombre) + '</option>').join('');
+ if (sel.data('lista') !== htmlLista) { const elegido = sel.val(); sel.html(htmlLista).data('lista', htmlLista); if (elegido) sel.val(elegido); }
  $('#aviso-sin-orientadores').toggleClass('d-none', db.orientadores.length > 0);
  }
 }
@@ -4706,7 +4708,9 @@ $(function () {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
   /* Versión nueva del sistema: sin sesión abierta se recarga sola; con sesión abierta (escaneando) aparece una barra para tocar y no interrumpir */
   const hayVersionNueva = () => {
-   if (!rolActivo) { location.reload(); return; }
+   // Sin sesión se recarga sola, pero NO si la persona está escribiendo en el inicio de sesión (perdería lo escrito): en ese caso solo aparece la barra
+   const escribiendo = !rolActivo && ($('#input-correo').val() !== (correosRoles[$('#rol-select').val()] || '') || !!$('#input-clave').val() || _correoEditado);
+   if (!rolActivo && !escribiendo) { location.reload(); return; }
    if (document.getElementById('barra-version-nueva')) return;
    const bar = document.createElement('button');
    bar.id = 'barra-version-nueva'; bar.type = 'button';
