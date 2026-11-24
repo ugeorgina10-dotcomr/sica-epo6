@@ -1,50 +1,26 @@
 @echo off
 cd /d "%~dp0"
-title Instalar SICA-EPO6
-
-rem --- Buscar PHP (el de XAMPP si no esta en el PATH) ---
+title SICA-EPO6 (no cierres esta ventana)
 set "PHP=php"
 where php >nul 2>nul || set "PHP=C:\xampp\php\php.exe"
-"%PHP%" -v >nul 2>nul
-if errorlevel 1 (
-  echo No se encontro PHP. Instala XAMPP o revisa que exista C:\xampp\php\php.exe
-  pause & exit /b 1
+
+rem Mantiene abierta la conexion a la base de datos entre visitas (abrirla cada vez es lento con la base de datos en la nube)
+set "DB_PERSISTENT=true"
+
+rem Deja todo preparado de antemano: asi el sistema abre y responde mas rapido
+rem Configuracion, rutas, pantallas y base de datos en UN solo arranque (solo repite lo que cambio); tambien despierta la base de datos (la de la nube se duerme sola)
+"%PHP%" artisan sica:preparar
+
+rem Abre el navegador cuando el servidor ya esta encendido (antes se abria primero y salia "no se puede conectar")
+start "" /min cmd /c "ping -n 3 127.0.0.1 >nul & start "" http://127.0.0.1:8000"
+
+rem Arranque rapido: enciende PHP directo (sin "artisan serve"), con el codigo ya preparado en memoria y con las respuestas comprimidas.
+rem Si cambias archivos .php, cierra esta ventana y vuelve a abrir iniciar.bat.
+set "SERVIDOR=vendor\laravel\framework\src\Illuminate\Foundation\resources\server.php"
+if exist "%SERVIDOR%" (
+  cd public
+  "%PHP%" -d upload_max_filesize=25M -d post_max_size=30M -d max_file_uploads=50 -d memory_limit=256M -d opcache.enable_cli=1 -d opcache.jit=tracing -d opcache.jit_buffer_size=32M -d pcre.jit=1 -d opcache.interned_strings_buffer=16 -d xdebug.mode=off -d zend.assertions=-1 -d opcache.validate_timestamps=0 -d opcache.memory_consumption=128 -d opcache.max_accelerated_files=10000 -d realpath_cache_size=4096K -d realpath_cache_ttl=600 -S 127.0.0.1:8000 -t . "..\%SERVIDOR%"
+) else (
+  "%PHP%" artisan serve --host=127.0.0.1 --port=8000
 )
-
-rem --- Dependencias (carpeta vendor) ---
-if not exist vendor\autoload.php (
-  where composer >nul 2>nul
-  if errorlevel 1 (
-    echo Falta la carpeta vendor y Composer no esta instalado.
-    echo Instala Composer desde https://getcomposer.org/download/ y vuelve a abrir este archivo.
-    pause & exit /b 1
-  )
-  echo Instalando dependencias con Composer...
-  call composer install --no-dev --optimize-autoloader --no-interaction
-  if errorlevel 1 ( echo Fallo composer install. & pause & exit /b 1 )
-)
-
-rem --- Archivo .env y clave de la aplicacion ---
-if not exist .env copy .env.example .env >nul
-"%PHP%" artisan key:generate --force
-if errorlevel 1 ( echo Fallo key:generate. & pause & exit /b 1 )
-
-rem --- Crear la base de datos en el MySQL de XAMPP (debe estar encendido) ---
-if exist C:\xampp\mysql\bin\mysql.exe (
-  C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE IF NOT EXISTS sica_epo6_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-  if errorlevel 1 (
-    echo No se pudo conectar a MySQL. Abre el Panel de XAMPP, da Start en MySQL y vuelve a ejecutar este archivo.
-    pause & exit /b 1
-  )
-)
-
-rem --- Tablas y cuentas ---
-"%PHP%" artisan optimize:clear
-if exist storage\framework\sica-preparado.json del storage\framework\sica-preparado.json
-"%PHP%" artisan migrate --force
-if errorlevel 1 ( echo Fallo migrate. Revisa los datos DB_ en el archivo .env & pause & exit /b 1 )
-"%PHP%" artisan sica:crear-usuarios
-
-echo.
-echo Listo. Ahora abre "iniciar.bat" para encender el sistema.
 pause
