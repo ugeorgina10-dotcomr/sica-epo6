@@ -11,6 +11,12 @@ abstract class TestCase extends BaseTestCase
     {
         $app = parent::createApplication();
 
+        // Las pruebas siempre corren como "testing", aunque en la computadora exista APP_ENV=local
+        // (variable del sistema) o una configuración guardada con "php artisan config:cache".
+        // Si no, Laravel exige el token CSRF y /auth/login responde 419 en vez de 422.
+        $app->instance('env', 'testing');
+        $app['config']->set('app.env', 'testing');
+
         // Las pruebas siempre usan una base SQLite temporal, nunca la base real.
         $app['config']->set('database.default', 'sqlite');
         $app['config']->set('database.connections.sqlite.database', ':memory:');
